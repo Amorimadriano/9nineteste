@@ -1,0 +1,23 @@
+@echo off
+chcp 65001 > nul
+echo ==========================================
+echo   🤖 ATIVANDO AGENTES BPO - TIME COMPLETO
+echo ==========================================
+echo.
+echo 🎨 Agente Frontend React/TS:    ATIVO
+echo 🗄️  Agente Supabase:              ATIVO
+echo 💰 Agente Financeiro/CNAB240:    ATIVO
+echo 🧪 Agente Testes/QE:              ATIVO
+echo ⚙️  Agente DevOps/Config:         ATIVO
+echo 🎭 Agente UI/UX:                 ATIVO
+echo 🔐 Agente Seguranca:             ATIVO
+echo 📊 Agente Analytics:            ATIVO
+echo.
+echo ==========================================
+echo ✅ TIME BPO ATIVO - 8 AGENTES PRONTOS
+echo ==========================================
+echo.
+echo Use: @agente-[nome] para atribuir tarefas
+echo Documentacao: .planning/agents/AGENTES_BPO.md
+echo.
+pause

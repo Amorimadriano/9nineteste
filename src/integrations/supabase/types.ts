@@ -1,0 +1,1507 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.4"
+  }
+  public: {
+    Tables: {
+      anexos: {
+        Row: {
+          conta_pagar_id: string | null
+          conta_receber_id: string | null
+          created_at: string
+          id: string
+          nome_arquivo: string
+          storage_path: string
+          tamanho: number | null
+          tipo_arquivo: string | null
+          user_id: string
+        }
+        Insert: {
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          id?: string
+          nome_arquivo: string
+          storage_path: string
+          tamanho?: number | null
+          tipo_arquivo?: string | null
+          user_id: string
+        }
+        Update: {
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          id?: string
+          nome_arquivo?: string
+          storage_path?: string
+          tamanho?: number | null
+          tipo_arquivo?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "anexos_conta_pagar_id_fkey"
+            columns: ["conta_pagar_id"]
+            isOneToOne: false
+            referencedRelation: "contas_pagar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "anexos_conta_receber_id_fkey"
+            columns: ["conta_receber_id"]
+            isOneToOne: false
+            referencedRelation: "contas_receber"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assinaturas: {
+        Row: {
+          boleto_barcode: string | null
+          boleto_url: string | null
+          created_at: string
+          data_fim: string | null
+          data_inicio: string | null
+          id: string
+          metodo_pagamento: string | null
+          pagarme_charge_id: string | null
+          pagarme_customer_id: string | null
+          pagarme_order_id: string | null
+          pix_qr_code: string | null
+          pix_qr_code_url: string | null
+          plano: string
+          status: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          boleto_barcode?: string | null
+          boleto_url?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          id?: string
+          metodo_pagamento?: string | null
+          pagarme_charge_id?: string | null
+          pagarme_customer_id?: string | null
+          pagarme_order_id?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_url?: string | null
+          plano?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor?: number
+        }
+        Update: {
+          boleto_barcode?: string | null
+          boleto_url?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string | null
+          id?: string
+          metodo_pagamento?: string | null
+          pagarme_charge_id?: string | null
+          pagarme_customer_id?: string | null
+          pagarme_order_id?: string | null
+          pix_qr_code?: string | null
+          pix_qr_code_url?: string | null
+          plano?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: []
+      }
+      audit_logs: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          ip_address: string | null
+          new_data: Json | null
+          old_data: Json | null
+          record_id: string | null
+          table_name: string
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name: string
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          new_data?: Json | null
+          old_data?: Json | null
+          record_id?: string | null
+          table_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bancos_cartoes: {
+        Row: {
+          agencia: string | null
+          ativo: boolean
+          banco: string | null
+          bandeira: string | null
+          conta: string | null
+          created_at: string
+          id: string
+          limite: number | null
+          nome: string
+          observacoes: string | null
+          saldo_inicial: number | null
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          bandeira?: string | null
+          conta?: string | null
+          created_at?: string
+          id?: string
+          limite?: number | null
+          nome: string
+          observacoes?: string | null
+          saldo_inicial?: number | null
+          tipo?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agencia?: string | null
+          ativo?: boolean
+          banco?: string | null
+          bandeira?: string | null
+          conta?: string | null
+          created_at?: string
+          id?: string
+          limite?: number | null
+          nome?: string
+          observacoes?: string | null
+          saldo_inicial?: number | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      categorias: {
+        Row: {
+          ativo: boolean
+          created_at: string
+          descricao: string | null
+          id: string
+          nome: string
+          plano_conta_id: string | null
+          tipo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome: string
+          plano_conta_id?: string | null
+          tipo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          created_at?: string
+          descricao?: string | null
+          id?: string
+          nome?: string
+          plano_conta_id?: string | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categorias_plano_conta_id_fkey"
+            columns: ["plano_conta_id"]
+            isOneToOne: false
+            referencedRelation: "plano_contas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certificados_nfse: {
+        Row: {
+          arquivo_path: string | null
+          ativo: boolean
+          cnpj: string | null
+          created_at: string
+          emissor: string | null
+          id: string
+          nome: string
+          updated_at: string
+          user_id: string
+          valido_ate: string | null
+        }
+        Insert: {
+          arquivo_path?: string | null
+          ativo?: boolean
+          cnpj?: string | null
+          created_at?: string
+          emissor?: string | null
+          id?: string
+          nome: string
+          updated_at?: string
+          user_id: string
+          valido_ate?: string | null
+        }
+        Update: {
+          arquivo_path?: string | null
+          ativo?: boolean
+          cnpj?: string | null
+          created_at?: string
+          emissor?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string
+          user_id?: string
+          valido_ate?: string | null
+        }
+        Relationships: []
+      }
+      clientes: {
+        Row: {
+          ativo: boolean
+          cidade: string | null
+          created_at: string
+          documento: string | null
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          cidade?: string | null
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          cidade?: string | null
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      cobranca_historico: {
+        Row: {
+          canal: string
+          cliente_email: string | null
+          cliente_nome: string | null
+          conta_receber_id: string | null
+          created_at: string
+          data_vencimento: string | null
+          id: string
+          mensagem: string | null
+          status: string
+          tipo: string
+          user_id: string
+          valor: number | null
+        }
+        Insert: {
+          canal?: string
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_vencimento?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
+          tipo: string
+          user_id: string
+          valor?: number | null
+        }
+        Update: {
+          canal?: string
+          cliente_email?: string | null
+          cliente_nome?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_vencimento?: string | null
+          id?: string
+          mensagem?: string | null
+          status?: string
+          tipo?: string
+          user_id?: string
+          valor?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cobranca_historico_conta_receber_id_fkey"
+            columns: ["conta_receber_id"]
+            isOneToOne: false
+            referencedRelation: "contas_receber"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contador_config: {
+        Row: {
+          created_at: string
+          email_contador: string
+          escritorio: string | null
+          id: string
+          nome_contador: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_contador: string
+          escritorio?: string | null
+          id?: string
+          nome_contador?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_contador?: string
+          escritorio?: string | null
+          id?: string
+          nome_contador?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contador_documentos: {
+        Row: {
+          ano_referencia: number | null
+          created_at: string
+          enviado: boolean
+          enviado_em: string | null
+          id: string
+          mes_referencia: number | null
+          nome_arquivo: string
+          storage_path: string
+          tamanho: number | null
+          tipo_arquivo: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ano_referencia?: number | null
+          created_at?: string
+          enviado?: boolean
+          enviado_em?: string | null
+          id?: string
+          mes_referencia?: number | null
+          nome_arquivo: string
+          storage_path: string
+          tamanho?: number | null
+          tipo_arquivo?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ano_referencia?: number | null
+          created_at?: string
+          enviado?: boolean
+          enviado_em?: string | null
+          id?: string
+          mes_referencia?: number | null
+          nome_arquivo?: string
+          storage_path?: string
+          tamanho?: number | null
+          tipo_arquivo?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      contas_pagar: {
+        Row: {
+          banco_cartao_id: string | null
+          categoria_id: string | null
+          created_at: string
+          data_emissao: string
+          data_fim_recorrencia: string | null
+          data_pagamento: string | null
+          data_vencimento: string
+          descricao: string
+          documento: string | null
+          forma_pagamento: string | null
+          fornecedor_id: string | null
+          frequencia: string | null
+          id: string
+          observacoes: string | null
+          recorrente: boolean
+          status: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          banco_cartao_id?: string | null
+          categoria_id?: string | null
+          created_at?: string
+          data_emissao?: string
+          data_fim_recorrencia?: string | null
+          data_pagamento?: string | null
+          data_vencimento: string
+          descricao: string
+          documento?: string | null
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          frequencia?: string | null
+          id?: string
+          observacoes?: string | null
+          recorrente?: boolean
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          banco_cartao_id?: string | null
+          categoria_id?: string | null
+          created_at?: string
+          data_emissao?: string
+          data_fim_recorrencia?: string | null
+          data_pagamento?: string | null
+          data_vencimento?: string
+          descricao?: string
+          documento?: string | null
+          forma_pagamento?: string | null
+          fornecedor_id?: string | null
+          frequencia?: string | null
+          id?: string
+          observacoes?: string | null
+          recorrente?: boolean
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_pagar_banco_cartao_id_fkey"
+            columns: ["banco_cartao_id"]
+            isOneToOne: false
+            referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_pagar_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_pagar_fornecedor_id_fkey"
+            columns: ["fornecedor_id"]
+            isOneToOne: false
+            referencedRelation: "fornecedores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contas_receber: {
+        Row: {
+          banco_cartao_id: string | null
+          categoria_id: string | null
+          cliente_id: string | null
+          created_at: string
+          data_emissao: string
+          data_fim_recorrencia: string | null
+          data_recebimento: string | null
+          data_vencimento: string
+          descricao: string
+          documento: string | null
+          forma_pagamento: string | null
+          frequencia: string | null
+          id: string
+          observacoes: string | null
+          recorrente: boolean
+          status: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          banco_cartao_id?: string | null
+          categoria_id?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          data_emissao?: string
+          data_fim_recorrencia?: string | null
+          data_recebimento?: string | null
+          data_vencimento: string
+          descricao: string
+          documento?: string | null
+          forma_pagamento?: string | null
+          frequencia?: string | null
+          id?: string
+          observacoes?: string | null
+          recorrente?: boolean
+          status?: string
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          banco_cartao_id?: string | null
+          categoria_id?: string | null
+          cliente_id?: string | null
+          created_at?: string
+          data_emissao?: string
+          data_fim_recorrencia?: string | null
+          data_recebimento?: string | null
+          data_vencimento?: string
+          descricao?: string
+          documento?: string | null
+          forma_pagamento?: string | null
+          frequencia?: string | null
+          id?: string
+          observacoes?: string | null
+          recorrente?: boolean
+          status?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contas_receber_banco_cartao_id_fkey"
+            columns: ["banco_cartao_id"]
+            isOneToOne: false
+            referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_receber_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contas_receber_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      empresa: {
+        Row: {
+          bairro: string | null
+          cep: string | null
+          cidade: string | null
+          cnpj: string | null
+          complemento: string | null
+          created_at: string
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          inscricao_estadual: string | null
+          inscricao_municipal: string | null
+          logo_url: string | null
+          nome_fantasia: string | null
+          numero: string | null
+          observacoes: string | null
+          razao_social: string | null
+          telefone: string | null
+          updated_at: string
+          user_id: string
+          website: string | null
+        }
+        Insert: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          logo_url?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          razao_social?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id: string
+          website?: string | null
+        }
+        Update: {
+          bairro?: string | null
+          cep?: string | null
+          cidade?: string | null
+          cnpj?: string | null
+          complemento?: string | null
+          created_at?: string
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          inscricao_estadual?: string | null
+          inscricao_municipal?: string | null
+          logo_url?: string | null
+          nome_fantasia?: string | null
+          numero?: string | null
+          observacoes?: string | null
+          razao_social?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      extrato_bancario: {
+        Row: {
+          banco_cartao_id: string | null
+          conciliado: boolean
+          conta_pagar_id: string | null
+          conta_receber_id: string | null
+          created_at: string
+          data_transacao: string
+          descricao: string
+          fitid: string | null
+          id: string
+          lancamento_id: string | null
+          origem: string
+          parcela_atual: number | null
+          parcelas: number | null
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          banco_cartao_id?: string | null
+          conciliado?: boolean
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_transacao: string
+          descricao: string
+          fitid?: string | null
+          id?: string
+          lancamento_id?: string | null
+          origem?: string
+          parcela_atual?: number | null
+          parcelas?: number | null
+          tipo?: string
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          banco_cartao_id?: string | null
+          conciliado?: boolean
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_transacao?: string
+          descricao?: string
+          fitid?: string | null
+          id?: string
+          lancamento_id?: string | null
+          origem?: string
+          parcela_atual?: number | null
+          parcelas?: number | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "extrato_bancario_banco_cartao_id_fkey"
+            columns: ["banco_cartao_id"]
+            isOneToOne: false
+            referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extrato_bancario_conta_pagar_id_fkey"
+            columns: ["conta_pagar_id"]
+            isOneToOne: false
+            referencedRelation: "contas_pagar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extrato_bancario_conta_receber_id_fkey"
+            columns: ["conta_receber_id"]
+            isOneToOne: false
+            referencedRelation: "contas_receber"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "extrato_bancario_lancamento_id_fkey"
+            columns: ["lancamento_id"]
+            isOneToOne: false
+            referencedRelation: "lancamentos_caixa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fechamentos_mensais: {
+        Row: {
+          ano: number
+          contas_pagar_pendentes: number
+          contas_receber_pendentes: number
+          created_at: string
+          custos_diretos: number
+          despesa_total: number
+          despesas_operacionais: number
+          fechado_em: string | null
+          id: string
+          lucro_bruto: number
+          lucro_liquido: number
+          mes: number
+          observacoes: string | null
+          receita_total: number
+          saldo_final: number
+          saldo_inicial: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ano?: number
+          contas_pagar_pendentes?: number
+          contas_receber_pendentes?: number
+          created_at?: string
+          custos_diretos?: number
+          despesa_total?: number
+          despesas_operacionais?: number
+          fechado_em?: string | null
+          id?: string
+          lucro_bruto?: number
+          lucro_liquido?: number
+          mes: number
+          observacoes?: string | null
+          receita_total?: number
+          saldo_final?: number
+          saldo_inicial?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ano?: number
+          contas_pagar_pendentes?: number
+          contas_receber_pendentes?: number
+          created_at?: string
+          custos_diretos?: number
+          despesa_total?: number
+          despesas_operacionais?: number
+          fechado_em?: string | null
+          id?: string
+          lucro_bruto?: number
+          lucro_liquido?: number
+          mes?: number
+          observacoes?: string | null
+          receita_total?: number
+          saldo_final?: number
+          saldo_inicial?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      fornecedores: {
+        Row: {
+          ativo: boolean
+          cidade: string | null
+          created_at: string
+          documento: string | null
+          email: string | null
+          endereco: string | null
+          estado: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          telefone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          cidade?: string | null
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          cidade?: string | null
+          created_at?: string
+          documento?: string | null
+          email?: string | null
+          endereco?: string | null
+          estado?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          telefone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      lancamentos_caixa: {
+        Row: {
+          categoria_id: string | null
+          conta_pagar_id: string | null
+          conta_receber_id: string | null
+          created_at: string
+          data_lancamento: string
+          descricao: string
+          id: string
+          observacoes: string | null
+          tipo: string
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          categoria_id?: string | null
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_lancamento?: string
+          descricao: string
+          id?: string
+          observacoes?: string | null
+          tipo: string
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          categoria_id?: string | null
+          conta_pagar_id?: string | null
+          conta_receber_id?: string | null
+          created_at?: string
+          data_lancamento?: string
+          descricao?: string
+          id?: string
+          observacoes?: string | null
+          tipo?: string
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lancamentos_caixa_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_caixa_conta_pagar_id_fkey"
+            columns: ["conta_pagar_id"]
+            isOneToOne: false
+            referencedRelation: "contas_pagar"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lancamentos_caixa_conta_receber_id_fkey"
+            columns: ["conta_receber_id"]
+            isOneToOne: false
+            referencedRelation: "contas_receber"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      licencas_software: {
+        Row: {
+          chave_licenca: string
+          cnpj: string | null
+          contato_nome: string | null
+          created_at: string
+          data_fim: string | null
+          data_inicio: string
+          desconto_percentual: number | null
+          email: string | null
+          id: string
+          max_usuarios: number
+          nome_fantasia: string | null
+          observacoes: string | null
+          plano: string
+          razao_social: string
+          status: string
+          telefone: string | null
+          tipo_cliente: string
+          updated_at: string
+          user_id: string
+          valor_mensal: number
+        }
+        Insert: {
+          chave_licenca?: string
+          cnpj?: string | null
+          contato_nome?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          desconto_percentual?: number | null
+          email?: string | null
+          id?: string
+          max_usuarios?: number
+          nome_fantasia?: string | null
+          observacoes?: string | null
+          plano?: string
+          razao_social: string
+          status?: string
+          telefone?: string | null
+          tipo_cliente?: string
+          updated_at?: string
+          user_id: string
+          valor_mensal?: number
+        }
+        Update: {
+          chave_licenca?: string
+          cnpj?: string | null
+          contato_nome?: string | null
+          created_at?: string
+          data_fim?: string | null
+          data_inicio?: string
+          desconto_percentual?: number | null
+          email?: string | null
+          id?: string
+          max_usuarios?: number
+          nome_fantasia?: string | null
+          observacoes?: string | null
+          plano?: string
+          razao_social?: string
+          status?: string
+          telefone?: string | null
+          tipo_cliente?: string
+          updated_at?: string
+          user_id?: string
+          valor_mensal?: number
+        }
+        Relationships: []
+      }
+      metas_orcamentarias: {
+        Row: {
+          ano: number
+          categoria_id: string | null
+          created_at: string
+          id: string
+          mes: number
+          observacoes: string | null
+          updated_at: string
+          user_id: string
+          valor_orcado: number
+        }
+        Insert: {
+          ano?: number
+          categoria_id?: string | null
+          created_at?: string
+          id?: string
+          mes: number
+          observacoes?: string | null
+          updated_at?: string
+          user_id: string
+          valor_orcado?: number
+        }
+        Update: {
+          ano?: number
+          categoria_id?: string | null
+          created_at?: string
+          id?: string
+          mes?: number
+          observacoes?: string | null
+          updated_at?: string
+          user_id?: string
+          valor_orcado?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "metas_orcamentarias_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categorias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notificacoes_admin: {
+        Row: {
+          created_at: string
+          id: string
+          lida: boolean
+          mensagem: string | null
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string | null
+          tipo?: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lida?: boolean
+          mensagem?: string | null
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: []
+      }
+      plano_contas: {
+        Row: {
+          ativo: boolean
+          codigo_conta: string
+          codigo_pai: string | null
+          created_at: string
+          descricao: string
+          descricao_reduzida: string | null
+          empresa_id: string | null
+          id: string
+          natureza: string
+          nivel: number
+          permite_lancamento: boolean
+          tipo_conta: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          codigo_conta: string
+          codigo_pai?: string | null
+          created_at?: string
+          descricao: string
+          descricao_reduzida?: string | null
+          empresa_id?: string | null
+          id?: string
+          natureza?: string
+          nivel?: number
+          permite_lancamento?: boolean
+          tipo_conta?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          codigo_conta?: string
+          codigo_pai?: string | null
+          created_at?: string
+          descricao?: string
+          descricao_reduzida?: string | null
+          empresa_id?: string | null
+          id?: string
+          natureza?: string
+          nivel?: number
+          permite_lancamento?: boolean
+          tipo_conta?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      regua_cobranca: {
+        Row: {
+          ativo: boolean
+          canal: string
+          created_at: string
+          dias_antes_1: number | null
+          dias_antes_2: number | null
+          dias_apos_1: number | null
+          dias_apos_2: number | null
+          dias_apos_3: number | null
+          dias_no_vencimento: boolean | null
+          id: string
+          mensagem_antes: string | null
+          mensagem_apos: string | null
+          mensagem_vencimento: string | null
+          nome: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ativo?: boolean
+          canal?: string
+          created_at?: string
+          dias_antes_1?: number | null
+          dias_antes_2?: number | null
+          dias_apos_1?: number | null
+          dias_apos_2?: number | null
+          dias_apos_3?: number | null
+          dias_no_vencimento?: boolean | null
+          id?: string
+          mensagem_antes?: string | null
+          mensagem_apos?: string | null
+          mensagem_vencimento?: string | null
+          nome?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ativo?: boolean
+          canal?: string
+          created_at?: string
+          dias_antes_1?: number | null
+          dias_antes_2?: number | null
+          dias_apos_1?: number | null
+          dias_apos_2?: number | null
+          dias_apos_3?: number | null
+          dias_no_vencimento?: boolean | null
+          id?: string
+          mensagem_antes?: string | null
+          mensagem_apos?: string | null
+          mensagem_vencimento?: string | null
+          nome?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transferencias_contas: {
+        Row: {
+          conta_destino_id: string | null
+          conta_origem_id: string | null
+          created_at: string
+          data_transferencia: string
+          descricao: string | null
+          id: string
+          observacoes: string | null
+          updated_at: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          conta_destino_id?: string | null
+          conta_origem_id?: string | null
+          created_at?: string
+          data_transferencia?: string
+          descricao?: string | null
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          conta_destino_id?: string | null
+          conta_origem_id?: string | null
+          created_at?: string
+          data_transferencia?: string
+          descricao?: string | null
+          id?: string
+          observacoes?: string | null
+          updated_at?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transferencias_contas_conta_destino_id_fkey"
+            columns: ["conta_destino_id"]
+            isOneToOne: false
+            referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transferencias_contas_conta_origem_id_fkey"
+            columns: ["conta_origem_id"]
+            isOneToOne: false
+            referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_trials: {
+        Row: {
+          active: boolean
+          created_at: string
+          id: string
+          trial_end: string
+          trial_start: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          trial_end?: string
+          trial_start?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          id?: string
+          trial_end?: string
+          trial_start?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      criar_plano_contas_padrao: {
+        Args: { p_empresa_id?: string; p_user_id: string }
+        Returns: number
+      }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      inserir_plano_contas_padrao: {
+        Args: { p_user_id: string }
+        Returns: number
+      }
+      seed_default_categories: {
+        Args: { p_user_id: string }
+        Returns: undefined
+      }
+      sincronizar_categorias_plano_contas: {
+        Args: { p_empresa_id?: string; p_user_id: string }
+        Returns: Json[]
+      }
+      verificar_ou_criar_plano_padrao: {
+        Args: { p_empresa_id?: string; p_user_id: string }
+        Returns: number
+      }
+    }
+    Enums: {
+      app_role: "admin" | "moderator" | "user"
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  public: {
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
+  },
+} as const

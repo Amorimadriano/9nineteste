@@ -1,0 +1,7 @@
+project_id = "tomrlopsmxgvzgqsfizh"
+
+[functions.pagarme-webhook]
+verify_jwt = false
+
+[functions.parecer-ibs-cbs]
+verify_jwt = false
