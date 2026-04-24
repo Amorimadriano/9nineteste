@@ -92,7 +92,7 @@ export default function Usuarios() {
         user_id: userId,
         status: "ativa",
         plano: "mensal",
-        valor: 399.90,
+        valor: 199.90,
         metodo_pagamento: "dinheiro",
         data_inicio: new Date().toISOString(),
       } as any);

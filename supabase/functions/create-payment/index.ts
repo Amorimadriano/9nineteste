@@ -56,7 +56,7 @@ serve(async (req) => {
     // Build payment object based on method
     const paymentObj: any = {
       payment_method,
-      amount: 39990, // R$ 399,90 in cents
+      amount: 19990, // R$ 199,90 in cents
     };
 
     if (payment_method === "credit_card") {
@@ -95,7 +95,7 @@ serve(async (req) => {
       customer: customerPayload,
       items: [
         {
-          amount: 39990,
+          amount: 19990,
           description: "9Nine Business Control - Mensal",
           quantity: 1,
           code: "9nine-mensal",
@@ -131,7 +131,7 @@ serve(async (req) => {
       user_id: user.id,
       status: "pendente",
       plano: "mensal",
-      valor: 399.90,
+      valor: 199.90,
       metodo_pagamento: payment_method,
       pagarme_order_id: orderData.id,
       pagarme_charge_id: charge?.id || null,

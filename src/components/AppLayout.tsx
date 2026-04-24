@@ -62,7 +62,7 @@ export function AppLayout() {
               </span>
               <Button size="sm" onClick={() => navigate("/planos")} className="gap-1.5">
                 <CreditCard className="h-3.5 w-3.5" />
-                Assinar — R$ 399,90/mês
+                Assinar — R$ 199,90/mês
               </Button>
             </div>
           )}

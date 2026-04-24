@@ -31,10 +31,11 @@ export default function EmailMarketing() {
   const [smtpConfig, setSmtpConfig] = useState({
     host: "",
     porta: "587",
-    secure: false,
     email: "",
-    senha: "",
+    senhaEmail: "",
   });
+  const [resendApiKey, setResendApiKey] = useState("");
+  const [useResend, setUseResend] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<"none" | "success" | "error">("none");
   const [connectionMessage, setConnectionMessage] = useState("");
@@ -44,15 +45,23 @@ export default function EmailMarketing() {
     const loadConfig = async () => {
       if (!user) return;
       const { data } = await supabase
-        .from("settings")
+        .from("settings" as any)
         .select("value")
         .eq("user_id", user.id)
-        .eq("key", "smtp_config")
-        .single();
-      if (data?.value) {
-        try {
-          setSmtpConfig(JSON.parse(data.value));
-        } catch {}
+        .in("key", ["smtp_config", "resend_config"])
+        .order("key");
+      if (data && data.length > 0) {
+        for (const row of data as any[]) {
+          try {
+            const parsed = JSON.parse(row.value);
+            if (row.key === "smtp_config") {
+              setSmtpConfig(parsed);
+            } else if (row.key === "resend_config") {
+              setResendApiKey(parsed.apiKey || "");
+              setUseResend(parsed.active === true);
+            }
+          } catch {}
+        }
       }
     };
     loadConfig();
@@ -60,41 +69,78 @@ export default function EmailMarketing() {
 
   const handleSaveSmtpConfig = async () => {
     if (!user) return;
-    if (!smtpConfig.email || !smtpConfig.senha || !smtpConfig.host) {
-      toast.error("Preencha todos os campos obrigatórios (host, e-mail e senha).");
-      return;
-    }
-    const { error } = await supabase
-      .from("settings")
-      .upsert({ user_id: user.id, key: "smtp_config", value: JSON.stringify(smtpConfig) });
-    if (error) {
-      toast.error("Erro ao salvar configuração: " + error.message);
+    if (useResend) {
+      if (!resendApiKey) {
+        toast.error("Preencha a API Key do Resend.");
+        return;
+      }
+      const { error } = await supabase
+        .from("settings" as any)
+        .upsert({ user_id: user.id, key: "resend_config", value: JSON.stringify({ apiKey: resendApiKey, active: true }) } as any);
+      if (error) {
+        toast.error("Erro ao salvar configuração: " + error.message);
+        return;
+      }
+      toast.success("Configuração Resend salva com sucesso!");
     } else {
+      if (!smtpConfig.email || !smtpConfig.senhaEmail || !smtpConfig.host) {
+        toast.error("Preencha todos os campos obrigatórios (host, e-mail e senha).");
+        return;
+      }
+      const { data, error } = await supabase
+        .from("settings" as any)
+        .update({ value: JSON.stringify(smtpConfig) } as any)
+        .eq("user_id", user.id)
+        .eq("key", "smtp_config")
+        .select();
+      if (error) {
+        toast.error("Erro ao salvar configuração: " + error.message);
+        return;
+      }
+      if (!data || data.length === 0) {
+        const { error: insertError } = await supabase
+          .from("settings" as any)
+          .upsert({ user_id: user.id, key: "smtp_config", value: JSON.stringify(smtpConfig) } as any);
+        if (insertError) {
+          toast.error("Erro ao salvar configuração: " + insertError.message);
+          return;
+        }
+      }
       toast.success("Configuração SMTP salva com sucesso!");
-      setConnectionStatus("none");
     }
+    setConnectionStatus("none");
   };
 
   const handleTestConnection = async () => {
-    if (!smtpConfig.email || !smtpConfig.senha || !smtpConfig.host) {
-      toast.error("Preencha host, e-mail e senha antes de testar.");
-      return;
+    if (useResend) {
+      if (!resendApiKey) {
+        toast.error("Preencha a API Key do Resend antes de testar.");
+        return;
+      }
+    } else {
+      if (!smtpConfig.email || !smtpConfig.senhaEmail || !smtpConfig.host) {
+        toast.error("Preencha host, e-mail e senha antes de testar.");
+        return;
+      }
     }
     setTestingConnection(true);
     setConnectionStatus("none");
     setConnectionMessage("");
     try {
-      const { error } = await supabase.functions.invoke("test-smtp-connection", {
-        body: smtpConfig,
+      const { data, error } = await supabase.functions.invoke("test-smtp-connection", {
+        body: useResend
+          ? { provider: "resend", resendApiKey }
+          : { provider: "smtp", ...smtpConfig },
       });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       setConnectionStatus("success");
-      setConnectionMessage("Conexão estabelecida com sucesso!");
-      toast.success("Conexão SMTP testada com sucesso!");
+      setConnectionMessage(data?.message || "Conexão estabelecida com sucesso!");
+      toast.success("Conexão testada com sucesso!");
     } catch (err: any) {
       setConnectionStatus("error");
       setConnectionMessage(err.message || "Falha na conexão");
-      toast.error("Falha ao testar conexão SMTP");
+      toast.error("Falha ao testar conexão: " + (err.message || ""));
     } finally {
       setTestingConnection(false);
     }
@@ -146,9 +192,16 @@ export default function EmailMarketing() {
       return;
     }
 
-    if (!smtpConfig.host || !smtpConfig.email || !smtpConfig.senha) {
-      toast.error("Configure a API do Resend na aba Configurações antes de enviar.");
-      return;
+    if (useResend) {
+      if (!resendApiKey) {
+        toast.error("Configure a API Key do Resend na aba Configurações antes de enviar.");
+        return;
+      }
+    } else {
+      if (!smtpConfig.host || !smtpConfig.email || !smtpConfig.senhaEmail) {
+        toast.error("Configure o SMTP na aba Configurações antes de enviar.");
+        return;
+      }
     }
 
     setSending(true);
@@ -163,11 +216,15 @@ export default function EmailMarketing() {
       try {
         const { error } = await supabase.functions.invoke("send-email-marketing", {
           body: {
+            provider: useResend ? "resend" : "smtp",
             to: contact.email,
             nome: contact.nome,
             assunto,
             mensagemExtra,
-            smtpConfig,
+            html: buildTemplate(contact.nome, mensagemExtra),
+            ...(useResend
+              ? { resendApiKey }
+              : { host: smtpConfig.host, porta: smtpConfig.porta, email: smtpConfig.email, senhaEmail: smtpConfig.senhaEmail }),
           },
         });
         if (error) throw error;
@@ -179,7 +236,6 @@ export default function EmailMarketing() {
       setProgress(Math.round(((i + 1) / contacts.length) * 100));
       setSentCount(i + 1);
 
-      // Small delay to avoid rate limiting
       if (i < contacts.length - 1) {
         await new Promise((r) => setTimeout(r, 300));
       }
@@ -329,9 +385,13 @@ export default function EmailMarketing() {
                   <div className="flex gap-2 text-sm text-amber-700 dark:text-amber-400">
                     <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                     <p>
-                      {!smtpConfig.host
-                        ? "Configure a API do Resend na aba Configurações antes de enviar e-mails."
-                        : "Configuração pronta. Ready to send!"}
+                      {useResend
+                        ? !resendApiKey
+                          ? "Configure a API Key do Resend na aba Configurações antes de enviar e-mails."
+                          : "Configuração Resend pronta. Ready to send!"
+                        : !smtpConfig.host
+                          ? "Configure o SMTP na aba Configurações antes de enviar e-mails."
+                          : "Configuração SMTP pronta. Ready to send!"}
                     </p>
                   </div>
                 </CardContent>
@@ -372,50 +432,85 @@ export default function EmailMarketing() {
             <CardContent className="space-y-4">
               <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
                 <p className="text-sm text-amber-800">
-                  <strong>Como funciona:</strong> O sistema usa a API do Resend (resend.com) para enviar os e-mails.
-                  Crie uma conta gratuita no Resend para obter sua API Key.
+                  <strong>Como funciona:</strong> Você pode usar SMTP direto ou a API do Resend.
+                  Para Supabase hospedado (Deno Deploy), use Resend — portas SMTP podem estar bloqueadas.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+
+              <div className="flex gap-2">
+                <Button
+                  variant={!useResend ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setUseResend(false)}
+                >
+                  SMTP Direto
+                </Button>
+                <Button
+                  variant={useResend ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setUseResend(true)}
+                >
+                  Resend API (Recomendado)
+                </Button>
+              </div>
+
+              {useResend ? (
                 <div>
-                  <label className="text-sm font-medium">Host SMTP</label>
+                  <label className="text-sm font-medium">API Key do Resend</label>
                   <Input
-                    value={smtpConfig.host}
-                    onChange={(e) => setSmtpConfig({ ...smtpConfig, host: e.target.value })}
-                    placeholder="smtp.resend.com"
+                    type="password"
+                    value={resendApiKey}
+                    onChange={(e) => setResendApiKey(e.target.value)}
+                    placeholder="re_xxxxxxxxxxxx"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Servidor SMTP do provedor</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Obtenha em <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary underline">resend.com/api-keys</a>
+                  </p>
                 </div>
-                <div>
-                  <label className="text-sm font-medium">Porta</label>
-                  <Input
-                    value={smtpConfig.porta}
-                    onChange={(e) => setSmtpConfig({ ...smtpConfig, porta: e.target.value })}
-                    placeholder="587"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">通常: 587 (TLS) ou 465 (SSL)</p>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium">E-mail Remetente (From)</label>
-                <Input
-                  type="email"
-                  value={smtpConfig.email}
-                  onChange={(e) => setSmtpConfig({ ...smtpConfig, email: e.target.value })}
-                  placeholder="seu-email@seudominio.com.br"
-                />
-                <p className="text-xs text-muted-foreground mt-1">O e-mail que aparecerá como remetente (deve estar verificado no Resend)</p>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Resend API Key</label>
-                <Input
-                  type="password"
-                  value={smtpConfig.senha}
-                  onChange={(e) => setSmtpConfig({ ...smtpConfig, senha: e.target.value })}
-                  placeholder="re_xxxxxxxxxxxx"
-                />
-                <p className="text-xs text-muted-foreground mt-1">Obtenha sua API Key em: resend.com/api-keys</p>
-              </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-sm font-medium">Host SMTP</label>
+                      <Input
+                        value={smtpConfig.host}
+                        onChange={(e) => setSmtpConfig({ ...smtpConfig, host: e.target.value })}
+                        placeholder="smtp.gmail.com"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Servidor SMTP do provedor</p>
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Porta</label>
+                      <Input
+                        value={smtpConfig.porta}
+                        onChange={(e) => setSmtpConfig({ ...smtpConfig, porta: e.target.value })}
+                        placeholder="587"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">587 (STARTTLS) ou 465 (SSL)</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">E-mail Remetente (From)</label>
+                    <Input
+                      type="email"
+                      value={smtpConfig.email}
+                      onChange={(e) => setSmtpConfig({ ...smtpConfig, email: e.target.value })}
+                      placeholder="seu-email@seudominio.com.br"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">E-mail que aparecerá como remetente</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium">Senha do E-mail</label>
+                    <Input
+                      type="password"
+                      value={smtpConfig.senhaEmail}
+                      onChange={(e) => setSmtpConfig({ ...smtpConfig, senhaEmail: e.target.value })}
+                      placeholder="Senha do e-mail remetente"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Senha do e-mail usado como remetente</p>
+                  </div>
+                </>
+              )}
 
               {connectionStatus !== "none" && (
                 <div className={`flex items-center gap-2 p-3 rounded-lg ${connectionStatus === "success" ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}>
@@ -441,13 +536,21 @@ export default function EmailMarketing() {
 
               <div className="bg-muted p-4 rounded-lg text-sm">
                 <p className="font-medium mb-2">Instruções:</p>
-                <ol className="text-muted-foreground space-y-1 list-decimal list-inside">
-                  <li>Crie uma conta em <a href="https://resend.com" target="_blank" className="text-primary hover:underline">resend.com</a></li>
-                  <li>Adicione e verifique seu domínio ou e-mail</li>
-                  <li>Copie sua API Key do dashboard</li>
-                  <li>Cole a API Key e o e-mail acima</li>
-                  <li>Clique em "Testar Configuração" para verificar</li>
-                </ol>
+                {useResend ? (
+                  <ol className="text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Crie uma conta em <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-primary underline">resend.com</a></li>
+                    <li>Adicione e verifique o domínio de envio</li>
+                    <li>Gere uma API Key em Settings &gt; API Keys</li>
+                    <li>Cole a API Key acima e clique em "Testar Configuração"</li>
+                  </ol>
+                ) : (
+                  <ol className="text-muted-foreground space-y-1 list-decimal list-inside">
+                    <li>Informe o host do seu servidor SMTP (ex: smtp.gmail.com, smtp.office365.com)</li>
+                    <li>Informe a porta (587 para STARTTLS, 465 para SSL)</li>
+                    <li>Informe o e-mail e senha do remetente</li>
+                    <li>Clique em "Testar Configuração" para verificar</li>
+                  </ol>
+                )}
               </div>
             </CardContent>
           </Card>

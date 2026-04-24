@@ -260,3 +260,12 @@ export const ALIQUOTAS_CUMULATIVAS = {
   ir: 0,
   csll: 0,
 };
+
+// Alíquotas lucro presumido (base 8% para IRPJ e CSLL sobre receita)
+export const ALIQUOTAS_LUCRO_PRESUMIDO = {
+  pis: 0.65,
+  cofins: 3,
+  inss: 0, // Não incide INSS na prestação de serviços
+  ir: 1.2, // 8% base * 15% alíquota
+  csll: 1.08, // 8% base * 13% alíquota
+};

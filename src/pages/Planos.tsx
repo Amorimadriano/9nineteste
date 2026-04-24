@@ -94,7 +94,7 @@ function PaymentResult({ result, onBack }: { result: any; onBack: () => void }) 
               )}
             </div>
           )}
-          <p className="text-sm text-muted-foreground">Valor: <strong>R$ 399,90</strong> / mês</p>
+          <p className="text-sm text-muted-foreground">Valor: <strong>R$ 199,90</strong> / mês</p>
           <Button onClick={checkPaymentStatus} disabled={checkingStatus} variant="outline" className="w-full">
             {checkingStatus ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Já paguei - Verificar pagamento
@@ -168,21 +168,9 @@ export default function Planos() {
     }
   };
 
-  const handlePaymentLink = async () => {
-    setLoading(true);
-    try {
-      const data = await callPaymentFunction<any>("create-payment-link");
-
-      const url = data.payment_link_url || data.short_url;
-      if (url) {
-        window.open(url, "_blank");
-        toast({ title: "Link de pagamento aberto!" });
-      }
-    } catch (err: any) {
-      toast({ title: "Erro ao gerar link", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+  const handlePaymentLink = () => {
+    window.open("https://payment-link-v3.pagar.me/pl_yl3qvW72YMEB6yBhyHqO1jGpxQXOAKnZ", "_blank");
+    toast({ title: "Link de pagamento aberto!" });
   };
 
   if (paymentResult && (paymentResult.method === "pix" || paymentResult.method === "boleto")) {
@@ -212,7 +200,7 @@ export default function Planos() {
             <p className="text-sm text-muted-foreground">Acesso completo a todas as funcionalidades</p>
           </div>
           <div className="text-right">
-            <p className="text-3xl font-bold text-primary">R$ 399,90</p>
+            <p className="text-3xl font-bold text-primary">R$ 199,90</p>
             <p className="text-xs text-muted-foreground">/mês</p>
           </div>
         </CardHeader>
@@ -298,7 +286,7 @@ export default function Planos() {
                   });
                 }} disabled={loading}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-                  Pagar R$ 399,90
+                  Pagar R$ 199,90
                 </Button>
               </TabsContent>
 
@@ -306,7 +294,7 @@ export default function Planos() {
                 <p className="text-sm text-muted-foreground">Pague instantaneamente via PIX.</p>
                 <Button className="w-full" onClick={() => handlePayment("pix")} disabled={loading}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <QrCode className="mr-2 h-4 w-4" />}
-                  Gerar QR Code PIX — R$ 399,90
+                  Gerar QR Code PIX — R$ 199,90
                 </Button>
               </TabsContent>
 
@@ -314,7 +302,7 @@ export default function Planos() {
                 <p className="text-sm text-muted-foreground">Boleto com vencimento em 3 dias úteis.</p>
                 <Button className="w-full" onClick={() => handlePayment("boleto")} disabled={loading}>
                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-                  Gerar Boleto — R$ 399,90
+                  Gerar Boleto — R$ 199,90
                 </Button>
               </TabsContent>
 

@@ -92,16 +92,18 @@ function formatarValor(valor: number | undefined): string {
 }
 
 /**
- * Formata data para o padrão ISO
+ * Formata data para o padrão ISO. Retorna "—" se nulo/indefinido.
  */
-function formatarData(data: Date): string {
+function formatarData(data: Date | null | undefined): string {
+  if (!data) return '—';
   return data.toISOString().split('T')[0];
 }
 
 /**
- * Formata data e hora para o padrão ISO completo
+ * Formata data e hora para o padrão ISO completo. Retorna "—" se nulo/indefinido.
  */
-function formatarDataHora(data: Date): string {
+function formatarDataHora(data: Date | null | undefined): string {
+  if (!data) return '—';
   return data.toISOString();
 }
 

@@ -123,8 +123,10 @@ export function isValidCPF(cpf: string): boolean {
 /**
  * Formata data para exibição: DD/MM/YYYY
  */
-export function formatDate(date: Date | string): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
@@ -135,8 +137,10 @@ export function formatDate(date: Date | string): string {
 /**
  * Formata data e hora para exibição: DD/MM/YYYY HH:mm
  */
-export function formatDateTime(date: Date | string): string {
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return "—";
   const d = typeof date === "string" ? new Date(date) : date;
+  if (isNaN(d.getTime())) return "—";
   return d.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",

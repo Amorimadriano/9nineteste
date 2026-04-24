@@ -33,6 +33,7 @@ import {
   Search,
   Shield,
   Percent,
+  Gem,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
@@ -59,9 +60,9 @@ const menuItems = [
   { title: "Licenças de Software", url: "/licencas-software", icon: KeyRound, adminOnly: true },
   { title: "Dashboard", url: "/", icon: LayoutDashboard, tour: "dashboard" },
   { title: "Bancos e Cartões", url: "/bancos-cartoes", icon: Building2 },
-  // { title: "Open Banking", url: "/open-banking", icon: Banknote, disabled: true },
+  { title: "Open Banking", url: "/open-banking", icon: Banknote, disabled: true },
   { title: "Categorias", url: "/categorias", icon: Tag },
-  // { title: "Plano de Contas", url: "/plano-contas", icon: TreeDeciduous, disabled: true },
+  { title: "Plano de Contas", url: "/plano-contas", icon: TreeDeciduous, disabled: true },
   { title: "Clientes", url: "/clientes", icon: Users, tour: "clientes" },
   { title: "Fornecedores", url: "/fornecedores", icon: Truck },
   { title: "Contas a Receber", url: "/contas-receber", icon: ArrowDownCircle, tour: "contas-receber" },
@@ -73,13 +74,14 @@ const menuItems = [
   { title: "Simulador IBS/CBS", url: "/simulador-ibs-cbs", icon: Percent },
   { title: "Conciliação Bancária", url: "/conciliacao-bancaria", icon: Scale },
   { title: "Conciliação de Cartões", url: "/conciliacao-cartao", icon: CreditCard },
+  { title: "9nine Card Control", url: "/card-audit", icon: Receipt },
   { title: "CNAB 240", url: "/cnab240", icon: FileSpreadsheet, adminOnly: true },
   { title: "Fluxo de Caixa", url: "/fluxo-caixa", icon: DollarSign },
   { title: "DRE Gerencial", url: "/dre", icon: BarChart3 },
   { title: "Planejamento Orçamentário", url: "/planejamento-orcamentario", icon: Target },
   { title: "Auditoria Recebíveis", url: "/auditoria-recebiveis", icon: Receipt },
-  // { title: "NFS-e Emissão", url: "/nfse", icon: FileText, disabled: true },
-  // { title: "Integração Contábil", url: "/integracao-contabil", icon: Calculator, disabled: true },
+  { title: "NFS-e Emissão", url: "/nfse", icon: FileText, disabled: true },
+  { title: "Integração Contábil", url: "/integracao-contabil", icon: Calculator, disabled: true },
   { title: "ROI", url: "/roi", icon: TrendingUp },
   { title: "Ponto de Equilíbrio", url: "/ponto-equilibrio", icon: Crosshair },
   { title: "Fechamento de Mês", url: "/fechamento-mes", icon: CalendarCheck },
@@ -87,6 +89,7 @@ const menuItems = [
 ];
 
 const cadastroItems = [
+  { title: "Planos", url: "/planos", icon: Gem },
   { title: "Configurações", url: "/configuracoes", icon: Settings, tour: "configuracoes" },
   { title: "Usuários", url: "/usuarios", icon: UsersRound },
   { title: "Email Marketing", url: "/email-marketing", icon: Receipt, adminOnly: true },

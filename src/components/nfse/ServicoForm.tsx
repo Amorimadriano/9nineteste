@@ -2,7 +2,7 @@
  * Formulário de Serviço para NFS-e
  * Inclui cálculos automáticos de base, ISS e valor líquido
  */
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -10,7 +10,62 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ITENS_LISTA_SERVICO, CNAES_PADRAO, ServicoFormData } from "@/types/nfse-ui";
-import { formatCurrency, parseCurrency } from "@/lib/nfse-utils";
+import { formatCurrency } from "@/lib/nfse-utils";
+
+interface MoneyInputProps {
+  value: number;
+  onChange: (value: number) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  className?: string;
+}
+
+function MoneyInput({ value, onChange, placeholder = "0,00", disabled, className }: MoneyInputProps) {
+  const [displayValue, setDisplayValue] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(value > 0 ? formatCurrency(value) : "");
+    }
+  }, [value, isFocused]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^\d,]/g, "");
+    setDisplayValue(raw);
+    const normalized = raw.replace(",", ".");
+    const num = parseFloat(normalized) || 0;
+    onChange(num);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    if (value > 0) {
+      setDisplayValue(value.toString().replace(".", ","));
+    } else {
+      setDisplayValue("");
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    if (value > 0) {
+      setDisplayValue(formatCurrency(value));
+    }
+  };
+
+  return (
+    <Input
+      value={displayValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      disabled={disabled}
+      className={className}
+    />
+  );
+}
 
 interface ServicoFormProps {
   value: ServicoFormData;
@@ -46,16 +101,6 @@ export function ServicoForm({ value, onChange, errors = {} }: ServicoFormProps) 
       });
     }
   }, [calcularValores, value, onChange]);
-
-  const handleValorBrutoChange = (inputValue: string) => {
-    const valor = parseCurrency(inputValue);
-    onChange({ ...value, valor_bruto: valor });
-  };
-
-  const handleDeducoesChange = (inputValue: string) => {
-    const valor = parseCurrency(inputValue);
-    onChange({ ...value, deducoes: valor });
-  };
 
   const handleAliquotaChange = (inputValue: string) => {
     const valor = parseFloat(inputValue) || 0;
@@ -150,11 +195,10 @@ export function ServicoForm({ value, onChange, errors = {} }: ServicoFormProps) 
           {/* Valor Bruto */}
           <div className="space-y-2">
             <Label htmlFor="valor_bruto">Valor Bruto (R$) *</Label>
-            <Input
-              id="valor_bruto"
-              value={formatCurrency(value.valor_bruto)}
-              onChange={(e) => handleValorBrutoChange(e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.valor_bruto}
+              onChange={(v) => onChange({ ...value, valor_bruto: v })}
+              placeholder="0,00"
               className={errors.valor_bruto ? "border-red-500" : ""}
             />
             {errors.valor_bruto && (
@@ -165,20 +209,20 @@ export function ServicoForm({ value, onChange, errors = {} }: ServicoFormProps) 
           {/* Deduções */}
           <div className="space-y-2">
             <Label htmlFor="deducoes">Deduções (R$)</Label>
-            <Input
-              id="deducoes"
-              value={formatCurrency(value.deducoes)}
-              onChange={(e) => handleDeducoesChange(e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.deducoes}
+              onChange={(v) => onChange({ ...value, deducoes: v })}
+              placeholder="0,00"
             />
           </div>
 
           {/* Base de Cálculo (Calculado) */}
           <div className="space-y-2">
             <Label htmlFor="base_calculo">Base de Cálculo (R$)</Label>
-            <Input
-              id="base_calculo"
-              value={formatCurrency(value.base_calculo)}
+            <MoneyInput
+              value={value.base_calculo}
+              onChange={() => {}}
+              placeholder="0,00"
               disabled
               className="bg-muted"
             />

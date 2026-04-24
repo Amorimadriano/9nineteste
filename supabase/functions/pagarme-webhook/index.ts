@@ -86,7 +86,7 @@ serve(async (req) => {
         console.log("Subscription activated:", updated);
         // Notify admins
         const customerEmail = data?.customer?.email || updated?.[0]?.metodo_pagamento || "N/A";
-        const valor = data?.amount ? (data.amount / 100).toFixed(2) : "399,90";
+        const valor = data?.amount ? (data.amount / 100).toFixed(2) : "199,90";
         await supabase.from("notificacoes_admin").insert({
           titulo: "💰 Nova compra realizada!",
           mensagem: `Pagamento confirmado via Pagar.me. Cliente: ${customerEmail}. Valor: R$ ${valor}. Pedido: ${orderId || chargeId}.`,

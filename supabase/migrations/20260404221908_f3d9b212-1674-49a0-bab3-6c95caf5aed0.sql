@@ -44,4 +44,4 @@ USING (public.has_role(auth.uid(), 'admin'));
 CREATE TRIGGER update_assinaturas_updated_at
 BEFORE UPDATE ON public.assinaturas
 FOR EACH ROW
-EXECUTE FUNCTION public.update_updated_at_column();cr
+EXECUTE FUNCTION public.update_updated_at_column();

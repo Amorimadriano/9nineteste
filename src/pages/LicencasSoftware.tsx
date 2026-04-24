@@ -32,7 +32,7 @@ const tiposCliente = [
 ];
 
 const planos = [
-  { value: "profissional", label: "Profissional", preco: 399.90 },
+  { value: "profissional", label: "Profissional", preco: 199.90 },
 ];
 
 const statusMap: Record<string, { label: string; color: string; icon: any }> = {
@@ -51,7 +51,7 @@ const emptyForm = {
   telefone: "",
   contato_nome: "",
   plano: "profissional",
-  valor_mensal: 399.90,
+  valor_mensal: 199.90,
   desconto_percentual: 0,
   data_inicio: new Date().toISOString().split("T")[0],
   data_fim: "",

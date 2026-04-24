@@ -3,15 +3,73 @@
  * PIS, COFINS, INSS, IR, CSLL
  * Com cálculo automático baseado no valor do serviço
  */
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RetencoesFormData, ALIQUOTAS_CUMULATIVAS } from "@/types/nfse-ui";
-import { formatCurrency, parseCurrency } from "@/lib/nfse-utils";
-import { Calculator, Percent, Sparkles, RefreshCcw } from "lucide-react";
+import { RetencoesFormData, ALIQUOTAS_CUMULATIVAS, ALIQUOTAS_LUCRO_PRESUMIDO } from "@/types/nfse-ui";
+import { formatCurrency } from "@/lib/nfse-utils";
+import { Calculator, Percent, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+
+interface MoneyInputProps {
+  value: number;
+  onChange: (value: number) => void;
+  placeholder?: string;
+  disabled?: boolean;
+}
+
+function MoneyInput({ value, onChange, placeholder = "0,00", disabled }: MoneyInputProps) {
+  const [displayValue, setDisplayValue] = useState("");
+  const [isFocused, setIsFocused] = useState(false);
+
+  // Sincroniza displayValue quando o value mudar externamente
+  useEffect(() => {
+    if (!isFocused) {
+      setDisplayValue(value > 0 ? formatCurrency(value) : "");
+    }
+  }, [value, isFocused]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value.replace(/[^\d,]/g, "");
+    setDisplayValue(raw);
+
+    // Converter para número
+    const normalized = raw.replace(",", ".");
+    const num = parseFloat(normalized) || 0;
+    onChange(num);
+  };
+
+  const handleFocus = () => {
+    setIsFocused(true);
+    // Mostra só o número sem formatação para facilitar edição
+    if (value > 0) {
+      setDisplayValue(value.toString().replace(".", ","));
+    } else {
+      setDisplayValue("");
+    }
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    // Formata o valor ao sair
+    if (value > 0) {
+      setDisplayValue(formatCurrency(value));
+    }
+  };
+
+  return (
+    <Input
+      value={displayValue}
+      onChange={handleChange}
+      onFocus={handleFocus}
+      onBlur={handleBlur}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
+  );
+}
 
 interface RetencoesFormProps {
   value: RetencoesFormData;
@@ -68,14 +126,6 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
     });
   };
 
-  const handleValorChange = (campo: keyof RetencoesFormData, inputValue: string) => {
-    const valor = parseCurrency(inputValue);
-    onChange({
-      ...value,
-      [campo]: valor,
-    });
-  };
-
   const aplicarAliquotasPadrao = () => {
     const novoPis = calcularValorRetencao(ALIQUOTAS_CUMULATIVAS.pis, baseCalculo);
     const novoCofins = calcularValorRetencao(ALIQUOTAS_CUMULATIVAS.cofins, baseCalculo);
@@ -105,6 +155,30 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
       pis: novoPis,
       cofins: novoCofins,
       inss: novoInss,
+    });
+  };
+
+  const aplicarLucroPresumido = () => {
+    // Lucro Presumido: IRPJ e CSLL têm base de 8% sobre receita
+    // PIS/COFINS: incidem sobre receita total
+    const baseIrrfCsll = baseCalculo * 0.08;
+    const novoPis = calcularValorRetencao(ALIQUOTAS_LUCRO_PRESUMIDO.pis, baseCalculo);
+    const novoCofins = calcularValorRetencao(ALIQUOTAS_LUCRO_PRESUMIDO.cofins, baseCalculo);
+    const novoIr = (baseIrrfCsll * 15) / 100; // 8% base * 15% = 1.2% effective
+    const novoCsll = (baseIrrfCsll * 13) / 100; // 8% base * 13% = 1.04% effective
+
+    onChange({
+      ...value,
+      aliquota_pis: ALIQUOTAS_LUCRO_PRESUMIDO.pis,
+      aliquota_cofins: ALIQUOTAS_LUCRO_PRESUMIDO.cofins,
+      aliquota_inss: 0,
+      aliquota_ir: 15, // Mostrar alíquota real (15%) e não a efetiva (1.2%)
+      aliquota_csll: 13, // Mostrar alíquota real (13%) e não a efetiva (1.04%)
+      pis: novoPis,
+      cofins: novoCofins,
+      inss: 0,
+      ir: novoIr,
+      csll: novoCsll,
     });
   };
 
@@ -167,6 +241,16 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
           </Button>
           <Button
             type="button"
+            variant="outline"
+            size="sm"
+            onClick={aplicarLucroPresumido}
+            className="text-xs"
+            disabled={baseCalculo <= 0}
+          >
+            Lucro Presumido (1,2% / 1,08%)
+          </Button>
+          <Button
+            type="button"
             variant="ghost"
             size="sm"
             onClick={limparRetencoes}
@@ -202,11 +286,10 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="pis">Valor PIS (R$)</Label>
-            <Input
-              id="pis"
-              value={formatCurrency(value.pis)}
-              onChange={(e) => handleValorChange("pis", e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.pis}
+              onChange={(v) => onChange({ ...value, pis: v })}
+              placeholder="0,00"
             />
           </div>
         </div>
@@ -231,11 +314,10 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="cofins">Valor COFINS (R$)</Label>
-            <Input
-              id="cofins"
-              value={formatCurrency(value.cofins)}
-              onChange={(e) => handleValorChange("cofins", e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.cofins}
+              onChange={(v) => onChange({ ...value, cofins: v })}
+              placeholder="0,00"
             />
           </div>
         </div>
@@ -261,11 +343,10 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="inss">Valor INSS (R$)</Label>
-            <Input
-              id="inss"
-              value={formatCurrency(value.inss)}
-              onChange={(e) => handleValorChange("inss", e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.inss}
+              onChange={(v) => onChange({ ...value, inss: v })}
+              placeholder="0,00"
             />
           </div>
         </div>
@@ -291,11 +372,10 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="ir">Valor IR (R$)</Label>
-            <Input
-              id="ir"
-              value={formatCurrency(value.ir)}
-              onChange={(e) => handleValorChange("ir", e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.ir}
+              onChange={(v) => onChange({ ...value, ir: v })}
+              placeholder="0,00"
             />
           </div>
         </div>
@@ -320,11 +400,10 @@ export function RetencoesForm({ value, onChange, baseCalculo }: RetencoesFormPro
           </div>
           <div className="space-y-2">
             <Label htmlFor="csll">Valor CSLL (R$)</Label>
-            <Input
-              id="csll"
-              value={formatCurrency(value.csll)}
-              onChange={(e) => handleValorChange("csll", e.target.value)}
-              placeholder="R$ 0,00"
+            <MoneyInput
+              value={value.csll}
+              onChange={(v) => onChange({ ...value, csll: v })}
+              placeholder="0,00"
             />
           </div>
         </div>

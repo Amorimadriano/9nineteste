@@ -48,6 +48,7 @@ import {
   AlertCircle,
   Loader2,
   RotateCcw,
+  XCircle,
 } from "lucide-react";
 
 // Interface para rascunho salvo
@@ -98,6 +99,7 @@ export default function NFSeEmissao() {
   } | null>(null);
   const [numeroNota, setNumeroNota] = useState(gerarNumeroNota());
   const [modalCertificadoAberto, setModalCertificadoAberto] = useState(false);
+  const [notaId, setNotaId] = useState<string | null>(null);
 
   // Carrega rascunhos salvos
   const carregarRascunhos = useCallback(async () => {
@@ -349,6 +351,7 @@ export default function NFSeEmissao() {
     setCurrentStep(1);
     setValidationErrors({});
     setNumeroNota(gerarNumeroNota());
+    setNotaId(null);
   };
 
   // Emite nota fiscal
@@ -402,6 +405,8 @@ export default function NFSeEmissao() {
 
       if (error) throw error;
 
+      setNotaId(nota.id);
+
       // Chama Edge Function para emitir
       const { error: emitError } = await supabase.functions.invoke("emitir-nfse", {
         body: {
@@ -423,6 +428,49 @@ export default function NFSeEmissao() {
       toast({
         title: "Erro ao emitir",
         description: error.message || "Não foi possível emitir a nota fiscal.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Função para cancelar nota na GINFES
+  const cancelarNota = async () => {
+    if (!notaId) {
+      toast({
+        title: "Nenhuma nota para cancelar",
+        description: "Emitir uma nota primeiro antes de cancelar.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const confirmar = window.confirm("Tem certeza que deseja cancelar esta nota fiscal?");
+    if (!confirmar) return;
+
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase.functions.invoke("cancelar-nfse", {
+        body: {
+          notaId,
+          motivoCancelamento: "Cancelamento a pedido do prestador",
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Nota cancelada",
+        description: "A nota fiscal foi cancelada com sucesso.",
+      });
+
+      limparFormulario();
+      await carregarNotasRecentes();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao cancelar",
+        description: error.message || "Não foi possível cancelar a nota fiscal.",
         variant: "destructive",
       });
     } finally {
@@ -663,22 +711,32 @@ export default function NFSeEmissao() {
                       <ChevronRight className="ml-2 h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button
-                      onClick={emitirNota}
-                      disabled={isSubmitting || !certificado?.ativo}
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Emitindo...
-                        </>
-                      ) : (
-                        <>
-                          <Send className="mr-2 h-4 w-4" />
-                          Emitir Nota
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="destructive"
+                        onClick={cancelarNota}
+                        disabled={isSubmitting || !notaId}
+                      >
+                        <XCircle className="mr-2 h-4 w-4" />
+                        {isSubmitting ? "Cancelando..." : "Cancelar Nota"}
+                      </Button>
+                      <Button
+                        onClick={emitirNota}
+                        disabled={isSubmitting || !certificado?.ativo}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Emitindo...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="mr-2 h-4 w-4" />
+                            Emitir Nota
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

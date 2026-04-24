@@ -212,6 +212,211 @@ export type Database = {
         }
         Relationships: []
       }
+      card_aliquotas_reforma: {
+        Row: {
+          aliquota_cbs: number
+          aliquota_ibs: number
+          ano: number
+          created_at: string
+          id: string
+          observacao: string | null
+          updated_at: string
+        }
+        Insert: {
+          aliquota_cbs?: number
+          aliquota_ibs?: number
+          ano: number
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Update: {
+          aliquota_cbs?: number
+          aliquota_ibs?: number
+          ano?: number
+          created_at?: string
+          id?: string
+          observacao?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      card_audit_logs: {
+        Row: {
+          acao: string
+          created_at: string
+          detalhes: Json | null
+          entidade: string
+          entidade_id: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          detalhes?: Json | null
+          entidade: string
+          entidade_id?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          detalhes?: Json | null
+          entidade?: string
+          entidade_id?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      card_split_simulacoes: {
+        Row: {
+          aliquota_cbs: number
+          aliquota_ibs: number
+          ano_referencia: number
+          created_at: string
+          id: string
+          observacoes: string | null
+          transacao_id: string | null
+          updated_at: string
+          user_id: string
+          valor_bruto: number
+          valor_cbs: number
+          valor_ibs: number
+          valor_liquido_empresa: number
+          valor_mdr: number
+        }
+        Insert: {
+          aliquota_cbs?: number
+          aliquota_ibs?: number
+          ano_referencia: number
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          transacao_id?: string | null
+          updated_at?: string
+          user_id: string
+          valor_bruto?: number
+          valor_cbs?: number
+          valor_ibs?: number
+          valor_liquido_empresa?: number
+          valor_mdr?: number
+        }
+        Update: {
+          aliquota_cbs?: number
+          aliquota_ibs?: number
+          ano_referencia?: number
+          created_at?: string
+          id?: string
+          observacoes?: string | null
+          transacao_id?: string | null
+          updated_at?: string
+          user_id?: string
+          valor_bruto?: number
+          valor_cbs?: number
+          valor_ibs?: number
+          valor_liquido_empresa?: number
+          valor_mdr?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_split_simulacoes_transacao_id_fkey"
+            columns: ["transacao_id"]
+            isOneToOne: false
+            referencedRelation: "card_transacoes_brutas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_transacoes_brutas: {
+        Row: {
+          adquirente: string
+          arquivo_origem: string | null
+          autorizacao: string | null
+          banco_cartao_id: string | null
+          bandeira: string | null
+          conciliado: boolean
+          created_at: string
+          data_prevista_recebimento: string | null
+          data_recebimento: string | null
+          data_venda: string
+          id: string
+          nsu: string | null
+          observacoes: string | null
+          parcela_atual: number
+          parcelas: number
+          status_auditoria: string
+          taxa_mdr: number
+          tipo_transacao: string
+          updated_at: string
+          user_id: string
+          valor_bruto: number
+          valor_liquido: number
+          valor_taxa: number
+        }
+        Insert: {
+          adquirente?: string
+          arquivo_origem?: string | null
+          autorizacao?: string | null
+          banco_cartao_id?: string | null
+          bandeira?: string | null
+          conciliado?: boolean
+          created_at?: string
+          data_prevista_recebimento?: string | null
+          data_recebimento?: string | null
+          data_venda: string
+          id?: string
+          nsu?: string | null
+          observacoes?: string | null
+          parcela_atual?: number
+          parcelas?: number
+          status_auditoria?: string
+          taxa_mdr?: number
+          tipo_transacao?: string
+          updated_at?: string
+          user_id: string
+          valor_bruto?: number
+          valor_liquido?: number
+          valor_taxa?: number
+        }
+        Update: {
+          adquirente?: string
+          arquivo_origem?: string | null
+          autorizacao?: string | null
+          banco_cartao_id?: string | null
+          bandeira?: string | null
+          conciliado?: boolean
+          created_at?: string
+          data_prevista_recebimento?: string | null
+          data_recebimento?: string | null
+          data_venda?: string
+          id?: string
+          nsu?: string | null
+          observacoes?: string | null
+          parcela_atual?: number
+          parcelas?: number
+          status_auditoria?: string
+          taxa_mdr?: number
+          tipo_transacao?: string
+          updated_at?: string
+          user_id?: string
+          valor_bruto?: number
+          valor_liquido?: number
+          valor_taxa?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_transacoes_brutas_banco_cartao_id_fkey"
+            columns: ["banco_cartao_id"]
+            isOneToOne: false
+            referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categorias: {
         Row: {
           ativo: boolean
@@ -1102,6 +1307,209 @@ export type Database = {
           },
         ]
       }
+      notas_fiscais_servico: {
+        Row: {
+          aliquota_cofins: number | null
+          aliquota_csll: number | null
+          aliquota_inss: number | null
+          aliquota_ir: number | null
+          aliquota_iss: number | null
+          aliquota_pis: number | null
+          base_calculo: number | null
+          certificado_id: string | null
+          cliente_bairro: string | null
+          cliente_cep: string | null
+          cliente_cidade: string | null
+          cliente_cnpj_cpf: string | null
+          cliente_complemento: string | null
+          cliente_email: string | null
+          cliente_endereco: string | null
+          cliente_estado: string | null
+          cliente_ibge: string | null
+          cliente_nome: string | null
+          cliente_nome_fantasia: string | null
+          cliente_numero: string | null
+          cliente_razao_social: string | null
+          cliente_telefone: string | null
+          cliente_tipo_documento: string | null
+          cnae: string | null
+          codigo_tributacao: string | null
+          codigo_verificacao: string | null
+          created_at: string | null
+          data_competencia: string | null
+          data_emissao: string | null
+          id: string
+          iss_retido: boolean | null
+          link_nfse: string | null
+          link_pdf: string | null
+          link_xml: string | null
+          municipio_prestacao: number | null
+          natureza_operacao: number | null
+          numero_nota: string | null
+          numero_rps: string | null
+          protocolo: string | null
+          regime_tributario: number | null
+          retencao_cofins: number | null
+          retencao_csll: number | null
+          retencao_inss: number | null
+          retencao_ir: number | null
+          retencao_pis: number | null
+          serie: string | null
+          servico_cnae: string | null
+          servico_codigo: string | null
+          servico_codigo_tributacao: string | null
+          servico_descricao: string | null
+          servico_discriminacao: string | null
+          servico_item_lista_servico: string | null
+          status: string | null
+          tipo_rps: string | null
+          updated_at: string | null
+          user_id: string
+          valor_deducoes: number | null
+          valor_iss: number | null
+          valor_liquido: number | null
+          valor_servico: number | null
+          xml_envio: string | null
+          xml_retorno: string | null
+        }
+        Insert: {
+          aliquota_cofins?: number | null
+          aliquota_csll?: number | null
+          aliquota_inss?: number | null
+          aliquota_ir?: number | null
+          aliquota_iss?: number | null
+          aliquota_pis?: number | null
+          base_calculo?: number | null
+          certificado_id?: string | null
+          cliente_bairro?: string | null
+          cliente_cep?: string | null
+          cliente_cidade?: string | null
+          cliente_cnpj_cpf?: string | null
+          cliente_complemento?: string | null
+          cliente_email?: string | null
+          cliente_endereco?: string | null
+          cliente_estado?: string | null
+          cliente_ibge?: string | null
+          cliente_nome?: string | null
+          cliente_nome_fantasia?: string | null
+          cliente_numero?: string | null
+          cliente_razao_social?: string | null
+          cliente_telefone?: string | null
+          cliente_tipo_documento?: string | null
+          cnae?: string | null
+          codigo_tributacao?: string | null
+          codigo_verificacao?: string | null
+          created_at?: string | null
+          data_competencia?: string | null
+          data_emissao?: string | null
+          id?: string
+          iss_retido?: boolean | null
+          link_nfse?: string | null
+          link_pdf?: string | null
+          link_xml?: string | null
+          municipio_prestacao?: number | null
+          natureza_operacao?: number | null
+          numero_nota?: string | null
+          numero_rps?: string | null
+          protocolo?: string | null
+          regime_tributario?: number | null
+          retencao_cofins?: number | null
+          retencao_csll?: number | null
+          retencao_inss?: number | null
+          retencao_ir?: number | null
+          retencao_pis?: number | null
+          serie?: string | null
+          servico_cnae?: string | null
+          servico_codigo?: string | null
+          servico_codigo_tributacao?: string | null
+          servico_descricao?: string | null
+          servico_discriminacao?: string | null
+          servico_item_lista_servico?: string | null
+          status?: string | null
+          tipo_rps?: string | null
+          updated_at?: string | null
+          user_id: string
+          valor_deducoes?: number | null
+          valor_iss?: number | null
+          valor_liquido?: number | null
+          valor_servico?: number | null
+          xml_envio?: string | null
+          xml_retorno?: string | null
+        }
+        Update: {
+          aliquota_cofins?: number | null
+          aliquota_csll?: number | null
+          aliquota_inss?: number | null
+          aliquota_ir?: number | null
+          aliquota_iss?: number | null
+          aliquota_pis?: number | null
+          base_calculo?: number | null
+          certificado_id?: string | null
+          cliente_bairro?: string | null
+          cliente_cep?: string | null
+          cliente_cidade?: string | null
+          cliente_cnpj_cpf?: string | null
+          cliente_complemento?: string | null
+          cliente_email?: string | null
+          cliente_endereco?: string | null
+          cliente_estado?: string | null
+          cliente_ibge?: string | null
+          cliente_nome?: string | null
+          cliente_nome_fantasia?: string | null
+          cliente_numero?: string | null
+          cliente_razao_social?: string | null
+          cliente_telefone?: string | null
+          cliente_tipo_documento?: string | null
+          cnae?: string | null
+          codigo_tributacao?: string | null
+          codigo_verificacao?: string | null
+          created_at?: string | null
+          data_competencia?: string | null
+          data_emissao?: string | null
+          id?: string
+          iss_retido?: boolean | null
+          link_nfse?: string | null
+          link_pdf?: string | null
+          link_xml?: string | null
+          municipio_prestacao?: number | null
+          natureza_operacao?: number | null
+          numero_nota?: string | null
+          numero_rps?: string | null
+          protocolo?: string | null
+          regime_tributario?: number | null
+          retencao_cofins?: number | null
+          retencao_csll?: number | null
+          retencao_inss?: number | null
+          retencao_ir?: number | null
+          retencao_pis?: number | null
+          serie?: string | null
+          servico_cnae?: string | null
+          servico_codigo?: string | null
+          servico_codigo_tributacao?: string | null
+          servico_descricao?: string | null
+          servico_discriminacao?: string | null
+          servico_item_lista_servico?: string | null
+          status?: string | null
+          tipo_rps?: string | null
+          updated_at?: string | null
+          user_id?: string
+          valor_deducoes?: number | null
+          valor_iss?: number | null
+          valor_liquido?: number | null
+          valor_servico?: number | null
+          xml_envio?: string | null
+          xml_retorno?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notas_fiscais_servico_certificado_id_fkey"
+            columns: ["certificado_id"]
+            isOneToOne: false
+            referencedRelation: "certificados_nfse"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notificacoes_admin: {
         Row: {
           created_at: string
@@ -1234,6 +1642,33 @@ export type Database = {
           nome?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      settings: {
+        Row: {
+          created_at: string | null
+          id: string
+          key: string
+          updated_at: string | null
+          user_id: string
+          value: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key: string
+          updated_at?: string | null
+          user_id: string
+          value?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key?: string
+          updated_at?: string | null
+          user_id?: string
+          value?: string | null
         }
         Relationships: []
       }

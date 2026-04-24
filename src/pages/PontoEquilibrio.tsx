@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Legend, ReferenceLine, ComposedChart, Line, Area,
+  Legend, ComposedChart, Line,
 } from "recharts";
 import { exportPontoEquilibrioPdf } from "@/lib/pdfPontoEquilibrioExport";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +22,6 @@ import { useToast } from "@/hooks/use-toast";
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const fmtPct = (v: number) => `${v.toFixed(1)}%`;
 const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-const mesesFull = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 // Termos que identificam custos variáveis (CMV, CSP, insumos, etc.)
 const TERMOS_CUSTOS_VARIAVEIS = ["custo", "cmv", "csp", "insumo", "mercadoria", "matéria", "material", "frete", "comissão", "comissao"];
@@ -39,14 +38,14 @@ export default function PontoEquilibrio() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const { data: contasReceber = [] } = useTableQuery("contas_receber");
-  const { data: contasPagar = [] } = useTableQuery("contas_pagar");
-  const { data: lancamentos = [] } = useTableQuery("lancamentos_caixa");
-  const { data: categorias = [] } = useTableQuery("categorias");
+  const { data: contasReceber = [], isLoading: loadingCR } = useTableQuery("contas_receber");
+  const { data: contasPagar = [], isLoading: loadingCP } = useTableQuery("contas_pagar");
+  const { data: categorias = [], isLoading: loadingCat } = useTableQuery("categorias");
+
+  const isLoading = loadingCR || loadingCP || loadingCat;
 
   useRealtimeSubscription("contas_receber", [["contas_receber"]]);
   useRealtimeSubscription("contas_pagar", [["contas_pagar"]]);
-  useRealtimeSubscription("lancamentos_caixa", [["lancamentos_caixa"]]);
   useRealtimeSubscription("categorias", [["categorias"]]);
 
   const catMap = useMemo(() => {
@@ -56,32 +55,38 @@ export default function PontoEquilibrio() {
   }, [categorias]);
 
   const calc = useMemo(() => {
-    const cr = (contasReceber as any[]).filter(c => c.status === "recebido");
-    const cp = (contasPagar as any[]).filter(c => c.status === "pago");
+    const crArray = Array.isArray(contasReceber) ? contasReceber as any[] : [];
+    const cpArray = Array.isArray(contasPagar) ? contasPagar as any[] : [];
+
+    const cr = crArray.filter(c => c?.status === "recebido");
+    const cp = cpArray.filter(c => c?.status === "pago");
 
     // Monthly breakdown
     const monthly = meses.map((mes, idx) => {
       const mesNum = idx + 1;
       const crMes = cr.filter(c => {
         const d = c.data_recebimento || c.data_vencimento;
-        return d && new Date(d).getFullYear() === anoSel && (new Date(d).getMonth() + 1) === mesNum;
+        if (!d) return false;
+        try { const dt = new Date(d); return dt.getFullYear() === anoSel && (dt.getMonth() + 1) === mesNum; } catch { return false; }
       });
       const cpMes = cp.filter(c => {
         const d = c.data_pagamento || c.data_vencimento;
-        return d && new Date(d).getFullYear() === anoSel && (new Date(d).getMonth() + 1) === mesNum;
+        if (!d) return false;
+        try { const dt = new Date(d); return dt.getFullYear() === anoSel && (dt.getMonth() + 1) === mesNum; } catch { return false; }
       });
 
-      const receita = crMes.reduce((s, c) => s + Number(c.valor), 0);
+      const receita = crMes.reduce((s, c) => s + (Number(c.valor) || 0), 0);
 
       let custoVariavel = 0;
       let custoFixo = 0;
       cpMes.forEach(c => {
         const cat = c.categoria_id ? catMap[c.categoria_id] : null;
         const catNome = cat?.nome || "";
+        const valor = Number(c.valor) || 0;
         if (isCustoVariavel(catNome)) {
-          custoVariavel += Number(c.valor);
+          custoVariavel += valor;
         } else {
-          custoFixo += Number(c.valor);
+          custoFixo += valor;
         }
       });
 
@@ -106,12 +111,13 @@ export default function PontoEquilibrio() {
     const custoFixoPorCat: Record<string, number> = {};
     cp.filter(c => {
       const d = c.data_pagamento || c.data_vencimento;
-      return d && new Date(d).getFullYear() === anoSel;
+      if (!d) return false;
+      try { return new Date(d).getFullYear() === anoSel; } catch { return false; }
     }).forEach(c => {
       const cat = c.categoria_id ? catMap[c.categoria_id] : null;
       const catNome = cat?.nome || "Sem Categoria";
       if (!isCustoVariavel(catNome)) {
-        custoFixoPorCat[catNome] = (custoFixoPorCat[catNome] || 0) + Number(c.valor);
+        custoFixoPorCat[catNome] = (custoFixoPorCat[catNome] || 0) + (Number(c.valor) || 0);
       }
     });
     const topCustosFixos = Object.entries(custoFixoPorCat)
@@ -123,12 +129,13 @@ export default function PontoEquilibrio() {
     const custoVarPorCat: Record<string, number> = {};
     cp.filter(c => {
       const d = c.data_pagamento || c.data_vencimento;
-      return d && new Date(d).getFullYear() === anoSel;
+      if (!d) return false;
+      try { return new Date(d).getFullYear() === anoSel; } catch { return false; }
     }).forEach(c => {
       const cat = c.categoria_id ? catMap[c.categoria_id] : null;
       const catNome = cat?.nome || "Sem Categoria";
       if (isCustoVariavel(catNome)) {
-        custoVarPorCat[catNome] = (custoVarPorCat[catNome] || 0) + Number(c.valor);
+        custoVarPorCat[catNome] = (custoVarPorCat[catNome] || 0) + (Number(c.valor) || 0);
       }
     });
     const topCustosVariaveis = Object.entries(custoVarPorCat)
@@ -144,6 +151,14 @@ export default function PontoEquilibrio() {
       mesesAtingidos,
     };
   }, [contasReceber, contasPagar, categorias, catMap, anoSel]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   const chartData = calc.monthly.map(m => ({
     mes: m.mes,

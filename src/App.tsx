@@ -10,6 +10,7 @@ import { AppLayout } from "@/components/AppLayout";
 import OnboardingTour from "@/components/OnboardingTour";
 import { Suspense, lazy, useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 // Importação estática de páginas críticas (primeiro carregamento)
 import Auth from "./pages/Auth";
@@ -59,6 +60,7 @@ const PlanoContas = lazy(() => import("./pages/PlanoContas"));
 const ConsultaCnpjCpf = lazy(() => import("./pages/ConsultaCnpjCpf"));
 const ConsultaScoreSerasa = lazy(() => import("./pages/ConsultaScoreSerasa"));
 const EmailMarketing = lazy(() => import("./pages/EmailMarketing"));
+const CardAudit = lazy(() => import("./pages/CardAudit"));
 
 // Componente de loading para Suspense
 function PageLoader() {
@@ -168,13 +170,14 @@ function AuthRoute() {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/site" element={<Site />} />
+    <ErrorBoundary>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <Routes>
+              <Route path="/site" element={<Site />} />
             <Route path="/login" element={<AuthRoute />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route element={<ProtectedRoutes />}>
@@ -310,9 +313,11 @@ const App = () => (
                 </Suspense>
               } />
               <Route path="/ponto-equilibrio" element={
-                <Suspense fallback={<PageLoader />}>
-                  <PontoEquilibrio />
-                </Suspense>
+                <ErrorBoundary>
+                  <Suspense fallback={<PageLoader />}>
+                    <PontoEquilibrio />
+                  </Suspense>
+                </ErrorBoundary>
               } />
               <Route path="/planos" element={
                 <Suspense fallback={<PageLoader />}>
@@ -359,12 +364,18 @@ const App = () => (
                   <EmailMarketing />
                 </Suspense>
               } />
+              <Route path="/card-audit" element={
+                <Suspense fallback={<PageLoader />}>
+                  <CardAudit />
+                </Suspense>
+              } />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
+    </ErrorBoundary>
   </QueryClientProvider>
 );
 

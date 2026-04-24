@@ -32,7 +32,7 @@ serve(async (req) => {
     const payload = {
       items: [
         {
-          amount: 39990,
+          amount: 19990,
           description: "9Nine Business Control - Mensal",
           quantity: 1,
           code: "9nine-mensal",
@@ -57,7 +57,7 @@ serve(async (req) => {
               expires_in: 3600,
             },
             credit_card: {
-              installments: [{ number: 1, total: 39990 }],
+              installments: [{ number: 1, total: 19990 }],
               statement_descriptor: "9NINE BPO",
             },
           },
@@ -99,7 +99,7 @@ serve(async (req) => {
       user_id: user.id,
       status: "pendente",
       plano: "mensal",
-      valor: 399.90,
+      valor: 199.90,
       metodo_pagamento: "link",
       pagarme_order_id: data.id,
       pagarme_charge_id: charge?.id || null,

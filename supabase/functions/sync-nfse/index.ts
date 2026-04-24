@@ -138,11 +138,11 @@ async function processarBatch(
         };
 
         if (resposta.status === "autorizada") {
-          updateData.numero_nota = resposta.numeroNota;
-          updateData.codigo_verificacao = resposta.codigoVerificacao;
-          updateData.link_pdf = resposta.linkPDF;
-          updateData.link_xml = resposta.linkXML;
-          updateData.data_autorizacao = resposta.dataAutorizacao;
+          updateData.numero_nota = resposta.numeroNota || undefined;
+          updateData.codigo_verificacao = resposta.codigoVerificacao || undefined;
+          updateData.link_pdf = resposta.linkPDF || undefined;
+          updateData.link_xml = resposta.linkXML || undefined;
+          updateData.data_autorizacao = resposta.dataAutorizacao || undefined;
           updateData.mensagem_erro = null;
           resultados.autorizadas++;
         } else if (resposta.status === "rejeitada") {
@@ -251,11 +251,11 @@ serve(async (req) => {
           };
 
           if (resposta.status === "autorizada") {
-            updateData.numero_nota = resposta.numeroNota;
-            updateData.codigo_verificacao = resposta.codigoVerificacao;
-            updateData.link_pdf = resposta.linkPDF;
-            updateData.link_xml = resposta.linkXML;
-            updateData.data_autorizacao = resposta.dataAutorizacao;
+            updateData.numero_nota = resposta.numeroNota || undefined;
+            updateData.codigo_verificacao = resposta.codigoVerificacao || undefined;
+            updateData.link_pdf = resposta.linkPDF || undefined;
+            updateData.link_xml = resposta.linkXML || undefined;
+            updateData.data_autorizacao = resposta.dataAutorizacao || undefined;
             updateData.mensagem_erro = null;
           } else if (resposta.status === "rejeitada") {
             updateData.mensagem_erro = resposta.mensagemErro;

@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { exportarPdfSimuladorIbsCbs } from "@/lib/pdfSimuladorIbsCbsExport";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -139,10 +140,28 @@ export default function SimuladorIBSCBS() {
     }
   };
 
+  // Buscar dados da empresa para o cabeçalho do PDF
+  const [empresaData, setEmpresaData] = useState<any>(null);
+  useEffect(() => {
+    const fetchEmpresa = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("empresa")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) setEmpresaData(data);
+    };
+    fetchEmpresa();
+  }, []);
+
   const exportarPDF = () => {
+    if (!resultado) return;
+    exportarPdfSimuladorIbsCbs(resultado, parecer.texto, empresaData);
     toast({
-      title: "Exportação em desenvolvimento",
-      description: "Funcionalidade de PDF será implementada em breve.",
+      title: "PDF exportado",
+      description: "O relatório da simulação IBS/CBS foi baixado com sucesso.",
     });
   };
 

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Pencil, Trash2, Tag, Search, Download, Upload, Link2, Calculator, Wand2, Sparkles, ArrowUpRight, CheckCircle2, AlertCircle, Link } from "lucide-react";
+import { Plus, Pencil, Trash2, Tag, Search, Download, Upload, Link2, Calculator, Sparkles, ArrowUpRight, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { Link as RouterLink } from "react-router-dom";
@@ -36,7 +36,6 @@ export default function Categorias() {
     categorias: categoriasComPlano,
     planoContas,
     buscarSugestaoPorNome,
-    aplicarMapeamentosAutomaticos,
     vincularConta,
     verificarCriarPlanoPadrao,
     isLoading: isLoadingInteligente,
@@ -53,7 +52,6 @@ export default function Categorias() {
   const [search, setSearch] = useState("");
   const [importing, setImporting] = useState(false);
   const [activeTab, setActiveTab] = useState("todas");
-  const [showMapeamentoDialog, setShowMapeamentoDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -77,7 +75,6 @@ export default function Categorias() {
     if (activeTab === "receita") return filtered.filter((c) => c.tipo === "receita");
     if (activeTab === "despesa") return filtered.filter((c) => c.tipo === "despesa");
     if (activeTab === "vinculadas") return filtered.filter((c) => c.plano_conta_id);
-    if (activeTab === "nao_vinculadas") return filtered.filter((c) => !c.plano_conta_id);
     return filtered;
   }, [filtered, activeTab]);
 
@@ -224,11 +221,6 @@ export default function Categorias() {
     }
   };
 
-  const handleMapeamentoAutomatico = async () => {
-    await aplicarMapeamentosAutomaticos();
-    setShowMapeamentoDialog(false);
-  };
-
   const getPlanoContaVinculado = (categoria: any): PlanoConta | undefined => {
     return planoContas.find((p) => p.id === categoria.plano_conta_id);
   };
@@ -252,9 +244,6 @@ export default function Categorias() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" onClick={() => setShowMapeamentoDialog(true)}>
-            <Wand2 className="mr-2 h-4 w-4" /> Mapeamento Auto
-          </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" /> Exportar
           </Button>
@@ -274,29 +263,6 @@ export default function Categorias() {
         </div>
       </div>
 
-      {/* Alerta de categorias não vinculadas */}
-      {estatisticas.vinculadas < estatisticas.total && (
-        <Alert className="bg-amber-50 border-amber-200">
-          <AlertCircle className="h-4 w-4 text-amber-600" />
-          <AlertTitle className="text-amber-800">Categorias sem vinculação</AlertTitle>
-          <AlertDescription className="flex items-center justify-between text-amber-700">
-            <span>{estatisticas.total - estatisticas.vinculadas} de {estatisticas.total} categorias não estão vinculadas ao plano de contas contábil.</span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => setShowMapeamentoDialog(true)}>
-                <Link2 className="mr-2 h-3 w-3" /> Vincular Automaticamente
-              </Button>
-              <Button size="sm" variant="outline" onClick={async () => {
-                const count = await verificarCriarPlanoPadrao();
-                if (count > 0) {
-                  toast({ title: `Plano de contas padrão criado!`, description: `${count} contas adicionadas.` });
-                }
-              }}>
-                <Calculator className="mr-2 h-3 w-3" /> Criar Plano Padrão
-              </Button>
-            </div>
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Estatísticas */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -335,7 +301,6 @@ export default function Categorias() {
             <TabsTrigger value="receita">Receitas</TabsTrigger>
             <TabsTrigger value="despesa">Despesas</TabsTrigger>
             <TabsTrigger value="vinculadas">Vinculadas</TabsTrigger>
-            <TabsTrigger value="nao_vinculadas">Sem Vínculo</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
@@ -511,62 +476,6 @@ export default function Categorias() {
             </div>
             <Button onClick={handleSubmit} className="w-full" disabled={!form.nome}>
               {editing ? "Atualizar" : "Criar"} Categoria
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Mapeamento Automático */}
-      <Dialog open={showMapeamentoDialog} onOpenChange={setShowMapeamentoDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wand2 className="h-5 w-5" />
-              Mapeamento Automático Completo
-            </DialogTitle>
-            <DialogDescription>
-              O sistema vinculará automaticamente todas as categorias ao plano de contas.
-              Se uma conta contábil não existir, ela será criada automaticamente.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="bg-muted p-4 rounded-lg">
-              <h4 className="font-medium mb-2">Resumo da operação:</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Categorias totais:</p>
-                  <p className="font-bold">{estatisticas.total}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Sem vínculo:</p>
-                  <p className="font-bold text-amber-600">{estatisticas.total - estatisticas.vinculadas}</p>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm">O que será feito:</h4>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Verificar se existe plano de contas (criar padrão se necessário)</li>
-                <li>• Para cada categoria sem vínculo:</li>
-                <li className="ml-4">- Tentar encontrar conta contábil existente pelo nome</li>
-                <li className="ml-4">- Se não existir, criar nova conta automaticamente</li>
-                <li className="ml-4">- Vincular categoria à conta contábil</li>
-              </ul>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg text-sm">
-              <p className="text-blue-700">
-                <strong>Dica:</strong> Ao criar novas categorias no futuro, elas serão
-                automaticamente vinculadas ao plano de contas!
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setShowMapeamentoDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleMapeamentoAutomatico}>
-              <Wand2 className="mr-2 h-4 w-4" />
-              Sincronizar Tudo
             </Button>
           </div>
         </DialogContent>

@@ -38,7 +38,10 @@
       "Bash(git push *)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(bun lint *)"
+      "Bash(bun lint *)",
+      "WebFetch(domain:deno.land)",
+      "WebFetch(domain:jsr.io)",
+      "WebFetch(domain:upyo.org)"
     ]
   }
 }

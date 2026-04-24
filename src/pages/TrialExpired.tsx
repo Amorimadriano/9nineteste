@@ -94,7 +94,7 @@ function PaymentResult({ result, onBack }: { result: any; onBack: () => void }) 
           )}
 
           <p className="text-sm text-muted-foreground">
-            Valor: <strong>R$ 399,90</strong> / mês
+            Valor: <strong>R$ 199,90</strong> / mês
           </p>
 
           <Button onClick={checkPaymentStatus} disabled={checkingStatus} variant="outline" className="w-full">
@@ -193,24 +193,9 @@ export default function TrialExpired() {
     });
   };
 
-  const handlePaymentLink = async () => {
-    setLoading(true);
-    try {
-      const data = await callPaymentFunction<any>("create-payment-link");
-
-      const url = data.payment_link_url || data.short_url;
-      if (url) {
-        window.open(url, "_blank");
-        toast({ title: "Link de pagamento aberto!", description: "Complete o pagamento na página da Pagar.me." });
-      } else {
-        toast({ title: "Erro", description: "Link não gerado", variant: "destructive" });
-      }
-    } catch (err: any) {
-      console.error("Payment link error:", err);
-      toast({ title: "Erro ao gerar link", description: err.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+  const handlePaymentLink = () => {
+    window.open("https://payment-link-v3.pagar.me/pl_yl3qvW72YMEB6yBhyHqO1jGpxQXOAKnZ", "_blank");
+    toast({ title: "Link de pagamento aberto!", description: "Complete o pagamento na página da Pagar.me." });
   };
 
   if (paymentResult && (paymentResult.method === "pix" || paymentResult.method === "boleto")) {
@@ -228,7 +213,7 @@ export default function TrialExpired() {
           <CardTitle className="text-xl">Período de teste encerrado</CardTitle>
           <p className="text-sm text-muted-foreground">
             Assine o <strong>9Nine Business Control</strong> por apenas{" "}
-            <strong className="text-primary">R$ 399,90/mês</strong> e continue gerenciando suas finanças.
+            <strong className="text-primary">R$ 199,90/mês</strong> e continue gerenciando suas finanças.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -315,7 +300,7 @@ export default function TrialExpired() {
               </div>
               <Button className="w-full" onClick={handleCardPayment} disabled={loading}>
                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-                Pagar R$ 399,90
+                Pagar R$ 199,90
               </Button>
             </TabsContent>
 
