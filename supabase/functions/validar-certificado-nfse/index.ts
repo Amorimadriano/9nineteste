@@ -12,7 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const { certificadoBase64, senha } = await req.json();
+    const body = await req.json();
+    const certificadoBase64 = body.certificadoBase64;
+    const senha = body.senha;
 
     if (!certificadoBase64 || !senha) {
       return new Response(
@@ -21,8 +23,19 @@ serve(async (req) => {
       );
     }
 
-    // Import node-forge for real PKCS12 parsing
-    const forge = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
+    console.log("validar-certificado: recebido, tamanho base64:", certificadoBase64.length);
+
+    // Import node-forge for PKCS12 parsing
+    let forge: any;
+    try {
+      forge = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
+    } catch (importErr) {
+      console.error("validar-certificado: erro ao importar node-forge:", importErr);
+      return new Response(
+        JSON.stringify({ valido: false, mensagem: "Erro interno ao carregar biblioteca de certificados" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     try {
       // Decode and parse PKCS12
@@ -33,7 +46,10 @@ serve(async (req) => {
       // Extract certificate
       const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
       if (!certBags[forge.pki.oids.certBag] || certBags[forge.pki.oids.certBag]!.length === 0) {
-        throw new Error("Nenhum certificado encontrado no arquivo PFX");
+        return new Response(
+          JSON.stringify({ valido: false, mensagem: "Nenhum certificado encontrado no arquivo PFX" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
 
       const cert = certBags[forge.pki.oids.certBag]![0].cert!;
@@ -46,7 +62,6 @@ serve(async (req) => {
       for (const attr of subject.attributes) {
         if (attr.shortName === "CN") {
           emitidoPara = attr.value;
-          // Try to extract CNPJ from CN
           const cnpjMatch = attr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
           if (cnpjMatch) {
             cnpj = cnpjMatch[0].replace(/\D/g, "");
@@ -69,8 +84,6 @@ serve(async (req) => {
               }
             }
           }
-          // OID 2.16.840.1.113730.4.1 is for subject alternative name
-          // OID for CNPJ in ICP-Brasil: 2.16.860.1.5.5.1
           if (ext.id === "2.16.860.1.5.5.1" || ext.id === "2.16.76.1.3.5") {
             try {
               const value = ext.value;
@@ -148,6 +161,8 @@ serve(async (req) => {
       // Calculate days until expiration
       const diasParaExpirar = Math.ceil((validoAte.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
+      console.log("validar-certificado: sucesso, CNPJ:", cnpj, "emissor:", emissor);
+
       return new Response(
         JSON.stringify({
           valido: true,
@@ -164,7 +179,7 @@ serve(async (req) => {
       );
 
     } catch (pfxError: any) {
-      // Common error messages
+      console.error("validar-certificado: erro ao processar PFX:", pfxError.message);
       let mensagem = "Erro ao processar certificado";
       if (pfxError.message?.includes("password") || pfxError.message?.includes("PKCS#12") || pfxError.message?.includes("decrypt")) {
         mensagem = "Senha do certificado incorreta";
@@ -181,9 +196,9 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error("Erro na validação do certificado:", error);
+    console.error("validar-certificado: erro geral:", error);
     return new Response(
-      JSON.stringify({ valido: false, mensagem: (error as Error).message }),
+      JSON.stringify({ valido: false, mensagem: (error as Error).message || "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
