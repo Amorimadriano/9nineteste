@@ -29,7 +29,8 @@ serve(async (req) => {
     let forge: any;
     try {
       const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
-      forge = forgeModule.default || forgeModule;
+      forge = forgeModule.default?.util ? forgeModule.default : forgeModule;
+      console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki);
     } catch (importErr) {
       console.error("validar-certificado: erro ao importar node-forge:", importErr);
       return new Response(

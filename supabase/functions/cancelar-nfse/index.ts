@@ -48,8 +48,10 @@ function getElementName(xml: string, id: string): string {
 
 async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
   const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
-  const forge = forgeModule.default || forgeModule;
+  const forge: any = forgeModule.default?.util ? forgeModule.default : forgeModule;
   (globalThis as any).forge = forge;
+
+  console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki, "has pkcs12:", !!forge.pkcs12);
   const pfxDer = forge.util.decode64(pfxBase64);
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
