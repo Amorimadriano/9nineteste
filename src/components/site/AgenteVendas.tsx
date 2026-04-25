@@ -104,28 +104,28 @@ const FLUXO_CONVERSA = {
 
 const MENSAGENS_SEGUINTES: Record<string, { mensagem: string; proximo?: string; opcoes?: Opcao[] }> = {
   mei: {
-    mensagem: "Entendido! Para MEIs e autônomos, temos planos a partir de R$ 97/mês. Você terá acesso a todas as funcionalidades essenciais para organizar suas finanças.\n\nQual próximo passo?",
+    mensagem: "Entendido! Para MEIs e autônomos, nosso plano é R$ 199,90/mês com acesso a todas as funcionalidades essenciais para organizar suas finanças.\n\nQual próximo passo?",
     opcoes: [
       { label: "Quero uma proposta", valor: "coletar_dados" },
       { label: "Ver demonstração", valor: "demo" },
     ],
   },
   pequena: {
-    mensagem: "Ótimo! Para pequenas empresas, nosso sistema é perfeito para organizar o financeiro sem complicação. Planos a partir de R$ 197/mês.\n\nQual próximo passo?",
+    mensagem: "Ótimo! Para pequenas empresas, nosso sistema é perfeito para organizar o financeiro sem complicação. Plano fixo de R$ 199,90/mês.\n\nQual próximo passo?",
     opcoes: [
       { label: "Quero uma proposta", valor: "coletar_dados" },
       { label: "Ver demonstração", valor: "demo" },
     ],
   },
   media: {
-    mensagem: "Excelente! Empresas de médio porte costumam economizar até 40% do tempo gasto em tarefas financeiras com nosso sistema. Planos sob medida.\n\nQual próximo passo?",
+    mensagem: "Excelente! Empresas de médio porte costumam economizar até 40% do tempo gasto em tarefas financeiras com nosso sistema. Plano de R$ 199,90/mês.\n\nQual próximo passo?",
     opcoes: [
       { label: "Quero uma proposta", valor: "coletar_dados" },
       { label: "Ver demonstração", valor: "demo" },
     ],
   },
   grande: {
-    mensagem: "Perfeito! Para grandes empresas, oferecemos soluções personalizadas com integrações específicas, API dedicada e suporte prioritário. Vamos preparar uma proposta exclusiva?",
+    mensagem: "Perfeito! Para grandes empresas, oferecemos o sistema completo com integrações específicas, API dedicada e suporte prioritário por R$ 199,90/mês. Vamos preparar uma proposta?",
     opcoes: [
       { label: "Sim, quero proposta personalizada", valor: "coletar_dados" },
       { label: "Falar com executivo", valor: "coletar_dados" },
