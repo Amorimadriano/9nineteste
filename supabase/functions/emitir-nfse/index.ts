@@ -426,6 +426,8 @@ serve(async (req) => {
     notaId = body.notaId;
     const certificadoId = body.certificadoId;
 
+    console.log("emitir-nfse: notaId=", notaId, "certificadoId=", certificadoId);
+
     if (!notaId || !certificadoId) {
       return new Response(
         JSON.stringify({ error: "notaId e certificadoId são obrigatórios" }),
@@ -442,7 +444,11 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (certError || !certificado) {
+    if (certError) {
+      console.error("emitir-nfse: erro ao buscar certificado:", certError);
+      throw new Error(`Erro ao buscar certificado: ${certError.message}`);
+    }
+    if (!certificado) {
       throw new Error("Certificado não encontrado ou não pertence ao usuário");
     }
 
@@ -450,9 +456,16 @@ serve(async (req) => {
       throw new Error("Certificado não possui arquivo PFX. Faça upload novamente.");
     }
 
-    const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
-    certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
-    certDigital.cnpj = certificado.cnpj || "";
+    let certDigital;
+    try {
+      certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
+      certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
+      certDigital.cnpj = certificado.cnpj || "";
+      console.log("emitir-nfse: certificado carregado, CNPJ=", certDigital.cnpj, "IM=", certDigital.inscricaoMunicipal);
+    } catch (certErr: any) {
+      console.error("emitir-nfse: erro ao carregar certificado:", certErr);
+      throw new Error(`Erro no certificado digital: ${certErr.message}`);
+    }
 
     await supabase
       .from("notas_fiscais_servico")
@@ -467,9 +480,15 @@ serve(async (req) => {
       .eq("user_id", user.id)
       .single();
 
-    if (notaError || !nota) {
+    if (notaError) {
+      console.error("emitir-nfse: erro ao buscar nota:", notaError);
+      throw new Error(`Erro ao buscar nota: ${notaError.message}`);
+    }
+    if (!nota) {
       throw new Error("Nota fiscal não encontrada");
     }
+
+    console.log("emitir-nfse: nota encontrada, status=", nota.status, "valor_servico=", nota.valor_servico);
 
     const dadosNota: DadosNota = {
       identificacaoRps: {
@@ -488,7 +507,7 @@ serve(async (req) => {
         inscricaoMunicipal: certDigital.inscricaoMunicipal,
         razaoSocial: certificado.razao_social || certDigital.razaoSocial || "",
         endereco: {
-          logradouro: certificado.endereco?.logradouro || "",
+          logradouro: (certificado.endereco && typeof certificado.endereco === "object" ? certificado.endereco.logradouro : "") || "",
           numero: certificado.numero || "",
           bairro: certificado.bairro || "",
           codigoMunicipio: certificado.codigo_municipio || "3550308",
@@ -536,7 +555,7 @@ serve(async (req) => {
       },
     };
 
-    console.log("Emitindo NFS-e:", dadosNota.identificacaoRps.numero);
+    console.log("Emitindo NFS-e:", dadosNota.identificacaoRps.numero, "Ambiente:", Deno.env.get("NFSE_AMBIENTE") || "homologacao");
 
     const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
     let resultado;

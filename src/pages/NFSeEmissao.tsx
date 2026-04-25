@@ -200,8 +200,8 @@ export default function NFSeEmissao() {
     return () => clearInterval(interval);
   }, [activeTab, tomador, servico, retencoes]);
 
-  // Validação do formulário
-  const validarFormulario = (): boolean => {
+  // Validação do formulário (retorna erros para uso síncrono)
+  const validarFormularioComErros = (): Record<string, string> => {
     const errors: Record<string, string> = {};
 
     // Validação do Tomador
@@ -223,6 +223,9 @@ export default function NFSeEmissao() {
     if (!tomador.numero.trim()) {
       errors.numero = "Número é obrigatório";
     }
+    if (!tomador.bairro.trim()) {
+      errors.bairro = "Bairro é obrigatório";
+    }
     if (!tomador.cidade.trim()) {
       errors.cidade = "Cidade é obrigatória";
     }
@@ -241,8 +244,7 @@ export default function NFSeEmissao() {
       errors.valor_bruto = "Valor bruto deve ser maior que zero";
     }
 
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+    return errors;
   };
 
   // Salva rascunho automaticamente
@@ -366,14 +368,17 @@ export default function NFSeEmissao() {
       return;
     }
 
-    if (!validarFormulario()) {
+    const errors = validarFormularioComErros();
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
       toast({
         title: "Campos obrigatórios",
-        description: "Preencha todos os campos obrigatórios.",
+        description: Object.values(errors).join(". "),
         variant: "destructive",
       });
       return;
     }
+    setValidationErrors({});
 
     setIsSubmitting(true);
     try {
@@ -407,14 +412,22 @@ export default function NFSeEmissao() {
       setNotaId(nota.id);
 
       // Chama Edge Function para emitir
-      const { error: emitError } = await supabase.functions.invoke("emitir-nfse", {
+      const { data: emitData, error: emitError } = await supabase.functions.invoke("emitir-nfse", {
         body: {
           notaId: nota.id,
           certificadoId: certificado.id,
         },
       });
 
-      if (emitError) throw emitError;
+      if (emitError) {
+        const errorMsg = emitError.message || "Erro na função de emissão";
+        throw new Error(errorMsg);
+      }
+
+      if (emitData && !emitData.sucesso) {
+        const msgs = emitData.mensagens?.map((m: any) => m.mensagem).join("; ") || emitData.error || "Erro desconhecido na emissão";
+        throw new Error(msgs);
+      }
 
       toast({
         title: "Nota emitida",
