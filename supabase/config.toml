@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.sync-open-banking]
 verify_jwt = false
+
+[functions.consultar-cnpj]
+verify_jwt = false

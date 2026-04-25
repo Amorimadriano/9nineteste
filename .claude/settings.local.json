@@ -43,7 +43,8 @@
       "WebFetch(domain:jsr.io)",
       "WebFetch(domain:upyo.org)",
       "Bash(ls dist/.htaccess)",
-      "Bash(ls public/.htaccess)"
+      "Bash(ls public/.htaccess)",
+      "WebFetch(domain:brasilapi.com.br)"
     ]
   }
 }

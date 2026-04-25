@@ -12,6 +12,7 @@ import { Loader2, Search, Building2, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TomadorFormData } from "@/types/nfse-ui";
 import { formatCNPJ, formatCPF, formatCEP, isValidCNPJ, isValidCPF } from "@/lib/nfse-utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface TomadorFormProps {
   value: TomadorFormData;
@@ -47,7 +48,7 @@ export function TomadorForm({ value, onChange, errors = {} }: TomadorFormProps) 
   const [loadingCNPJ, setLoadingCNPJ] = useState(false);
   const [loadingCEP, setLoadingCEP] = useState(false);
 
-  // Busca CNPJ na Brasil API
+  // Busca CNPJ via edge function (sem problema de CORS)
   const buscarCNPJ = async () => {
     const documentoLimpo = value.documento.replace(/\D/g, "");
     if (value.tipo === "CNPJ" && documentoLimpo.length !== 14) {
@@ -61,43 +62,54 @@ export function TomadorForm({ value, onChange, errors = {} }: TomadorFormProps) 
 
     setLoadingCNPJ(true);
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${documentoLimpo}`);
-      if (!response.ok) throw new Error("CNPJ não encontrado");
-
-      const data: BrasilAPICNPJResponse = await response.json();
-
-      const telefone = data.ddd_telefone_1
-        ? `(${data.ddd_telefone_1.slice(0, 2)}) ${data.ddd_telefone_1.slice(2)}`
-        : "";
-
-      onChange({
-        ...value,
-        razao_social: data.razao_social || "",
-        nome_fantasia: data.nome_fantasia || "",
-        email: data.email || "",
-        telefone,
-        endereco: data.logradouro || "",
-        numero: data.numero || "",
-        complemento: data.complemento || "",
-        bairro: data.bairro || "",
-        cidade: data.municipio || "",
-        estado: data.uf || "",
-        cep: data.cep?.replace(/\D/g, "") || "",
+      const { data, error } = await supabase.functions.invoke("consultar-cnpj", {
+        method: "GET",
+        query: { cnpj: documentoLimpo },
       });
 
-      toast({
-        title: "Dados preenchidos",
-        description: "Informações do CNPJ carregadas com sucesso.",
-      });
-    } catch (error) {
+      if (error) throw new Error(error.message);
+      if (!data?.data) throw new Error("CNPJ não encontrado");
+
+      const cnpjData: BrasilAPICNPJResponse = data.data;
+      preencherDadosCNPJ(cnpjData);
+    } catch (err: any) {
       toast({
         title: "Erro na consulta",
-        description: "Não foi possível buscar os dados do CNPJ. Verifique o número e tente novamente.",
+        description: err.message || "Não foi possível buscar os dados do CNPJ. Preencha manualmente.",
         variant: "destructive",
       });
     } finally {
       setLoadingCNPJ(false);
     }
+  };
+
+  const preencherDadosCNPJ = (data: BrasilAPICNPJResponse) => {
+    const telefone = data.ddd_telefone_1
+      ? data.ddd_telefone_1.replace(/\D/g, "").length >= 10
+        ? `(${data.ddd_telefone_1.replace(/\D/g, "").slice(0, 2)}) ${data.ddd_telefone_1.replace(/\D/g, "").slice(2)}`
+        : data.ddd_telefone_1
+      : "";
+
+    onChange({
+      ...value,
+      razao_social: data.razao_social || "",
+      nome_fantasia: data.nome_fantasia || "",
+      email: data.email || "",
+      telefone,
+      endereco: data.logradouro || "",
+      numero: data.numero || "",
+      complemento: data.complemento || "",
+      bairro: data.bairro || "",
+      cidade: data.municipio || "",
+      estado: data.uf || "",
+      cep: data.cep?.replace(/\D/g, "") || "",
+    });
+
+    toast({
+      title: "Dados preenchidos",
+      description: "Informações do CNPJ carregadas com sucesso.",
+    });
+    setLoadingCNPJ(false);
   };
 
   // Busca CEP na ViaCEP
