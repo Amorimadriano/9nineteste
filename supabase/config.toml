@@ -1,4 +1,4 @@
-project_id = "tomrlopsmxgvzgqsfizh"
+project_id = "rjcruiwlurqdwooarrpa"
 
 [functions.pagarme-webhook]
 verify_jwt = false

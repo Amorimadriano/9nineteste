@@ -129,6 +129,10 @@ export default function Planos() {
     if (cleanDoc.length !== 11 && cleanDoc.length !== 14) {
       toast({ title: "Informe um CPF ou CNPJ válido", variant: "destructive" }); return false;
     }
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      toast({ title: "Informe um telefone válido com DDD", variant: "destructive" }); return false;
+    }
     return true;
   };
 
@@ -234,7 +238,7 @@ export default function Planos() {
                   <Input value={document} onChange={e => setDocument(e.target.value)} placeholder="000.000.000-00" />
                 </div>
                 <div>
-                  <Label>Telefone</Label>
+                  <Label>Telefone com DDD</Label>
                   <Input value={phone} onChange={e => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
                 </div>
               </div>
@@ -268,7 +272,7 @@ export default function Planos() {
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div><Label>Mês</Label><Input value={cardExpMonth} onChange={e => setCardExpMonth(e.target.value)} placeholder="MM" maxLength={2} /></div>
-                    <div><Label>Ano</Label><Input value={cardExpYear} onChange={e => setCardExpYear(e.target.value)} placeholder="AA" maxLength={2} /></div>
+                    <div><Label>Ano</Label><Input value={cardExpYear} onChange={e => setCardExpYear(e.target.value)} placeholder="AAAA" maxLength={4} /></div>
                     <div><Label>CVV</Label><Input value={cardCvv} onChange={e => setCardCvv(e.target.value)} placeholder="000" maxLength={4} /></div>
                   </div>
                 </div>

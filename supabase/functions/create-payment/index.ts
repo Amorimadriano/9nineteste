@@ -40,16 +40,17 @@ serve(async (req) => {
       type: cleanDoc.length > 11 ? "company" : "individual",
       document: cleanDoc,
       document_type: cleanDoc.length > 11 ? "CNPJ" : "CPF",
-      phones: {},
     };
 
     if (cleanPhone.length >= 10) {
       const ddd = cleanPhone.substring(0, 2);
       const number = cleanPhone.substring(2);
-      customerPayload.phones.mobile_phone = {
-        country_code: "55",
-        area_code: ddd,
-        number: number,
+      customerPayload.phones = {
+        mobile_phone: {
+          country_code: "55",
+          area_code: ddd,
+          number: number,
+        },
       };
     }
 
@@ -61,6 +62,8 @@ serve(async (req) => {
 
     if (payment_method === "credit_card") {
       if (!card) throw new Error("Dados do cartão são obrigatórios");
+      let expYear = parseInt(card.exp_year);
+      if (expYear < 100) expYear += 2000;
       paymentObj.credit_card = {
         recurrence: false,
         installments: 1,
@@ -69,7 +72,7 @@ serve(async (req) => {
           number: card.number.replace(/\s/g, ""),
           holder_name: card.holder_name,
           exp_month: parseInt(card.exp_month),
-          exp_year: parseInt(card.exp_year),
+          exp_year: expYear,
           cvv: card.cvv,
           billing_address: {
             line_1: `100, ${customer.address || "Rua Exemplo"}, ${customer.neighborhood || "Centro"}`,

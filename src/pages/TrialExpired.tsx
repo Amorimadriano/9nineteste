@@ -135,6 +135,10 @@ export default function TrialExpired() {
     if (cleanDoc.length !== 11 && cleanDoc.length !== 14) {
       toast({ title: "Informe um CPF ou CNPJ válido", variant: "destructive" }); return false;
     }
+    const cleanPhone = phone.replace(/\D/g, "");
+    if (cleanPhone.length < 10) {
+      toast({ title: "Informe um telefone válido com DDD", variant: "destructive" }); return false;
+    }
     return true;
   };
 
@@ -230,7 +234,7 @@ export default function TrialExpired() {
                 <Input id="document" value={document} onChange={e => setDocument(e.target.value)} placeholder="000.000.000-00" />
               </div>
               <div>
-                <Label htmlFor="phone">Telefone (opcional)</Label>
+                <Label htmlFor="phone">Telefone com DDD</Label>
                 <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="(11) 99999-9999" />
               </div>
             </div>
@@ -290,7 +294,7 @@ export default function TrialExpired() {
                   </div>
                   <div>
                     <Label>Ano</Label>
-                    <Input value={cardExpYear} onChange={e => setCardExpYear(e.target.value)} placeholder="AA" maxLength={2} />
+                    <Input value={cardExpYear} onChange={e => setCardExpYear(e.target.value)} placeholder="AAAA" maxLength={4} />
                   </div>
                   <div>
                     <Label>CVV</Label>
