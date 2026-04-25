@@ -30,24 +30,93 @@ function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
 }
 
+/**
+ * Proper C14N canonicalization for XMLDSIG.
+ * Preserves xmlns attributes (required for GINFES XSD validation).
+ */
 function canonicalizeXml(xml: string): string {
-  return xml.replace(/>\s+</g, "><").replace(/\s+xmlns[^"]*"[^"]*"/g, "").replace(/\s+/g, " ").trim();
+  let result = xml;
+  // Remove XML declaration
+  result = result.replace(/<\?xml[^?]*\?>\s*/g, "");
+  // Remove processing instructions
+  result = result.replace(/<\?[^?]*\?>\s*/g, "");
+  // Normalize empty elements
+  result = result.replace(/<(\w+)([^>]*)\/>/g, (_match: string, tagName: string, attrs: string) => {
+    if (attrs.trim()) {
+      return `<${tagName}${attrs}></${tagName}>`;
+    }
+    return `<${tagName}></${tagName}>`;
+  });
+  // Normalize whitespace between tags
+  result = result.replace(/>\s+</g, "><");
+  // Normalize attribute whitespace
+  result = result.replace(/\s+=\s+/g, "=");
+  // Trim
+  result = result.replace(/\n\s+/g, "\n");
+  result = result.trim();
+  return result;
 }
 
+/**
+ * Extract XML element by Id with proper nested tag handling.
+ */
 function extractElementById(xml: string, id: string): string | null {
-  const regex = new RegExp(`(<\\w+[^>]*Id="${id}"[^>]*>[\\s\\S]*?<\\/\\w+>)`, "i");
-  const match = xml.match(regex);
-  return match ? match[1] : null;
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const openRegex = new RegExp(`<([\\w]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, "i");
+  const openMatch = xml.match(openRegex);
+  if (!openMatch) return null;
+
+  const tagName = openMatch[1];
+  const fullOpenMatch = openMatch[0];
+  const startIndex = xml.indexOf(fullOpenMatch);
+  if (startIndex === -1) return null;
+
+  // Balanced tag matching
+  let depth = 0;
+  let pos = startIndex;
+
+  while (pos < xml.length) {
+    const nextOpen = xml.indexOf(`<${tagName}`, pos + 1);
+    const nextClose = xml.indexOf(`</${tagName}>`, pos + 1);
+
+    if (nextClose === -1) break;
+
+    depth++;
+    if (nextOpen === -1 || nextOpen > nextClose) {
+      return xml.substring(startIndex, nextClose + `</${tagName}>`.length);
+    }
+
+    let searchPos = nextClose + `</${tagName}>`.length;
+    while (depth > 0 && searchPos < xml.length) {
+      const innerOpen = xml.indexOf(`<${tagName}`, searchPos);
+      const innerClose = xml.indexOf(`</${tagName}>`, searchPos);
+      if (innerClose === -1) break;
+      if (innerOpen !== -1 && innerOpen < innerClose) {
+        depth++;
+      } else {
+        depth--;
+      }
+      if (depth === 0) {
+        searchPos = innerClose + `</${tagName}>`.length;
+        break;
+      }
+      searchPos = innerClose + `</${tagName}>`.length;
+    }
+    return xml.substring(startIndex, searchPos);
+  }
+
+  return null;
 }
 
 function getElementName(xml: string, id: string): string {
-  const regex = new RegExp(`<(\\w+)[^>]*Id="${id}"`, "i");
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, "i");
   const match = xml.match(regex);
   return match ? match[1] : "Pedido";
 }
 
 async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
-  const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+  const forgeModule = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
   const forge: any = forgeModule.default?.util ? forgeModule.default : forgeModule;
   (globalThis as any).forge = forge;
 
@@ -57,7 +126,6 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
 
   const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-  const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
 
   let certPem = "";
   let keyPem = "";
@@ -73,21 +141,33 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
     for (const attr of subject.attributes) {
       if (attr.shortName === "CN") razaoSocial = attr.value;
     }
-    const cnAttr = subject.attributes.find((a: any) => a.shortName === "CN");
+    const cnAttr = subject.attributes.find((a: any) =>
+      a.oid === "2.5.4.5" || a.oid === "2.16.840.1.113730.4.1" || a.oid === "0.9.2342.19200300.100.1.1" || a.shortName === "CN"
+    );
     if (cnAttr) {
       const cnpjMatch = cnAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
       if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
     }
   }
 
-  if (keyBags[forge.pki.oids.pkcs8ShorthandKeyBag]) {
-    const key = keyBags[forge.pki.oids.pkcs8ShorthandKeyBag]![0];
+  // Try pkcs8ShroudedKeyBag first (most common for ICP-Brasil)
+  const keyBagsShrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+  if (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag] && keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]!.length > 0) {
+    const key = keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]![0];
     keyPem = forge.pki.privateKeyToPem(key.key!);
   } else {
-    const keyBags2 = p12.getBags({ bagType: forge.pki.oids.keyBag });
-    if (keyBags2[forge.pki.oids.keyBag]) {
-      const key = keyBags2[forge.pki.oids.keyBag]![0];
+    // Fallback to pkcs8ShorthandKeyBag
+    const keyBagsShorthand = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
+    if (keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag] && keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]!.length > 0) {
+      const key = keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]![0];
       keyPem = forge.pki.privateKeyToPem(key.key!);
+    } else {
+      // Fallback to keyBag
+      const keyBags2 = p12.getBags({ bagType: forge.pki.oids.keyBag });
+      if (keyBags2[forge.pki.oids.keyBag]) {
+        const key = keyBags2[forge.pki.oids.keyBag]![0];
+        keyPem = forge.pki.privateKeyToPem(key.key!);
+      }
     }
   }
 
@@ -98,7 +178,8 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   return { pfxBase64, senha, cnpj, inscricaoMunicipal: "", razaoSocial, certPem, keyPem, validoAte };
 }
 
-function construirXmlCancelamento(numeroNfse: string, cnpj: string, inscricaoMunicipal: string, codigoCancelamento: string): string {
+function construirXmlCancelamento(numeroNfse: string, cnpj: string, inscricaoMunicipal: string, codigoCancelamento: string, codigoMunicipio?: string): string {
+  const municipio = codigoMunicipio || "3550308"; // Default São Paulo, allow override
   const pedidoId = `CANC${numeroNfse}`;
   return `<CancelarNfseEnvio xmlns="${ABRASF_NAMESPACES.servicoCancelar}">
   <Pedido Id="${pedidoId}">
@@ -107,7 +188,7 @@ function construirXmlCancelamento(numeroNfse: string, cnpj: string, inscricaoMun
         <Numero>${numeroNfse}</Numero>
         <Cnpj>${cnpj}</Cnpj>
         <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
-        <CodigoMunicipio>3550308</CodigoMunicipio>
+        <CodigoMunicipio>${municipio}</CodigoMunicipio>
       </IdentificacaoNfse>
       <CodigoCancelamento>${codigoCancelamento}</CodigoCancelamento>
     </InfPedidoCancelamento>
@@ -115,62 +196,49 @@ function construirXmlCancelamento(numeroNfse: string, cnpj: string, inscricaoMun
 </CancelarNfseEnvio>`;
 }
 
+/**
+ * Signs XML using XMLDSIG. Throws error on failure instead of returning unsigned XML.
+ */
 function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) {
-    console.warn("node-forge not available for XML signing");
-    return xml;
+    throw new Error("node-forge não está disponível para assinatura XML. Cancelamento em produção requer assinatura digital.");
   }
   try {
     const privateKey = forge.pki.privateKeyFromPem(certificado.keyPem);
     const certificate = forge.pki.certificateFromPem(certificado.certPem);
     const referencedXml = extractElementById(xml, idReferencia);
-    if (!referencedXml) return xml;
+    if (!referencedXml) {
+      throw new Error(`Elemento com Id="${idReferencia}" não encontrado no XML para assinatura`);
+    }
     const canonReferenced = canonicalizeXml(referencedXml);
     const digest = forge.md.sha1.create();
-    digest.update(canonReferenced);
+    digest.update(canonReferenced, "utf8");
     const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-      <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-      <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-      <Reference URI="#${idReferencia}">
-        <Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms>
-        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-        <DigestValue>${digestBase64}</DigestValue>
-      </Reference>
-    </SignedInfo>`;
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
     const canonSignedInfo = canonicalizeXml(signedInfoXml);
     const signatureMd = forge.md.sha1.create();
-    signatureMd.update(canonSignedInfo);
+    signatureMd.update(canonSignedInfo, "utf8");
     const signatureBytes = privateKey.sign(signatureMd);
     const signatureBase64 = forge.util.encode64(signatureBytes);
     const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
     const certBase64 = forge.util.encode64(certDer);
 
-    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-      <SignedInfo>
-        <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-        <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-        <Reference URI="#${idReferencia}">
-          <Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms>
-          <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-          <DigestValue>${digestBase64}</DigestValue>
-        </Reference>
-      </SignedInfo>
-      <SignatureValue>${signatureBase64}</SignatureValue>
-      <KeyInfo>
-        <X509Data>
-          <X509Certificate>${certBase64}</X509Certificate>
-        </X509Data>
-      </KeyInfo>
-    </Signature>`;
+    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
-    return xml.replace(`</${getElementName(xml, idReferencia)}>`, `${signatureBlock}</${getElementName(xml, idReferencia)}>`);
+    // Insert signature inside the referenced element
+    const elementName = getElementName(xml, idReferencia);
+    const closingTag = `</${elementName}>`;
+    const insertionPoint = xml.lastIndexOf(closingTag);
+    if (insertionPoint === -1) {
+      throw new Error(`Tag de fechamento </${elementName}> não encontrada`);
+    }
+
+    return xml.substring(0, insertionPoint) + signatureBlock + xml.substring(insertionPoint);
   } catch (error) {
-    console.error("Error signing XML:", error);
-    return xml;
+    throw new Error(`Erro na assinatura digital: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -372,11 +440,16 @@ serve(async (req) => {
     if (notaId) {
       try {
         const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-        await supabase
+        const updateResult = await supabase
           .from("notas_fiscais_servico")
           .update({ status: "erro", mensagem_erro: (err as Error).message })
           .eq("id", notaId);
-      } catch {}
+        if (updateResult.error) {
+          console.error("Falha ao atualizar status de erro no banco:", updateResult.error.message);
+        }
+      } catch (dbErr) {
+        console.error("Falha ao conectar ao banco para atualizar status de erro:", dbErr);
+      }
     }
 
     return new Response(
@@ -395,7 +468,8 @@ function cancelarHomologacao(nota: any, certificado: any, motivoCancelamento: st
     nota.numero_nota || nota.numero_rps || "",
     certificado.cnpj || "",
     certificado.inscricao_municipal || "",
-    motivoCancelamento
+    motivoCancelamento,
+    certificado.codigo_municipio
   );
   return {
     sucesso: true,
@@ -413,7 +487,8 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
   const numeroNfse = nota.numero_nota || nota.numero_rps || "";
   const cnpj = certDigital.cnpj;
   const inscricaoMunicipal = certDigital.inscricaoMunicipal;
-  const xmlCancelamento = construirXmlCancelamento(numeroNfse, cnpj, inscricaoMunicipal, motivoCancelamento);
+  const codigoMunicipio = nota.codigo_municipio || "3550308";
+  const xmlCancelamento = construirXmlCancelamento(numeroNfse, cnpj, inscricaoMunicipal, motivoCancelamento, codigoMunicipio);
   const pedidoId = `CANC${numeroNfse}`;
   const signedXml = assinarXml(xmlCancelamento, certDigital, pedidoId);
   const cabecalho = criarCabecalhoGinfes();
@@ -424,5 +499,6 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
 
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
   console.log("Resposta GINFES Cancelamento:", soapResponse.substring(0, 500));
-  return parsearRespostaCancelamento(soapResponse);
+  const resultado = parsearRespostaCancelamento(soapResponse);
+  return { ...resultado, xmlEnvio: signedXml };
 }

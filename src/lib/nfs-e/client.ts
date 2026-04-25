@@ -69,6 +69,7 @@ export class NFSeClientSP {
 
   /**
    * Faz requisição SOAP para a API da GINFES
+   * GINFES v03 format: cabecalho in Body as arg0, dados in arg1
    */
   private async fazerRequisicaoSOAP(
     endpoint: string,
@@ -76,16 +77,17 @@ export class NFSeClientSP {
     options?: RequestOptions
   ): Promise<string> {
     const soapAction = options?.soapAction || NFSeConfig.soapActions.enviarLoteRps;
+    const cabecalho = `<cabecalho xmlns="${NFSeConfig.namespaces.cabecalho}" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 
     const envelope = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="${NFSeConfig.namespaces.soap}" xmlns:xsi="${NFSeConfig.namespaces.xsi}" xmlns:xsd="${NFSeConfig.namespaces.xsd}">
-${criarHeaderSOAP({ cnpj: '', inscricaoMunicipal: '', endereco: { logradouro: '', numero: '', bairro: '', codigoMunicipio: '', uf: '', cep: '' }, certificado: { certificado: '', senha: '' }, razaoSocial: '' })}
-  <soap:Body>
-    <RecepcionarLoteRpsRequest xmlns="${NFSeConfig.namespaces.nfse}">
-      ${xmlBody}
-    </RecepcionarLoteRpsRequest>
-  </soap:Body>
-</soap:Envelope>`;
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="${NFSeConfig.namespaces.xsi}" xmlns:xsd="${NFSeConfig.namespaces.xsd}">
+  <soap12:Body>
+    <${soapAction} xmlns="http://www.ginfes.com.br/">
+      <arg0>${cabecalho}</arg0>
+      <arg1><![CDATA[${xmlBody}]]></arg1>
+    </${soapAction}>
+  </soap12:Body>
+</soap12:Envelope>`;
 
     try {
       const controller = new AbortController();

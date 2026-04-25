@@ -96,8 +96,14 @@ export class AssinaturaDigitalService {
     }
 
     try {
-      // Canonicaliza o XML
-      const xmlCanonicalizado = this.canonicalizarXML(xml);
+      // Extract the referenced element
+      const referencedXml = this.extractElementById(xml, idReferencia);
+      if (!referencedXml) {
+        throw new Error(`Elemento com Id="${idReferencia}" não encontrado no XML para assinatura`);
+      }
+
+      // Canonicaliza o elemento referenciado (C14N preserving xmlns)
+      const xmlCanonicalizado = this.canonicalizarXML(referencedXml);
 
       // Converte a chave privada PEM para objeto
       const privateKey = forge.pki.privateKeyFromPem(this.certificado.chavePrivadaPem);
@@ -105,59 +111,32 @@ export class AssinaturaDigitalService {
       // Extrai o certificado em DER e converte para Base64
       const x509Base64 = this.extrairX509Base64(this.certificado.certificadoPem);
 
-      // Calcula o hash SHA-1 do conteúdo canonicalizado
+      // Calcula o hash SHA-1 do elemento referenciado canonicalizado
       const md = forge.md.sha1.create();
       md.update(xmlCanonicalizado, 'utf8');
       const digestValue = forge.util.encode64(md.digest().bytes());
 
       // Cria o conteúdo SignedInfo que será assinado
-      const signedInfoCanonical = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-  <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-  <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-  <Reference URI="#${idReferencia}">
-    <Transforms>
-      <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
-    </Transforms>
-    <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-    <DigestValue>${digestValue}</DigestValue>
-  </Reference>
-</SignedInfo>`;
+      const signedInfoCanonical = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestValue}</DigestValue></Reference></SignedInfo>`;
 
-      // Assina o SignedInfo
+      // Assina o SignedInfo canonicalizado
       const signedInfoMd = forge.md.sha1.create();
-      signedInfoMd.update(signedInfoCanonical, 'utf8');
+      signedInfoMd.update(this.canonicalizarXML(signedInfoCanonical), 'utf8');
       const signature = privateKey.sign(signedInfoMd);
       const signatureValue = forge.util.encode64(signature);
 
       // Monta a estrutura da assinatura XML
-      const signatureXML = `
-<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-  <SignedInfo>
-    <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-    <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-    <Reference URI="#${idReferencia}">
-      <Transforms>
-        <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
-      </Transforms>
-      <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-      <DigestValue>${digestValue}</DigestValue>
-    </Reference>
-  </SignedInfo>
-  <SignatureValue>${signatureValue}</SignatureValue>
-  <KeyInfo>
-    <X509Data>
-      <X509Certificate>${x509Base64}</X509Certificate>
-    </X509Data>
-  </KeyInfo>
-</Signature>`;
+      const signatureXML = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestValue}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureValue}</SignatureValue><KeyInfo><X509Data><X509Certificate>${x509Base64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
-      // Insere a assinatura antes do fechamento do elemento raiz
-      const posicaoInsercao = xml.lastIndexOf('</');
-      if (posicaoInsercao === -1) {
-        throw new Error('Estrutura XML inválida: não foi possível encontrar o elemento raiz');
+      // Insere a assinatura dentro do elemento referenciado (antes da tag de fechamento)
+      const elementName = this.getElementName(xml, idReferencia);
+      const closingTag = `</${elementName}>`;
+      const insertionPoint = xml.lastIndexOf(closingTag);
+      if (insertionPoint === -1) {
+        throw new Error(`Tag de fechamento </${elementName}> não encontrada para inserir assinatura`);
       }
 
-      const xmlAssinado = xml.substring(0, posicaoInsercao) + signatureXML + xml.substring(posicaoInsercao);
+      const xmlAssinado = xml.substring(0, insertionPoint) + signatureXML + xml.substring(insertionPoint);
 
       return xmlAssinado;
     } catch (error: any) {
@@ -230,16 +209,87 @@ export class AssinaturaDigitalService {
   }
 
   /**
-   * Canonicaliza XML conforme especificação C14N
-   * Remove espaços em branco desnecessários e normaliza o XML
+   * Proper C14N canonicalization for XMLDSIG.
+   * Preserves xmlns attributes (required for GINFES XSD validation).
    */
   private canonicalizarXML(xml: string): string {
-    return xml
-      .replace(/\s+/g, ' ')
-      .replace(/>\s+</g, '><')
-      .replace(/\s+>/g, '>')
-      .replace(/<\s+/g, '<')
-      .trim();
+    let result = xml;
+    // Remove XML declaration
+    result = result.replace(/<\?xml[^?]*\?>\s*/g, '');
+    // Remove processing instructions
+    result = result.replace(/<\?[^?]*\?>\s*/g, '');
+    // Normalize empty elements: <tag/> -> <tag></tag>
+    result = result.replace(/<(\w+)([^>]*)\/>/g, (_match: string, tagName: string, attrs: string) => {
+      if (attrs.trim()) {
+        return `<${tagName}${attrs}></${tagName}>`;
+      }
+      return `<${tagName}></${tagName}>`;
+    });
+    // Normalize whitespace between tags
+    result = result.replace(/>\s+</g, '><');
+    // Normalize attribute whitespace
+    result = result.replace(/\s+=\s+/g, '=');
+    // Trim lines
+    result = result.replace(/\n\s+/g, '\n');
+    result = result.trim();
+    return result;
+  }
+
+  /**
+   * Extract XML element by Id with proper nested tag handling.
+   */
+  private extractElementById(xml: string, id: string): string | null {
+    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const openRegex = new RegExp(`<([\\w]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, 'i');
+    const openMatch = xml.match(openRegex);
+    if (!openMatch) return null;
+
+    const tagName = openMatch[1];
+    const fullOpenMatch = openMatch[0];
+    const startIndex = xml.indexOf(fullOpenMatch);
+    if (startIndex === -1) return null;
+
+    let depth = 0;
+    let pos = startIndex;
+
+    while (pos < xml.length) {
+      const nextOpen = xml.indexOf(`<${tagName}`, pos + 1);
+      const nextClose = xml.indexOf(`</${tagName}>`, pos + 1);
+
+      if (nextClose === -1) break;
+
+      depth++;
+      if (nextOpen === -1 || nextOpen > nextClose) {
+        return xml.substring(startIndex, nextClose + `</${tagName}>`.length);
+      }
+
+      let searchPos = nextClose + `</${tagName}>`.length;
+      while (depth > 0 && searchPos < xml.length) {
+        const innerOpen = xml.indexOf(`<${tagName}`, searchPos);
+        const innerClose = xml.indexOf(`</${tagName}>`, searchPos);
+        if (innerClose === -1) break;
+        if (innerOpen !== -1 && innerOpen < innerClose) {
+          depth++;
+        } else {
+          depth--;
+        }
+        if (depth === 0) {
+          searchPos = innerClose + `</${tagName}>`.length;
+          break;
+        }
+        searchPos = innerClose + `</${tagName}>`.length;
+      }
+      return xml.substring(startIndex, searchPos);
+    }
+
+    return null;
+  }
+
+  private getElementName(xml: string, id: string): string {
+    const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, 'i');
+    const match = xml.match(regex);
+    return match ? match[1] : 'InfRps';
   }
 
   /**

@@ -69,11 +69,8 @@ export async function carregarCertificadoDigital(
     // Parse do PKCS#12
     const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
 
-    // Extrai bags de certificado e chave privada
+    // Extrai bags de certificado
     const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-    const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-
-    // Pega o primeiro certificado
     const certBag = certBags[forge.pki.oids.certBag];
     if (!certBag || certBag.length === 0) {
       throw new Error('Certificado não encontrado no arquivo PFX/P12');
@@ -82,14 +79,27 @@ export async function carregarCertificadoDigital(
     const certificate = certBag[0].cert;
     const certPem = forge.pki.certificateToPem(certificate);
 
-    // Pega a chave privada
-    const keyBag = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag];
-    if (!keyBag || keyBag.length === 0) {
-      throw new Error('Chave privada não encontrada no arquivo PFX/P12');
+    // Pega a chave privada - tenta pkcs8ShroudedKeyBag primeiro (mais comum ICP-Brasil),
+    // depois pkcs8ShorthandKeyBag, depois keyBag
+    let keyPem = '';
+    const keyBagsShrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+    if (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag] && keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag].length > 0) {
+      keyPem = forge.pki.privateKeyToPem(keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag][0].key!);
+    } else {
+      const keyBagsShorthand = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+      if (keyBagsShorthand[forge.pki.oids.pkcs8ShroudedKeyBag] && keyBagsShorthand[forge.pki.oids.pkcs8ShroudedKeyBag].length > 0) {
+        keyPem = forge.pki.privateKeyToPem(keyBagsShorthand[forge.pki.oids.pkcs8ShroudedKeyBag][0].key!);
+      } else {
+        const keyBagsPlain = p12.getBags({ bagType: forge.pki.oids.keyBag });
+        if (keyBagsPlain[forge.pki.oids.keyBag] && keyBagsPlain[forge.pki.oids.keyBag].length > 0) {
+          keyPem = forge.pki.privateKeyToPem(keyBagsPlain[forge.pki.oids.keyBag][0].key!);
+        }
+      }
     }
 
-    const privateKey = keyBag[0].key;
-    const keyPem = forge.pki.privateKeyToPem(privateKey);
+    if (!keyPem) {
+      throw new Error('Chave privada não encontrada no arquivo PFX/P12');
+    }
 
     return {
       certificado: cleanCert,
@@ -187,16 +197,88 @@ export function criarHeaderSOAP(emitente: EmitenteNfse): string {
 }
 
 /**
- * Canonicaliza XML conforme especificação C14N
- * Remove espaços em branco desnecessários e normaliza o XML
+ * Proper C14N canonicalization for XMLDSIG.
+ * Preserves xmlns attributes (required for GINFES XSD validation).
  */
 function canonicalizarXML(xml: string): string {
-  return xml
-    .replace(/\s+/g, ' ')
-    .replace(/>\s+</g, '><')
-    .replace(/\s+>/g, '>')
-    .replace(/<\s+/g, '<')
-    .trim();
+  let result = xml;
+  // Remove XML declaration
+  result = result.replace(/<\?xml[^?]*\?>\s*/g, '');
+  // Remove processing instructions
+  result = result.replace(/<\?[^?]*\?>\s*/g, '');
+  // Normalize empty elements: <tag/> -> <tag></tag>
+  result = result.replace(/<(\w+)([^>]*)\/>/g, (_match: string, tagName: string, attrs: string) => {
+    if (attrs.trim()) {
+      return `<${tagName}${attrs}></${tagName}>`;
+    }
+    return `<${tagName}></${tagName}>`;
+  });
+  // Normalize whitespace between tags (keep text content whitespace)
+  result = result.replace(/>\s+</g, '><');
+  // Normalize attribute whitespace
+  result = result.replace(/\s+=\s+/g, '=');
+  // Trim lines
+  result = result.replace(/\n\s+/g, '\n');
+  result = result.trim();
+  return result;
+}
+
+/**
+ * Extract XML element by Id with proper nested tag handling.
+ */
+function extractElementById(xml: string, id: string): string | null {
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const openRegex = new RegExp(`<([\\w]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, 'i');
+  const openMatch = xml.match(openRegex);
+  if (!openMatch) return null;
+
+  const tagName = openMatch[1];
+  const fullOpenMatch = openMatch[0];
+  const startIndex = xml.indexOf(fullOpenMatch);
+  if (startIndex === -1) return null;
+
+  // Balanced tag matching
+  let depth = 0;
+  let pos = startIndex;
+
+  while (pos < xml.length) {
+    const nextOpen = xml.indexOf(`<${tagName}`, pos + 1);
+    const nextClose = xml.indexOf(`</${tagName}>`, pos + 1);
+
+    if (nextClose === -1) break;
+
+    depth++;
+    if (nextOpen === -1 || nextOpen > nextClose) {
+      return xml.substring(startIndex, nextClose + `</${tagName}>`.length);
+    }
+
+    let searchPos = nextClose + `</${tagName}>`.length;
+    while (depth > 0 && searchPos < xml.length) {
+      const innerOpen = xml.indexOf(`<${tagName}`, searchPos);
+      const innerClose = xml.indexOf(`</${tagName}>`, searchPos);
+      if (innerClose === -1) break;
+      if (innerOpen !== -1 && innerOpen < innerClose) {
+        depth++;
+      } else {
+        depth--;
+      }
+      if (depth === 0) {
+        searchPos = innerClose + `</${tagName}>`.length;
+        break;
+      }
+      searchPos = innerClose + `</${tagName}>`.length;
+    }
+    return xml.substring(startIndex, searchPos);
+  }
+
+  return null;
+}
+
+function getElementName(xml: string, id: string): string {
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, 'i');
+  const match = xml.match(regex);
+  return match ? match[1] : 'InfRps';
 }
 
 /**
@@ -333,6 +415,7 @@ export async function assinarCancelamento(xmlCancelamento: string, certificado: 
 /**
  * Assina XML digitalmente usando node-forge conforme especificação ABRASF/GINFES
  * Implementa assinatura RSA-SHA1 com C14N
+ * Throws error on failure instead of returning unsigned XML.
  */
 export async function assinarXML(
   xml: string,
@@ -344,8 +427,14 @@ export async function assinarXML(
   }
 
   try {
-    // Canonicaliza o XML
-    const xmlCanonicalizado = canonicalizarXML(xml);
+    // Extract the referenced element
+    const referencedXml = extractElementById(xml, idReferencia);
+    if (!referencedXml) {
+      throw new Error(`Elemento com Id="${idReferencia}" não encontrado no XML para assinatura`);
+    }
+
+    // Canonicaliza o elemento referenciado
+    const xmlCanonicalizado = canonicalizarXML(referencedXml);
 
     // Converte a chave privada PEM para objeto
     const privateKey = forge.pki.privateKeyFromPem(certificado.chavePrivadaPem);
@@ -356,44 +445,33 @@ export async function assinarXML(
     // Extrai o certificado em DER e converte para Base64
     const x509Base64 = extrairX509Base64(certificado.certificadoPem);
 
-    // Calcula o hash SHA-1 do conteúdo canonicalizado
+    // Calcula o hash SHA-1 do conteúdo canonicalizado (elemento referenciado)
     const md = forge.md.sha1.create();
     md.update(xmlCanonicalizado, 'utf8');
     const digestValue = forge.util.encode64(md.digest().bytes());
 
-    // Cria a assinatura RSA-SHA1
-    const signature = privateKey.sign(md);
-    const signatureValue = forge.util.encode64(signature);
+    // Constrói o SignedInfo para ser assinado
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestValue}</DigestValue></Reference></SignedInfo>`;
+
+    // Canonicaliza e assina o SignedInfo
+    const canonSignedInfo = canonicalizarXML(signedInfoXml);
+    const signedInfoMd = forge.md.sha1.create();
+    signedInfoMd.update(canonSignedInfo, 'utf8');
+    const signatureBytes = privateKey.sign(signedInfoMd);
+    const signatureValue = forge.util.encode64(signatureBytes);
 
     // Monta a estrutura da assinatura XML
-    const signatureXML = `
-<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-  <SignedInfo>
-    <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-    <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-    <Reference URI="#${idReferencia}">
-      <Transforms>
-        <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
-      </Transforms>
-      <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-      <DigestValue>${digestValue}</DigestValue>
-    </Reference>
-  </SignedInfo>
-  <SignatureValue>${signatureValue}</SignatureValue>
-  <KeyInfo>
-    <X509Data>
-      <X509Certificate>${x509Base64}</X509Certificate>
-    </X509Data>
-  </KeyInfo>
-</Signature>`;
+    const signatureXML = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestValue}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureValue}</SignatureValue><KeyInfo><X509Data><X509Certificate>${x509Base64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
-    // Insere a assinatura antes do fechamento do elemento raiz
-    const posicaoInsercao = xml.lastIndexOf('</');
-    if (posicaoInsercao === -1) {
-      throw new Error('Estrutura XML inválida: não foi possível encontrar o elemento raiz');
+    // Insere a assinatura dentro do elemento referenciado (antes da tag de fechamento)
+    const elementName = getElementName(xml, idReferencia);
+    const closingTag = `</${elementName}>`;
+    const insertionPoint = xml.lastIndexOf(closingTag);
+    if (insertionPoint === -1) {
+      throw new Error(`Tag de fechamento </${elementName}> não encontrada para inserir assinatura`);
     }
 
-    const xmlAssinado = xml.substring(0, posicaoInsercao) + signatureXML + xml.substring(posicaoInsercao);
+    const xmlAssinado = xml.substring(0, insertionPoint) + signatureXML + xml.substring(insertionPoint);
 
     return xmlAssinado;
   } catch (error: any) {

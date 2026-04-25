@@ -28,7 +28,7 @@ serve(async (req) => {
     // Import node-forge for PKCS12 parsing
     let forge: any;
     try {
-      const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+      const forgeModule = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
       forge = forgeModule.default?.util ? forgeModule.default : forgeModule;
       console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki);
     } catch (importErr) {
@@ -141,10 +141,14 @@ serve(async (req) => {
         );
       }
 
-      // Verify private key
-      const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
-      const keyBags2 = p12.getBags({ bagType: forge.pki.oids.keyBag });
-      const hasPrivateKey = (keyBags[forge.pki.oids.pkcs8ShorthandKeyBag]?.length ?? 0) > 0 || (keyBags2[forge.pki.oids.keyBag]?.length ?? 0) > 0;
+      // Verify private key - try pkcs8ShroudedKeyBag first (most common for ICP-Brasil)
+      const keyBagsShrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+      const keyBagsShorthand = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
+      const keyBagsPlain = p12.getBags({ bagType: forge.pki.oids.keyBag });
+      const hasPrivateKey =
+        (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]?.length ?? 0) > 0 ||
+        (keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]?.length ?? 0) > 0 ||
+        (keyBagsPlain[forge.pki.oids.keyBag]?.length ?? 0) > 0;
 
       if (!hasPrivateKey) {
         return new Response(

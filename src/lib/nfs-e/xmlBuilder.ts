@@ -100,11 +100,13 @@ function formatarData(data: Date | null | undefined): string {
 }
 
 /**
- * Formata data e hora para o padrão ISO completo. Retorna "—" se nulo/indefinido.
+ * Formata data e hora para o padrão GINFES (yyyy-MM-ddTHH:mm:ss).
+ * Remove milissegundos e sufixo Z, conforme exigido pelo GINFES XSD.
  */
 function formatarDataHora(data: Date | null | undefined): string {
   if (!data) return '—';
-  return data.toISOString();
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${data.getFullYear()}-${pad(data.getMonth() + 1)}-${pad(data.getDate())}T${pad(data.getHours())}:${pad(data.getMinutes())}:${pad(data.getSeconds())}`;
 }
 
 /**
@@ -155,6 +157,7 @@ export function construirRps(nota: DadosNotaFiscal, idRps?: string): string {
           ${valores.valorIss !== undefined ? `<ValorIss>${formatarValor(valores.valorIss)}</ValorIss>` : ''}
           ${valores.descontoIncondicionado !== undefined ? `<DescontoIncondicionado>${formatarValor(valores.descontoIncondicionado)}</DescontoIncondicionado>` : ''}
           ${valores.descontoCondicionado !== undefined ? `<DescontoCondicionado>${formatarValor(valores.descontoCondicionado)}</DescontoCondicionado>` : ''}
+          <BaseCalculo>${formatarValor(valores.valorServicos - (valores.valorDeducoes || 0))}</BaseCalculo>
           ${valores.issRetido !== undefined ? `<IssRetido>${valores.issRetido ? '1' : '2'}</IssRetido>` : '<IssRetido>2</IssRetido>'}
           ${valores.aliquota !== undefined ? `<Aliquota>${formatarValor(valores.aliquota)}</Aliquota>` : ''}
         </Valores>
@@ -339,13 +342,10 @@ export function construirPedidoCancelamento(
   cnpjPrestador: string,
   inscricaoMunicipal: string,
   codigoCancelamento: string,
-  motivoCancelamento?: string
+  motivoCancelamento?: string,
+  codigoMunicipio?: string
 ): string {
-  // Códigos de cancelamento:
-  // E007 - Erro de preenchimento
-  // E008 - Serviço não prestado
-  // E009 - Duplicidade de nota
-  // Outros conforme legislação municipal
+  const municipio = codigoMunicipio || '3550308'; // Default São Paulo, allow override
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseEnvio xmlns="${NFSeConfig.namespaces.nfseCancelamento}">
@@ -355,7 +355,7 @@ export function construirPedidoCancelamento(
         <Numero>${numeroNfse}</Numero>
         <Cnpj>${formatarCnpjNfse(cnpjPrestador)}</Cnpj>
         <InscricaoMunicipal>${formatarInscricaoMunicipal(inscricaoMunicipal)}</InscricaoMunicipal>
-        <CodigoMunicipio>3550308</CodigoMunicipio>
+        <CodigoMunicipio>${municipio}</CodigoMunicipio>
       </IdentificacaoNfse>
       <CodigoCancelamento>${codigoCancelamento}</CodigoCancelamento>
       ${motivoCancelamento ? `<MotivoCancelamento>${motivoCancelamento}</MotivoCancelamento>` : ''}

@@ -11,11 +11,14 @@ export const NFSeConfig = {
   },
 
   // Ambiente atual (pode ser sobrescrito via variável de ambiente)
+  // IMPORTANTE: Para emissão em produção, VITE_NFSE_AMBIENTE DEVE ser definido como "producao"
   get ambiente(): 'homologacao' | 'producao' {
-    // Usa try/catch para evitar erro se import.meta.env não estiver disponível
     try {
       const env = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_NFSE_AMBIENTE) as 'homologacao' | 'producao' | undefined;
-      return env || 'homologacao';
+      if (env && (env === 'homologacao' || env === 'producao')) return env;
+      // Se não configurado, assume homologacao mas emite aviso
+      console.warn('[NFS-e] VITE_NFSE_AMBIENTE não configurado. Usando "homologacao". Para emissão real, configure VITE_NFSE_AMBIENTE=producao');
+      return 'homologacao';
     } catch {
       return 'homologacao';
     }
@@ -47,13 +50,13 @@ export const NFSeConfig = {
   // Content-Type header para requisições SOAP
   contentType: 'application/soap+xml; charset=utf-8',
 
-  // Actions SOAP para cada operação
+  // Actions SOAP para cada operação (formato GINFES v03)
   soapActions: {
-    enviarLoteRps: 'http://www.ginfes.com.br/ServiceGinfesImpl?wsdl',
-    consultarNfsePorRps: 'http://www.ginfes.com.br/ServiceGinfesImpl?wsdl',
-    consultarNfse: 'http://www.ginfes.com.br/ServiceGinfesImpl?wsdl',
-    consultarLoteRps: 'http://www.ginfes.com.br/ServiceGinfesImpl?wsdl',
-    cancelarNfse: 'http://www.ginfes.com.br/ServiceGinfesImpl?wsdl',
+    enviarLoteRps: 'RecepcionarLoteRpsV3',
+    consultarNfsePorRps: 'ConsultarNfseRpsV3',
+    consultarNfse: 'ConsultarNfseV3',
+    consultarLoteRps: 'ConsultarLoteRpsV3',
+    cancelarNfse: 'CancelarNfseV3',
   },
 
   // Endpoints específicos

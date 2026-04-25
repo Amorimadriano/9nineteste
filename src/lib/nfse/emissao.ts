@@ -28,13 +28,13 @@ export function calcularValoresNFSe(data: {
 }
 
 /**
- * Emite NFSe
+ * Emite NFSe via Supabase edge function
  */
 export async function emitirNFSe(data: NFSeEmissaoData): Promise<NFSeResposta> {
-  // Implementação real virá posteriormente
-  return {
-    sucesso: true,
-    numero: "12345",
-    codigoVerificacao: "ABC123",
-  };
+  // Emissão real é feita pelo backend (Supabase edge function)
+  // que tem acesso ao certificado digital para assinatura
+  throw new Error(
+    "Emissão de NFS-e deve ser feita via Supabase edge function (emitir-nfse). " +
+    "Use a função do backend que tem acesso ao certificado digital para assinatura."
+  );
 }

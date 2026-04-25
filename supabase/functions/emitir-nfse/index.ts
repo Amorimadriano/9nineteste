@@ -77,25 +77,116 @@ function escapeXml(str: string): string {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 }
 
+/**
+ * Proper C14N canonicalization for XMLDSIG.
+ * Preserves xmlns attributes (required for GINFES XSD validation).
+ */
 function canonicalizeXml(xml: string): string {
-  return xml.replace(/>\s+</g, "><").replace(/\s+xmlns[^"]*"[^"]*"/g, "").replace(/\s+/g, " ").trim();
+  let result = xml;
+  // Remove XML declaration
+  result = result.replace(/<\?xml[^?]*\?>\s*/g, "");
+  // Remove processing instructions
+  result = result.replace(/<\?[^?]*\?>\s*/g, "");
+  // Normalize empty elements
+  result = result.replace(/<(\w+)([^>]*)\/>/g, (_match: string, tagName: string, attrs: string) => {
+    if (attrs.trim()) {
+      return `<${tagName}${attrs}></${tagName}>`;
+    }
+    return `<${tagName}></${tagName}>`;
+  });
+  // Normalize whitespace between tags
+  result = result.replace(/>\s+</g, "><");
+  // Normalize attribute whitespace
+  result = result.replace(/\s+=\s+/g, "=");
+  // Trim
+  result = result.replace(/\n\s+/g, "\n");
+  result = result.trim();
+  return result;
 }
 
+/**
+ * Extract XML element by Id with proper nested tag handling.
+ */
 function extractElementById(xml: string, id: string): string | null {
-  const regex = new RegExp(`(<\\w+[^>]*Id="${id}"[^>]*>[\\s\\S]*?<\\/\\w+>)`, "i");
-  const match = xml.match(regex);
-  return match ? match[1] : null;
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const openRegex = new RegExp(`<([\\w]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, "i");
+  const openMatch = xml.match(openRegex);
+  if (!openMatch) return null;
+
+  const tagName = openMatch[1];
+  // Combine attrs from groups 2 and 3
+  const fullOpenMatch = openMatch[0];
+  const startIndex = xml.indexOf(fullOpenMatch);
+  if (startIndex === -1) return null;
+
+  // Use balanced tag matching
+  let depth = 0;
+  let pos = startIndex;
+
+  while (pos < xml.length) {
+    const nextOpen = xml.indexOf(`<${tagName}`, pos + 1);
+    const nextClose = xml.indexOf(`</${tagName}>`, pos + 1);
+
+    if (nextClose === -1) break;
+
+    // Check if the nextOpen is actually a self-closing tag
+    if (nextOpen !== -1 && nextOpen < nextClose) {
+      // Verify it's not self-closing
+      const tagEnd = xml.indexOf(">", nextOpen);
+      if (tagEnd !== -1 && xml.substring(tagEnd - 1, tagEnd) === "/") {
+        // Self-closing, skip it
+        pos = tagEnd + 1;
+        continue;
+      }
+    }
+
+    depth++;
+    if (nextOpen === -1 || nextOpen > nextClose) {
+      // No more nested opens, found the matching close
+      return xml.substring(startIndex, nextClose + `</${tagName}>`.length);
+    }
+
+    // There's nesting, find the matching close for all opens
+    let searchPos = nextClose + `</${tagName}>`.length;
+    while (depth > 0 && searchPos < xml.length) {
+      const innerOpen = xml.indexOf(`<${tagName}`, searchPos);
+      const innerClose = xml.indexOf(`</${tagName}>`, searchPos);
+      if (innerClose === -1) break;
+      if (innerOpen !== -1 && innerOpen < innerClose) {
+        depth++;
+      } else {
+        depth--;
+      }
+      if (depth === 0) {
+        searchPos = innerClose + `</${tagName}>`.length;
+        break;
+      }
+      searchPos = innerClose + `</${tagName}>`.length;
+    }
+    return xml.substring(startIndex, searchPos);
+  }
+
+  return null;
 }
 
 function getElementName(xml: string, id: string): string {
-  const regex = new RegExp(`<(\\w+)[^>]*Id="${id}"`, "i");
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, "i");
   const match = xml.match(regex);
   return match ? match[1] : "InfRps";
 }
 
+/**
+ * Format date for GINFES: yyyy-MM-ddTHH:mm:ss (no milliseconds, no Z)
+ */
+function formatarDataNfse(data: string | Date): string {
+  const d = typeof data === "string" ? new Date(data) : data;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
-  const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
-  // esm.sh wraps node-forge as default export; fall back to module itself
+  const forgeModule = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
   const forge: any = forgeModule.default?.util ? forgeModule.default : forgeModule;
   (globalThis as any).forge = forge;
 
@@ -105,7 +196,6 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
 
   const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-  const keyBags = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
 
   let certPem = "";
   let keyPem = "";
@@ -122,7 +212,7 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
       if (attr.shortName === "CN") razaoSocial = attr.value;
     }
     const cnAttr = subject.attributes.find((a: any) =>
-      a.oid === "2.16.840.1.113730.4.1" || a.oid === "0.9.2342.19200300.100.1.1" || a.shortName === "CN"
+      a.oid === "2.5.4.5" || a.oid === "2.16.840.1.113730.4.1" || a.oid === "0.9.2342.19200300.100.1.1" || a.shortName === "CN"
     );
     if (cnAttr) {
       const cnpjMatch = cnAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
@@ -130,14 +220,24 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
     }
   }
 
-  if (keyBags[forge.pki.oids.pkcs8ShorthandKeyBag]) {
-    const key = keyBags[forge.pki.oids.pkcs8ShorthandKeyBag]![0];
+  // Try pkcs8ShroudedKeyBag first (most common for ICP-Brasil certificates)
+  const keyBagsShrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
+  if (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag] && keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]!.length > 0) {
+    const key = keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]![0];
     keyPem = forge.pki.privateKeyToPem(key.key!);
   } else {
-    const keyBags2 = p12.getBags({ bagType: forge.pki.oids.keyBag });
-    if (keyBags2[forge.pki.oids.keyBag]) {
-      const key = keyBags2[forge.pki.oids.keyBag]![0];
+    // Fallback to pkcs8ShorthandKeyBag
+    const keyBagsShorthand = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
+    if (keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag] && keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]!.length > 0) {
+      const key = keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]![0];
       keyPem = forge.pki.privateKeyToPem(key.key!);
+    } else {
+      // Fallback to keyBag
+      const keyBags2 = p12.getBags({ bagType: forge.pki.oids.keyBag });
+      if (keyBags2[forge.pki.oids.keyBag]) {
+        const key = keyBags2[forge.pki.oids.keyBag]![0];
+        keyPem = forge.pki.privateKeyToPem(key.key!);
+      }
     }
   }
 
@@ -156,6 +256,11 @@ function construirXmlRps(dados: DadosNota): string {
   const optanteSimples = dados.optanteSimplesNacional ? "1" : "2";
   const incentivoFiscal = dados.incentivoFiscal ? "1" : "2";
   const cnae = dados.servico.codigoCnae || dados.servico.cnae;
+  const baseCalculo = (dados.servico.valores.valorServicos - dados.servico.valores.valorDeducoes).toFixed(2);
+  const dataEmissaoFormatada = formatarDataNfse(dados.dataEmissao);
+
+  // Tomador CodigoMunicipio: use cidade field (IBGE code)
+  const tomadorCodigoMunicipio = dados.tomador.endereco.cidade || dados.emitente.endereco.codigoMunicipio;
 
   return `<InfRps Id="${rpsId}">
       <IdentificacaoRps>
@@ -163,7 +268,7 @@ function construirXmlRps(dados: DadosNota): string {
         <Serie>${dados.identificacaoRps.serie}</Serie>
         <Tipo>${dados.identificacaoRps.tipo}</Tipo>
       </IdentificacaoRps>
-      <DataEmissao>${dados.dataEmissao}</DataEmissao>
+      <DataEmissao>${dataEmissaoFormatada}</DataEmissao>
       <NaturezaOperacao>${dados.naturezaOperacao}</NaturezaOperacao>
       <RegimeEspecialTributacao>${dados.regimeTributario}</RegimeEspecialTributacao>
       <OptanteSimplesNacional>${optanteSimples}</OptanteSimplesNacional>
@@ -180,6 +285,7 @@ function construirXmlRps(dados: DadosNota): string {
           <ValorCsll>${dados.servico.valores.valorCsll.toFixed(2)}</ValorCsll>
           <IssRetido>${issRetido}</IssRetido>
           <ValorIss>${valorIss}</ValorIss>
+          <BaseCalculo>${baseCalculo}</BaseCalculo>
           <Aliquota>${dados.servico.aliquotaIss.toFixed(4)}</Aliquota>
           <ValorLiquido>${dados.servico.valores.valorLiquido.toFixed(2)}</ValorLiquido>
         </Valores>
@@ -207,7 +313,7 @@ function construirXmlRps(dados: DadosNota): string {
           <Numero>${dados.tomador.endereco.numero}</Numero>
           ${dados.tomador.endereco.complemento ? `<Complemento>${escapeXml(dados.tomador.endereco.complemento)}</Complemento>` : ""}
           <Bairro>${escapeXml(dados.tomador.endereco.bairro)}</Bairro>
-          <CodigoMunicipio>${dados.tomador.endereco.cidade || ""}</CodigoMunicipio>
+          <CodigoMunicipio>${tomadorCodigoMunicipio}</CodigoMunicipio>
           <Uf>${dados.tomador.endereco.uf}</Uf>
           <Cep>${dados.tomador.endereco.cep}</Cep>
         </Endereco>` : ""}
@@ -216,10 +322,10 @@ function construirXmlRps(dados: DadosNota): string {
     </InfRps>`;
 }
 
-function construirXmlLoteRps(dados: DadosNota, xmlRps: string, _certificado: CertificadoDigital): string {
+function construirXmlLoteRps(dados: DadosNota, xmlRps: string, _certificado: CertificadoDigital): { xml: string; loteId: string } {
   const numeroLote = Date.now().toString();
   const loteId = `LOTE${numeroLote}`;
-  return `<EnviarLoteRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoEnviar}">
+  const xml = `<EnviarLoteRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoEnviar}">
   <LoteRps Id="${loteId}">
     <NumeroLote>${numeroLote}</NumeroLote>
     <Cnpj>${dados.emitente.cnpj}</Cnpj>
@@ -232,72 +338,79 @@ function construirXmlLoteRps(dados: DadosNota, xmlRps: string, _certificado: Cer
     </ListaRps>
   </LoteRps>
 </EnviarLoteRpsEnvio>`;
+  return { xml, loteId };
 }
 
+/**
+ * Signs XML using XMLDSIG. Throws error on failure instead of returning unsigned XML.
+ * Inserts Signature inside the referenced element (before its closing tag).
+ */
 function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) {
-    console.warn("node-forge not available for XML signing");
-    return xml;
+    throw new Error("node-forge não está disponível para assinatura XML. A emissão em produção requer assinatura digital.");
   }
   try {
     const privateKey = forge.pki.privateKeyFromPem(certificado.keyPem);
     const certificate = forge.pki.certificateFromPem(certificado.certPem);
     const referencedXml = extractElementById(xml, idReferencia);
     if (!referencedXml) {
-      console.warn(`Element with Id="${idReferencia}" not found, skipping signature`);
-      return xml;
+      throw new Error(`Elemento com Id="${idReferencia}" não encontrado no XML para assinatura`);
     }
     const canonReferenced = canonicalizeXml(referencedXml);
     const digest = forge.md.sha1.create();
-    digest.update(canonReferenced);
+    digest.update(canonReferenced, "utf8");
     const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#">
-      <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-      <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-      <Reference URI="#${idReferencia}">
-        <Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms>
-        <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-        <DigestValue>${digestBase64}</DigestValue>
-      </Reference>
-    </SignedInfo>`;
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
     const canonSignedInfo = canonicalizeXml(signedInfoXml);
     const signatureMd = forge.md.sha1.create();
-    signatureMd.update(canonSignedInfo);
+    signatureMd.update(canonSignedInfo, "utf8");
     const signatureBytes = privateKey.sign(signatureMd);
     const signatureBase64 = forge.util.encode64(signatureBytes);
 
     const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
     const certBase64 = forge.util.encode64(certDer);
 
-    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
-      <SignedInfo>
-        <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
-        <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
-        <Reference URI="#${idReferencia}">
-          <Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/></Transforms>
-          <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
-          <DigestValue>${digestBase64}</DigestValue>
-        </Reference>
-      </SignedInfo>
-      <SignatureValue>${signatureBase64}</SignatureValue>
-      <KeyInfo>
-        <X509Data>
-          <X509Certificate>${certBase64}</X509Certificate>
-        </X509Data>
-      </KeyInfo>
-    </Signature>`;
+    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
-    return xml.replace(
-      `</${getElementName(xml, idReferencia)}>`,
-      `${signatureBlock}</${getElementName(xml, idReferencia)}>`
-    );
+    // Insert signature inside the referenced element (before its closing tag)
+    const elementName = getElementName(xml, idReferencia);
+    const closingTag = `</${elementName}>`;
+    const insertionPoint = xml.lastIndexOf(closingTag);
+    if (insertionPoint === -1) {
+      throw new Error(`Tag de fechamento </${elementName}> não encontrada`);
+    }
+
+    return xml.substring(0, insertionPoint) + signatureBlock + xml.substring(insertionPoint);
   } catch (error) {
-    console.error("Error signing XML:", error);
-    return xml;
+    throw new Error(`Erro na assinatura digital: ${error instanceof Error ? error.message : String(error)}`);
   }
+}
+
+/**
+ * Signs both individual RPS elements and the LoteRps element.
+ * ABRASF 2.04/GINFES v03 requires each InfRps AND LoteRps to have Signatures.
+ */
+function assinarLoteCompleto(xmlLote: string, certificado: CertificadoDigital): string {
+  let xml = xmlLote;
+
+  // 1. Sign each InfRps individually
+  const infRpsRegex = /Id="(R[^"]+)"/g;
+  let match;
+  while ((match = infRpsRegex.exec(xml)) !== null) {
+    const rpsId = match[1];
+    xml = assinarXml(xml, certificado, rpsId);
+  }
+
+  // 2. Sign the LoteRps
+  const loteMatch = xml.match(/Id="(LOTE[^"]+)"/);
+  if (loteMatch) {
+    xml = assinarXml(xml, certificado, loteMatch[1]);
+  }
+
+  return xml;
 }
 
 function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string): string {
@@ -494,13 +607,17 @@ serve(async (req) => {
 
     console.log("emitir-nfse: nota encontrada, status=", nota.status, "valor_servico=", nota.valor_servico);
 
+    // Format dataEmissao properly (remove milliseconds and Z)
+    const dataEmissaoOriginal = nota.data_emissao || new Date().toISOString();
+    const dataEmissaoFormatada = formatarDataNfse(dataEmissaoOriginal);
+
     const dadosNota: DadosNota = {
       identificacaoRps: {
         numero: nota.numero_rps || nota.numero_nota || gerarNumeroRps(),
         serie: nota.serie || "1",
         tipo: nota.tipo_rps || "RPS",
       },
-      dataEmissao: nota.data_emissao || new Date().toISOString(),
+      dataEmissao: dataEmissaoFormatada,
       competencia: nota.data_competencia || new Date().toISOString().split("T")[0],
       naturezaOperacao: nota.natureza_operacao || 1,
       regimeTributario: nota.regime_tributario || 1,
@@ -572,14 +689,14 @@ serve(async (req) => {
 
     const updateData: any = {
       status: resultado.sucesso ? "autorizada" : "rejeitada",
-      xml_envio: resultado.xmlEnvio || null,
+      xml_envio: (resultado as any).xmlEnvio || null,
       xml_retorno: resultado.xmlRetorno || null,
-      link_pdf: resultado.linkPdf || null,
-      link_xml: resultado.linkXml || null,
+      link_pdf: (resultado as any).linkPdf || null,
+      link_xml: (resultado as any).linkXml || null,
       numero_nota: resultado.numeroNfse || nota.numero_nota,
       protocolo: resultado.protocolo || null,
       codigo_verificacao: resultado.codigoVerificacao || null,
-      link_nfse: resultado.linkNfse || null,
+      link_nfse: (resultado as any).linkNfse || null,
       data_autorizacao: resultado.sucesso ? new Date().toISOString() : null,
       mensagem_erro: resultado.sucesso ? null : resultado.mensagens?.map((m: any) => m.mensagem).join("; "),
     };
@@ -601,11 +718,16 @@ serve(async (req) => {
     if (notaId) {
       try {
         const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-        await supabase
+        const updateResult = await supabase
           .from("notas_fiscais_servico")
           .update({ status: "erro", mensagem_erro: (err as Error).message })
           .eq("id", notaId);
-      } catch {}
+        if (updateResult.error) {
+          console.error("Falha ao atualizar status de erro no banco:", updateResult.error.message);
+        }
+      } catch (dbErr) {
+        console.error("Falha ao conectar ao banco para atualizar status de erro:", dbErr);
+      }
     }
 
     return new Response(
@@ -643,11 +765,11 @@ function emitirHomologacao(dadosNota: DadosNota) {
 }
 
 async function emitirProducao(dadosNota: DadosNota, certDigital: CertificadoDigital) {
-  // GINFES v03: RPS não é assinado individualmente, apenas o Lote
+  // ABRASF 2.04/GINFES v03: Each InfRps AND LoteRps must be signed
   const xmlRps = construirXmlRps(dadosNota);
-  const xmlLote = construirXmlLoteRps(dadosNota, xmlRps, certDigital);
-  const loteId = `LOTE${Date.now()}`;
-  const signedLote = assinarXml(xmlLote, certDigital, loteId);
+  const { xml: xmlLote, loteId } = construirXmlLoteRps(dadosNota, xmlRps, certDigital);
+  // Sign both individual RPS and the LoteRps
+  const signedLote = assinarLoteCompleto(xmlLote, certDigital);
 
   // Envelope SOAP no formato GINFES v03: arg0=cabecalho, arg1=dados
   const cabecalho = criarCabecalhoGinfes();
@@ -657,10 +779,12 @@ async function emitirProducao(dadosNota: DadosNota, certDigital: CertificadoDigi
   console.log("CNPJ:", dadosNota.emitente.cnpj);
   console.log("IM:", dadosNota.emitente.inscricaoMunicipal);
   console.log("RPS:", dadosNota.identificacaoRps.numero);
+  console.log("LoteId:", loteId);
   console.log("Ambiente:", Deno.env.get("NFSE_AMBIENTE") || "homologacao");
 
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
   console.log("Resposta GINFES (primeiros 500 chars):", soapResponse.substring(0, 500));
 
-  return parsearRespostaEmissao(soapResponse);
+  const resultado = parsearRespostaEmissao(soapResponse);
+  return { ...resultado, xmlEnvio: signedLote };
 }

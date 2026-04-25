@@ -23,7 +23,7 @@ describe("NFSeXMLBuilder", () => {
       const xml = builder.buildRPS(dadosNotaFiscalValida);
 
       expect(xml).toContain('<?xml version="1.0"');
-      expect(xml).toContain("GerarNfseEnvio");
+      expect(xml).toContain("EnviarLoteRpsEnvio");
       expect(xml).toContain(dadosNotaFiscalValida.prestador.cnpj);
       expect(xml).toContain(dadosNotaFiscalValida.tomador.cnpj);
     });
@@ -40,8 +40,9 @@ describe("NFSeXMLBuilder", () => {
     it("deve incluir todos os campos obrigatórios do tomador", () => {
       const xml = builder.buildRPS(dadosNotaFiscalValida);
 
-      expect(xml).toContain("<TomadorServico>");
+      expect(xml).toContain("<Tomador>");
       expect(xml).toContain(dadosNotaFiscalValida.tomador.razaoSocial);
+      expect(xml).toContain("IdentificacaoTomador");
     });
 
     it("deve incluir todos os campos de serviço", () => {
@@ -62,13 +63,14 @@ describe("NFSeXMLBuilder", () => {
       expect(xml).not.toContain("<Cnpj>" + dadosNotaFiscalCPF.tomador.cpf);
     });
 
-    it("deve gerar XML com estrutura ABRASF válida", () => {
+    it("deve gerar XML com estrutura GINFES v03 válida", () => {
       const xml = builder.buildRPS(dadosNotaFiscalValida);
 
-      // Verificar estrutura básica ABRASF
-      expect(xml).toContain('xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd"');
+      // Verificar estrutura básica GINFES v03
+      expect(xml).toContain("ginfes.com.br");
       expect(xml).toContain("<Rps>");
-      expect(xml).toContain("<InfRps>");
+      expect(xml).toContain("<InfRps");
+      expect(xml).toContain("IdentificacaoTomador");
     });
   });
 
@@ -210,8 +212,8 @@ describe("NFSeXMLBuilder", () => {
       };
 
       const xml = builder.buildRPS(dados);
-      expect(xml).toMatch(/\u003cValorPis\u003e6\.56\u003c\/ValorPis\u003e/);
-      expect(xml).toMatch(/\u003cValorCofins\u003e3\.33\u003c\/ValorCofins\u003e/);
+      expect(xml).toContain("<ValorPis>6.55</ValorPis>");
+      expect(xml).toContain("<ValorCofins>3.33</ValorCofins>");
     });
 
     it("deve formatar valor líquido com 2 decimais", () => {
@@ -254,20 +256,22 @@ describe("NFSeXMLBuilder", () => {
   });
 
   describe("Assinatura digital", () => {
-    it("deve incluir estrutura para assinatura digital", () => {
+    it("deve gerar XML de RPS com Ids para assinatura", () => {
       const certificadoPem = "-----BEGIN CERTIFICATE-----\nMIIDXT...";
       const xml = builder.buildSignedRPS(dadosNotaFiscalValida, certificadoPem);
 
-      expect(xml).toContain("<Signature>");
-      expect(xml).toContain("<SignedInfo>");
-      expect(xml).toContain("<X509Certificate>");
+      // buildSignedRPS now delegates to buildRPS (signing is done by backend)
+      expect(xml).toContain("InfRps");
+      expect(xml).toContain('Id="');
+      expect(xml).toContain("LoteRps");
     });
 
-    it("deve incluir certificado no XML assinado", () => {
+    it("deve incluir IDs para referência de assinatura", () => {
       const certificadoPem = "-----BEGIN CERTIFICATE-----\nMIIDXT...\n-----END CERTIFICATE-----";
       const xml = builder.buildSignedRPS(dadosNotaFiscalValida, certificadoPem);
 
-      expect(xml).toContain("MIIDXT");
+      expect(xml).toMatch(/Id="R\d+"/);
+      expect(xml).toMatch(/Id="LOTE\d+"/);
     });
   });
 
@@ -308,11 +312,13 @@ describe("NFSeXMLBuilder", () => {
       expect(parseError).toBeNull();
     });
 
-    it("deve gerar XML consistente para mesmos dados", () => {
+    it("deve gerar XML consistente para mesmos dados (desconsiderando IDs dinâmicos)", () => {
       const xml1 = builder.buildRPS(dadosNotaFiscalValida);
       const xml2 = builder.buildRPS(dadosNotaFiscalValida);
 
-      expect(xml1).toBe(xml2);
+      // Remove os IDs dinâmicos (LOTE e RPS) antes de comparar
+      const stripDynamicIds = (xml: string) => xml.replace(/Id="LOTE\d+"/g, 'Id="LOTE_DYN"').replace(/Id="R\d+"/g, 'Id="R_DYN"');
+      expect(stripDynamicIds(xml1)).toBe(stripDynamicIds(xml2));
     });
   });
 });

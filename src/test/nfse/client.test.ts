@@ -49,14 +49,13 @@ describe("NFSeClient", () => {
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
-            "Content-Type": "text/xml; charset=utf-8",
-            SOAPAction: expect.any(String),
+            "Content-Type": "application/soap+xml; charset=utf-8",
           }),
         })
       );
     });
 
-    it("deve incluir certificado digital na requisição", async () => {
+    it("deve incluir envelope SOAP GINFES v03 na requisição", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -68,10 +67,13 @@ describe("NFSeClient", () => {
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = callArgs[1].body as string;
 
-      expect(requestBody).toContain(certificadoDigitalMock.arquivoPem);
+      expect(requestBody).toContain("soap12:Envelope");
+      expect(requestBody).toContain("RecepcionarLoteRpsV3");
+      expect(requestBody).toContain("cabecalho");
+      expect(requestBody).toContain("versaoDados");
     });
 
-    it("deve enviar XML assinado na requisição", async () => {
+    it("deve enviar XML com namespace GINFES v03", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -83,8 +85,7 @@ describe("NFSeClient", () => {
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = callArgs[1].body as string;
 
-      expect(requestBody).toContain("Signature");
-      expect(requestBody).toContain("SignedInfo");
+      expect(requestBody).toContain("ginfes.com.br");
     });
 
     it("deve fazer requisição para URL correta de homologação", async () => {
@@ -383,15 +384,17 @@ describe("NFSeClient", () => {
     });
 
     it("deve abortar requisição após timeout", async () => {
-      const controller = new AbortController();
-      const signal = controller.signal;
-
+      // The client creates its own AbortController internally.
+      // We mock fetch to listen for the signal the client passes.
       mockFetch.mockImplementationOnce(
-        () =>
+        (url: string, options: RequestInit) =>
           new Promise((_, reject) => {
-            signal.addEventListener("abort", () => {
-              reject(new Error("Aborted"));
-            });
+            const signal = options.signal as AbortSignal;
+            if (signal) {
+              signal.addEventListener("abort", () => {
+                reject(new DOMException("The operation was aborted", "AbortError"));
+              });
+            }
           })
       );
 
@@ -468,12 +471,13 @@ describe("NFSeClient", () => {
     });
 
     it("deve aumentar delay entre tentativas", async () => {
-      const delays: number[] = [];
+      const retryDelays: number[] = [];
       const originalSetTimeout = global.setTimeout;
 
       vi.spyOn(global, "setTimeout").mockImplementation((callback, delay) => {
-        if (typeof delay === "number") {
-          delays.push(delay);
+        if (typeof delay === "number" && delay < 30000) {
+          // Only capture retry backoff delays (1s, 2s), not AbortController timeout (30s)
+          retryDelays.push(delay);
         }
         return originalSetTimeout(callback as TimerHandler, 0);
       });
@@ -491,8 +495,8 @@ describe("NFSeClient", () => {
       }
 
       // Verificar que os delays aumentam (exponential backoff)
-      expect(delays.length).toBeGreaterThan(1);
-      expect(delays[1]).toBeGreaterThanOrEqual(delays[0]);
+      expect(retryDelays.length).toBeGreaterThan(1);
+      expect(retryDelays[1]).toBeGreaterThanOrEqual(retryDelays[0]);
     });
   });
 
