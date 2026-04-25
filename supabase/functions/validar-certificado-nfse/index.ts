@@ -28,7 +28,8 @@ serve(async (req) => {
     // Import node-forge for PKCS12 parsing
     let forge: any;
     try {
-      forge = await import("https://esm.sh/node-forge@1.3.1");
+      const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+      forge = forgeModule.default || forgeModule;
     } catch (importErr) {
       console.error("validar-certificado: erro ao importar node-forge:", importErr);
       return new Response(
