@@ -387,21 +387,50 @@ export default function NFSeEmissao() {
         .insert({
           user_id: user.id,
           status: "rascunho",
+          // Tomador
           cliente_nome: tomador.razao_social,
+          cliente_razao_social: tomador.razao_social,
           cliente_cnpj_cpf: tomador.documento,
-          cliente_endereco: `${tomador.endereco}, ${tomador.numero}${tomador.complemento ? ` - ${tomador.complemento}` : ""}, ${tomador.bairro}, ${tomador.cidade}/${tomador.estado}`,
+          cliente_tipo_documento: tomador.tipo,
+          cliente_endereco: `${tomador.endereco}, ${tomador.numero}${tomador.complemento ? ` - ${tomador.complemento}` : ""}`,
+          cliente_numero: tomador.numero,
+          cliente_complemento: tomador.complemento || "",
+          cliente_bairro: tomador.bairro,
+          cliente_cidade: tomador.cidade,
+          cliente_estado: tomador.estado,
+          cliente_cep: tomador.cep,
           cliente_email: tomador.email,
+          cliente_telefone: tomador.telefone || "",
+          cliente_nome_fantasia: tomador.nome_fantasia || "",
+          // Serviço
           servico_descricao: servico.descricao,
           servico_codigo: servico.item_lista_servico,
+          servico_item_lista_servico: servico.item_lista_servico,
+          servico_cnae: servico.cnae || "",
+          servico_codigo_tributacao: servico.codigo_tributacao || "",
+          servico_discriminacao: servico.descricao,
           valor_servico: servico.valor_bruto,
           valor_deducoes: servico.deducoes,
           base_calculo: servico.base_calculo,
           aliquota_iss: servico.aliquota_iss,
           iss_retido: servico.iss_retido,
           valor_iss: servico.valor_iss,
+          valor_liquido: servico.valor_liquido,
+          // Retenções
+          retencao_pis: retencoes.pis,
+          retencao_cofins: retencoes.cofins,
+          retencao_inss: retencoes.inss,
+          retencao_ir: retencoes.ir,
+          retencao_csll: retencoes.csll,
+          // CNAE e tributação
           cnae: servico.cnae,
           codigo_tributacao: servico.codigo_tributacao,
+          // Dados da emissão
           data_competencia: new Date().toISOString().split("T")[0],
+          natureza_operacao: 1,
+          regime_tributario: 1,
+          tipo_rps: "RPS",
+          serie: "1",
           certificado_id: certificado.id,
         })
         .select()
@@ -411,16 +440,53 @@ export default function NFSeEmissao() {
 
       setNotaId(nota.id);
 
-      // Chama Edge Function para emitir
-      const { data: emitData, error: emitError } = await supabase.functions.invoke("emitir-nfse", {
-        body: {
-          notaId: nota.id,
-          certificadoId: certificado.id,
-        },
-      });
+      // Chama Edge Function para emitir (com retry para erros transitórios como cold start)
+      let emitData: any = null;
+      let emitError: any = null;
+      const maxRetries = 2;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const result = await supabase.functions.invoke("emitir-nfse", {
+          body: {
+            notaId: nota.id,
+            certificadoId: certificado.id,
+          },
+        });
+
+        emitData = result.data;
+        emitError = result.error;
+
+        if (!emitError) break;
+
+        const isTransient = emitError.message?.includes("406")
+          || emitError.message?.includes("Failed to fetch")
+          || emitError.message?.includes("NetworkError")
+          || emitError.message?.includes("timeout");
+
+        if (isTransient && attempt < maxRetries) {
+          console.warn(`[NFSeEmissao] Tentativa ${attempt + 1} falhou (${emitError.message}), tentando novamente em 3s...`);
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          continue;
+        }
+
+        break;
+      }
 
       if (emitError) {
-        const errorMsg = emitError.message || "Erro na função de emissão";
+        // Tenta extrair detalhes do erro da resposta HTTP
+        let errorMsg = emitError.message || "Erro na função de emissão";
+        try {
+          const ctx = (emitError as any).context;
+          if (ctx?.response) {
+            const errorBody = await ctx.response.json();
+            if (errorBody?.mensagens?.length) {
+              errorMsg = errorBody.mensagens.map((m: any) => m.mensagem || m).join("; ");
+            } else if (errorBody?.error) {
+              errorMsg = errorBody.error;
+            }
+          }
+        } catch { /* ignora erros de parsing */ }
+        console.error("[NFSeEmissao] Erro na emissão:", emitError);
         throw new Error(errorMsg);
       }
 

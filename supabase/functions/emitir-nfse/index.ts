@@ -186,14 +186,23 @@ function formatarDataNfse(data: string | Date): string {
 }
 
 async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
-  const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
-  const forge: any = forgeModule.default?.util ? forgeModule.default
-    : forgeModule.util ? forgeModule
-    : (forgeModule as any).default?.default?.util ? (forgeModule as any).default.default
-    : forgeModule;
+  let forge: any;
+  try {
+    const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+    forge = forgeModule.default?.util ? forgeModule.default
+      : forgeModule.util ? forgeModule
+      : (forgeModule as any).default?.default?.util ? (forgeModule as any).default.default
+      : forgeModule;
+    if (!forge?.util || !forge?.pki || !forge?.pkcs12) {
+      throw new Error(`node-forge carregado sem módulos esperados. Chaves disponíveis: ${Object.keys(forge || {}).join(", ")}`);
+    }
+    console.log("emitir-nfse: node-forge carregado com sucesso, has util:", !!forge.util, "has pki:", !!forge.pki, "has pkcs12:", !!forge.pkcs12);
+  } catch (importErr: any) {
+    console.error("emitir-nfse: falha ao importar node-forge:", importErr?.message || importErr);
+    throw new Error(`Falha ao importar módulo de criptografia (node-forge): ${importErr?.message || String(importErr)}. Tente novamente em alguns segundos.`);
+  }
   (globalThis as any).forge = forge;
 
-  console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki, "has pkcs12:", !!forge.pkcs12);
   const pfxDer = forge.util.decode64(pfxBase64);
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
@@ -583,8 +592,15 @@ serve(async (req) => {
       certDigital.cnpj = certificado.cnpj || "";
       console.log("emitir-nfse: certificado carregado, CNPJ=", certDigital.cnpj, "IM=", certDigital.inscricaoMunicipal);
     } catch (certErr: any) {
-      console.error("emitir-nfse: erro ao carregar certificado:", certErr);
-      throw new Error(`Erro no certificado digital: ${certErr.message}`);
+      console.error("emitir-nfse: erro ao carregar certificado:", certErr?.message || certErr);
+      throw new Error(`Erro no certificado digital: ${certErr?.message || String(certErr)}`);
+    }
+
+    if (!certDigital.cnpj) {
+      throw new Error("CNPJ não encontrado no certificado digital. Verifique se o certificado está correto.");
+    }
+    if (!certDigital.inscricaoMunicipal) {
+      console.warn("emitir-nfse: Inscrição Municipal não configurada no certificado. A emissão em produção pode falhar.");
     }
 
     await supabase
@@ -608,7 +624,7 @@ serve(async (req) => {
       throw new Error("Nota fiscal não encontrada");
     }
 
-    console.log("emitir-nfse: nota encontrada, status=", nota.status, "valor_servico=", nota.valor_servico);
+    console.log("emitir-nfse: nota encontrada, status=", nota.status, "valor_servico=", nota.valor_servico, "cliente_cnpj_cpf=", nota.cliente_cnpj_cpf, "servico_descricao=", nota.servico_descricao);
 
     // Format dataEmissao properly (remove milliseconds and Z)
     const dataEmissaoOriginal = nota.data_emissao || new Date().toISOString();
@@ -631,12 +647,12 @@ serve(async (req) => {
         inscricaoMunicipal: certDigital.inscricaoMunicipal,
         razaoSocial: certificado.razao_social || certDigital.razaoSocial || "",
         endereco: {
-          logradouro: (certificado.endereco && typeof certificado.endereco === "object" ? certificado.endereco.logradouro : "") || "",
-          numero: certificado.numero || "",
-          bairro: certificado.bairro || "",
-          codigoMunicipio: certificado.codigo_municipio || "3550308",
-          uf: certificado.uf || "SP",
-          cep: certificado.cep || "",
+          logradouro: (certificado.endereco && typeof certificado.endereco === "object" && certificado.endereco !== null ? certificado.endereco.logradouro : (certificado.logradouro || "")) || "",
+          numero: certificado.numero || certificado.endereco_numero || "",
+          bairro: certificado.bairro || (certificado.endereco && typeof certificado.endereco === "object" && certificado.endereco !== null ? certificado.endereco.bairro : "") || "",
+          codigoMunicipio: certificado.codigo_municipio || (certificado.endereco && typeof certificado.endereco === "object" && certificado.endereco !== null ? certificado.endereco.codigoMunicipio : "") || "3550308",
+          uf: certificado.uf || (certificado.endereco && typeof certificado.endereco === "object" && certificado.endereco !== null ? certificado.endereco.uf : "") || "SP",
+          cep: certificado.cep || (certificado.endereco && typeof certificado.endereco === "object" && certificado.endereco !== null ? certificado.endereco.cep : "") || "",
         },
       },
       tomador: {
@@ -680,6 +696,7 @@ serve(async (req) => {
     };
 
     console.log("Emitindo NFS-e:", dadosNota.identificacaoRps.numero, "Ambiente:", Deno.env.get("NFSE_AMBIENTE") || "homologacao");
+    console.log("emitir-nfse: dadosNota tomador=", dadosNota.tomador.razaoSocial, "cnpjCpf=", dadosNota.tomador.cnpjCpf, "valorServicos=", dadosNota.servico.valores.valorServicos);
 
     const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
     let resultado;
