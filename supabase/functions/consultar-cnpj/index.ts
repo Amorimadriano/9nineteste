@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 serve(async (req) => {
@@ -12,21 +12,19 @@ serve(async (req) => {
   }
 
   try {
-    const url = new URL(req.url);
-    const cnpj = url.searchParams.get("cnpj");
+    const body = await req.json();
+    const cnpj = (body.cnpj || "").replace(/\D/g, "");
 
-    if (!cnpj || cnpj.replace(/\D/g, "").length !== 14) {
+    if (cnpj.length !== 14) {
       return new Response(
         JSON.stringify({ error: "CNPJ inválido. Envie 14 dígitos." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const cnpjLimpo = cnpj.replace(/\D/g, "");
-
     // Tenta Brasil API primeiro
     try {
-      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpjLimpo}`);
+      const response = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cnpj}`);
       if (response.ok) {
         const data = await response.json();
         return new Response(
@@ -38,7 +36,7 @@ serve(async (req) => {
 
     // Fallback: ReceitaWS
     try {
-      const response = await fetch(`https://receitaws.com.br/v1/cnpj/${cnpjLimpo}`, {
+      const response = await fetch(`https://receitaws.com.br/v1/cnpj/${cnpj}`, {
         headers: { Accept: "application/json" },
       });
       if (response.ok) {

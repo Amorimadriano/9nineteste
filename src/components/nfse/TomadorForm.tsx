@@ -63,8 +63,7 @@ export function TomadorForm({ value, onChange, errors = {} }: TomadorFormProps) 
     setLoadingCNPJ(true);
     try {
       const { data, error } = await supabase.functions.invoke("consultar-cnpj", {
-        method: "GET",
-        query: { cnpj: documentoLimpo },
+        body: { cnpj: documentoLimpo },
       });
 
       if (error) throw new Error(error.message);
