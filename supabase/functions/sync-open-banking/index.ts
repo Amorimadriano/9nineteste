@@ -1,10 +1,133 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import {
-  fetchBankTransactions,
-  checkRateLimit,
-  validateTransactionData,
-} from "../_shared/openBanking.ts";
+
+// --- Inline Open Banking helpers ---
+const OPEN_BANKING_URLS: Record<string, string> = {
+  "001": "https://api.bb.com.br/open-banking",
+  "237": "https://api.bradesco.com/open-banking",
+  "341": "https://api.itau.com.br/open-banking",
+  "033": "https://openbanking.santander.com.br",
+  "104": "https://openbanking.caixa.gov.br",
+  "260": "https://api.nubank.com.br/open-banking",
+  "077": "https://api.inter.co/open-banking",
+  "756": "https://api.sicoob.com.br/open-banking",
+};
+
+const OPEN_BANKING_SANDBOX_URLS: Record<string, string> = {
+  "001": "https://api.sandbox.bb.com.br/open-banking",
+  "237": "https://api-sandbox.bradesco.com/open-banking",
+  "341": "https://api.itau.com.br/sandbox/open-banking",
+  "033": "https://openbanking-sandbox.santander.com.br",
+  "104": "https://openbanking-sandbox.caixa.gov.br",
+  "260": "https://api-sandbox.nubank.com.br/open-banking",
+  "077": "https://api-sandbox.inter.co/open-banking",
+  "756": "https://api-sandbox.sicoob.com.br/open-banking",
+};
+
+const RATE_LIMITS: Record<string, number> = {
+  "001": 60,
+  "237": 60,
+  "341": 100,
+  "033": 60,
+  "104": 60,
+  "260": 120,
+  "077": 100,
+  "756": 60,
+};
+
+function getOpenBankingUrl(bancoCodigo: string, sandbox = false): string {
+  const urls = sandbox ? OPEN_BANKING_SANDBOX_URLS : OPEN_BANKING_URLS;
+  return urls[bancoCodigo] || "";
+}
+
+async function fetchBankTransactions(
+  bancoCodigo: string,
+  accessToken: string,
+  dataInicio: string,
+  dataFim: string,
+  sandbox = false
+): Promise<Array<{
+  transacao_id: string;
+  data: string;
+  valor: number;
+  tipo: "CREDIT" | "DEBIT";
+  descricao: string;
+  informacao_complementar?: string;
+}>> {
+  if (sandbox) {
+    const transacoes = [];
+    const numTransacoes = Math.floor(Math.random() * 10) + 5;
+    for (let i = 0; i < numTransacoes; i++) {
+      const data = new Date(dataInicio);
+      data.setDate(data.getDate() + Math.floor(Math.random() * 30));
+      transacoes.push({
+        transacao_id: `TXN-${Date.now()}-${i}`,
+        data: data.toISOString().split("T")[0],
+        valor: Math.round((Math.random() * 1000 + 50) * 100) / 100,
+        tipo: (Math.random() > 0.5 ? "CREDIT" : "DEBIT") as "CREDIT" | "DEBIT",
+        descricao: `Transação simulada ${i + 1}`,
+        informacao_complementar: `Complemento ${i + 1}`,
+      });
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    return transacoes;
+  }
+
+  const baseUrl = getOpenBankingUrl(bancoCodigo, false);
+  if (!baseUrl) {
+    throw new Error(`Banco ${bancoCodigo} não suportado`);
+  }
+  throw new Error("Integração real com banco não implementada");
+}
+
+async function checkRateLimit(
+  bancoCodigo: string,
+  kv: any
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const limit = RATE_LIMITS[bancoCodigo] || 60;
+  const key = `rate_limit:${bancoCodigo}`;
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+
+  const current = (await kv.get(key)) || { count: 0, windowStart: now };
+
+  if (now - current.windowStart > windowMs) {
+    current.count = 0;
+    current.windowStart = now;
+  }
+
+  if (current.count >= limit) {
+    const retryAfter = Math.ceil((current.windowStart + windowMs - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  current.count++;
+  await kv.set(key, current, { ttl: 60 });
+
+  return { allowed: true };
+}
+
+function validateTransactionData(
+  data: any
+): { valid: boolean; error?: string } {
+  if (!data || typeof data !== "object") {
+    return { valid: false, error: "Resposta inválida da API" };
+  }
+  if (!data.transacao_id || typeof data.transacao_id !== "string") {
+    return { valid: false, error: "transacao_id ausente ou inválido" };
+  }
+  if (!data.data || typeof data.data !== "string") {
+    return { valid: false, error: "data ausente ou inválida" };
+  }
+  if (typeof data.valor !== "number" || data.valor < 0) {
+    return { valid: false, error: "valor ausente ou inválido" };
+  }
+  if (!data.tipo || !["CREDIT", "DEBIT"].includes(data.tipo)) {
+    return { valid: false, error: "tipo ausente ou inválido" };
+  }
+  return { valid: true };
+}
+// --- End inline Open Banking helpers ---
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,7 +151,6 @@ interface SyncStats {
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -38,24 +160,20 @@ serve(async (req) => {
     const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Validar autenticação
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       throw new Error("Missing authorization header");
     }
 
-    // Criar cliente com autenticação do usuário
     const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
-    // Verificar usuário
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       throw new Error("Unauthorized");
     }
 
-    // Parse do body
     const body: SyncRequest = await req.json();
     const { integracaoId, userId, bancoCodigo, dataInicio, dataFim } = body;
 
@@ -63,15 +181,12 @@ serve(async (req) => {
       throw new Error("Missing required parameters: integracaoId and userId");
     }
 
-    // Verificar se userId corresponde ao usuário autenticado
     if (userId !== user.id) {
       throw new Error("User ID mismatch");
     }
 
-    // Criar cliente admin para operações sem RLS
     const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Buscar integração
     const { data: integracao, error: integracaoError } = await supabaseAdmin
       .from("open_banking_integracoes")
       .select("*, bancos_cartoes (*)")
@@ -83,18 +198,15 @@ serve(async (req) => {
       throw new Error("Integration not found");
     }
 
-    // Verificar consentimento ativo
     if (!integracao.consentimento_ativo) {
       throw new Error("Consentimento não está ativo");
     }
 
-    // Verificar se token expirou
     const tokenExpirado = new Date(integracao.token_expira_em) < new Date();
     if (tokenExpirado) {
       throw new Error("Token expirado. Renove o consentimento.");
     }
 
-    // Verificar rate limit
     const rateLimitResult = await checkRateLimit(
       integracao.banco_codigo,
       supabaseAdmin
@@ -106,7 +218,6 @@ serve(async (req) => {
       );
     }
 
-    // Definir período de busca
     const fim = dataFim || new Date().toISOString().split("T")[0];
     const inicio =
       dataInicio ||
@@ -114,7 +225,6 @@ serve(async (req) => {
         .toISOString()
         .split("T")[0];
 
-    // Buscar transações do banco (simulado ou real)
     const transacoesBanco = await fetchBankTransactions(
       integracao.banco_codigo,
       integracao.access_token,
@@ -130,16 +240,13 @@ serve(async (req) => {
       totalProcessado: transacoesBanco.length,
     };
 
-    // Processar cada transação
     for (const transacao of transacoesBanco) {
-      // Validar dados
       const validation = validateTransactionData(transacao);
       if (!validation.valid) {
         console.warn(`Transação inválida ignorada: ${validation.error}`);
         continue;
       }
 
-      // Verificar duplicidade
       const { data: existente } = await supabaseAdmin
         .from("open_banking_extratos")
         .select("id")
@@ -148,11 +255,9 @@ serve(async (req) => {
         .maybeSingle();
 
       if (existente) {
-        // Já existe, ignorar
         continue;
       }
 
-      // Inserir nova transação
       const { data: novaTransacao, error: insertError } = await supabaseAdmin
         .from("open_banking_extratos")
         .insert({
@@ -178,7 +283,6 @@ serve(async (req) => {
 
       stats.novas++;
 
-      // Tentar matching automático
       const matchingResult = await tentarMatchingAutomatico(
         supabaseAdmin,
         userId,
@@ -192,7 +296,6 @@ serve(async (req) => {
       }
     }
 
-    // Atualizar timestamp da última sincronização
     await supabaseAdmin
       .from("open_banking_integracoes")
       .update({
@@ -201,7 +304,6 @@ serve(async (req) => {
       })
       .eq("id", integracaoId);
 
-    // Registrar log de sincronização
     await supabaseAdmin.from("open_banking_sync_logs").insert({
       integracao_id: integracaoId,
       user_id: userId,
@@ -228,7 +330,6 @@ serve(async (req) => {
   } catch (error) {
     console.error("Erro na sincronização Open Banking:", error);
 
-    // Registrar erro
     try {
       const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
       const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -259,9 +360,6 @@ serve(async (req) => {
   }
 });
 
-/**
- * Tenta matching automático entre transação e lançamentos pendentes
- */
 async function tentarMatchingAutomatico(
   supabase: any,
   userId: string,
@@ -278,7 +376,6 @@ async function tentarMatchingAutomatico(
     const toleranciaDias = 1;
     const toleranciaValor = 0.01;
 
-    // Buscar lançamentos pendentes compatíveis
     const { data: lancamentos } = await supabase
       .from("contas_pagar")
       .select("id, valor, data_vencimento, data_pagamento")
@@ -295,7 +392,6 @@ async function tentarMatchingAutomatico(
       );
 
       if (diffDias <= toleranciaDias) {
-        // Match encontrado - vincular
         await supabase
           .from("open_banking_extratos")
           .update({

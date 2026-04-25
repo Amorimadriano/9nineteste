@@ -1,7 +1,19 @@
 project_id = "rjcruiwlurqdwooarrpa"
 
+[functions.create-payment]
+verify_jwt = false
+
+[functions.create-payment-link]
+verify_jwt = false
+
+[functions.check-payment-status]
+verify_jwt = false
+
 [functions.pagarme-webhook]
 verify_jwt = false
 
 [functions.parecer-ibs-cbs]
+verify_jwt = false
+
+[functions.sync-open-banking]
 verify_jwt = false
