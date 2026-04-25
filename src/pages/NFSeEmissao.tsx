@@ -260,7 +260,7 @@ export default function NFSeEmissao() {
         user_id: user.id,
         dados: formData,
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: 'user_id' });
 
       toast({
         title: "Rascunho salvo",
