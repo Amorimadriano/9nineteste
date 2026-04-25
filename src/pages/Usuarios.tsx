@@ -24,7 +24,7 @@ interface UserInfo {
   roles: string[];
 }
 
-const ADMIN_EMAILS = ["9ninebpo9@gmail.com", "adriano.amorim83@gmail.com", "marketing@9ninebusinesscontrol.com.br"];
+const ADMIN_EMAILS = ["9ninebpo9@gmail.com", "adriano.amorim83@gmail.com", "amorim.adriano83@gmail.com", "marketing@9ninebusinesscontrol.com.br"];
 
 function maskEmail(email: string): string {
   const [local, domain] = email.split("@");
