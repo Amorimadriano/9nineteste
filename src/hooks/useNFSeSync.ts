@@ -84,7 +84,7 @@ export function useNFSeSync() {
 
         // Chamar Edge Function para consultar prefeitura
         const { data: result, error: functionError } = await supabase.functions.invoke(
-          "consultar-nfse",
+          "sync-nfse",
           {
             body: {
               action: "consultarStatus",
@@ -284,14 +284,11 @@ export function useNFSeSync() {
 
         // Chamar Edge Function para cancelar
         const { error: functionError } = await supabase.functions.invoke(
-          "consultar-nfse",
+          "cancelar-nfse",
           {
             body: {
-              action: "cancelar",
               notaId,
-              numeroNota: nota.numero_nota,
-              codigoVerificacao: nota.codigo_verificacao,
-              motivo,
+              motivoCancelamento: motivo,
             },
           }
         );

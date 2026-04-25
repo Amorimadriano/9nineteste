@@ -68,6 +68,8 @@ export function CertificadoConfigModal({
   const [arquivoSelecionado, setArquivoSelecionado] = useState<File | null>(null);
   const [senha, setSenha] = useState("");
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [razaoSocial, setRazaoSocial] = useState("");
+  const [inscricaoMunicipal, setInscricaoMunicipal] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
@@ -238,8 +240,12 @@ export function CertificadoConfigModal({
         user_id: userIdReal,
         nome: arquivoSelecionado.name,
         arquivo_path: fileName,
+        arquivo_pfx: base64,
+        senha,
         valido_ate: certificadoInfo?.validoAte,
         cnpj: certificadoInfo?.cnpj,
+        razao_social: razaoSocial || certificadoInfo?.emitidoPara || "",
+        inscricao_municipal: inscricaoMunicipal,
         ativo: true,
         updated_at: new Date().toISOString(),
       };
@@ -513,6 +519,30 @@ export function CertificadoConfigModal({
                 <p className="text-xs text-muted-foreground">
                   A senha é necessária para validar e usar o certificado.
                 </p>
+              </div>
+            )}
+
+            {/* Dados do emitente */}
+            {arquivoSelecionado && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="razao-social">Razão Social</Label>
+                  <Input
+                    id="razao-social"
+                    value={razaoSocial}
+                    onChange={(e) => setRazaoSocial(e.target.value)}
+                    placeholder="Nome da empresa"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="inscricao-municipal">Inscrição Municipal</Label>
+                  <Input
+                    id="inscricao-municipal"
+                    value={inscricaoMunicipal}
+                    onChange={(e) => setInscricaoMunicipal(e.target.value)}
+                    placeholder="Número da inscrição municipal"
+                  />
+                </div>
               </div>
             )}
 

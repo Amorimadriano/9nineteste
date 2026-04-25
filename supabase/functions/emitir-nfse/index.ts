@@ -1,4 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  carregarCertificado,
+  construirXmlRps,
+  construirXmlLoteRps,
+  assinarXml,
+  criarEnvelopeSOAP,
+  enviarRequisicaoSOAP,
+  parsearRespostaEmissao,
+  type DadosNota,
+  type CertificadoDigital,
+} from "../_shared/nfse-ginfes-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,8 +23,33 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  let notaId: string | undefined;
+
   try {
-    const { notaId, certificadoId } = await req.json();
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Auth validation
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    notaId = body.notaId;
+    const certificadoId = body.certificadoId;
 
     if (!notaId || !certificadoId) {
       return new Response(
@@ -21,79 +58,50 @@ serve(async (req) => {
       );
     }
 
-    // Buscar dados do certificado
-    const certificadoResponse = await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/certificados_nfse?id=eq.${certificadoId}&select=*`,
-      {
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const certificados = await certificadoResponse.json();
-    if (!certificados || certificados.length === 0) {
-      throw new Error("Certificado não encontrado");
+    // Buscar certificado
+    const { data: certificado, error: certError } = await supabase
+      .from("certificados_nfse")
+      .select("*")
+      .eq("id", certificadoId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (certError || !certificado) {
+      throw new Error("Certificado não encontrado ou não pertence ao usuário");
     }
 
-    const certificado = certificados[0];
+    if (!certificado.arquivo_pfx) {
+      throw new Error("Certificado não possui arquivo PFX. Faça upload novamente.");
+    }
 
-    // Atualizar status da nota para "enviando"
-    await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/notas_fiscais_servico?id=eq.${notaId}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-          "Content-Type": "application/json",
-          "Prefer": "return=representation"
-        },
-        body: JSON.stringify({ status: "enviando" }),
-      }
-    );
+    // Carregar certificado digital
+    const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
+    certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
+    certDigital.cnpj = certificado.cnpj || "";
 
-    // Busca dados da nota
-    const notaResponse = await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/notas_fiscais_servico?id=eq.${notaId}&select=*`,
-      {
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-        },
-      }
-    );
+    // Atualizar status para "enviando"
+    await supabase
+      .from("notas_fiscais_servico")
+      .update({ status: "enviando" })
+      .eq("id", notaId)
+      .eq("user_id", user.id);
 
-    const notas = await notaResponse.json();
-    if (!notas || notas.length === 0) {
+    // Buscar nota
+    const { data: nota, error: notaError } = await supabase
+      .from("notas_fiscais_servico")
+      .select("*")
+      .eq("id", notaId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (notaError || !nota) {
       throw new Error("Nota fiscal não encontrada");
     }
 
-    const nota = notas[0];
-
-    // Preparar dados do emitente (deve vir de uma tabela de emitentes ou configuração)
-    const emitente = {
-      cnpj: certificado.cnpj || "",
-      inscricaoMunicipal: certificado.inscricao_municipal || "",
-      razaoSocial: certificado.razao_social || "",
-      endereco: {
-        logradouro: certificado.endereco || "",
-        numero: certificado.numero || "",
-        bairro: certificado.bairro || "",
-        codigoMunicipio: certificado.codigo_municipio || "3550308", // São Paulo
-        uf: certificado.uf || "SP",
-        cep: certificado.cep || "",
-      },
-      certificado: {
-        certificado: certificado.arquivo_pfx || "",
-        senha: certificado.senha || "",
-      },
-    };
-
-    // Preparar dados da nota para envio
-    const dadosNota = {
+    // Montar dados da nota
+    const dadosNota: DadosNota = {
       identificacaoRps: {
         numero: nota.numero_rps || nota.numero_nota || gerarNumeroRps(),
         serie: nota.serie || "1",
@@ -104,9 +112,20 @@ serve(async (req) => {
       naturezaOperacao: nota.natureza_operacao || 1,
       regimeTributario: nota.regime_tributario || 1,
       optanteSimplesNacional: nota.regime_tributario === 1,
-
-      emitente,
-
+      incentivoFiscal: false,
+      emitente: {
+        cnpj: certDigital.cnpj,
+        inscricaoMunicipal: certDigital.inscricaoMunicipal,
+        razaoSocial: certificado.razao_social || certDigital.razaoSocial || "",
+        endereco: {
+          logradouro: certificado.endereco?.logradouro || "",
+          numero: certificado.numero || "",
+          bairro: certificado.bairro || "",
+          codigoMunicipio: certificado.codigo_municipio || "3550308",
+          uf: certificado.uf || "SP",
+          cep: certificado.cep || "",
+        },
+      },
       tomador: {
         tipoDocumento: nota.cliente_tipo_documento || "CNPJ",
         cnpjCpf: nota.cliente_cnpj_cpf || "",
@@ -124,7 +143,6 @@ serve(async (req) => {
           cep: nota.cliente_cep || "",
         },
       },
-
       servico: {
         descricao: nota.servico_descricao || "",
         codigo: nota.servico_codigo || nota.servico_item_lista_servico || "",
@@ -143,44 +161,45 @@ serve(async (req) => {
           valorIss: parseFloat(nota.valor_iss) || 0,
           valorLiquido: parseFloat(nota.valor_liquido) || 0,
         },
-        aliquotaIss: parseFloat(nota.aliquota_iss) || 0,
+        aliquotaIss: parseFloat(nota.aliquota_iss) || 0.05,
         issRetido: nota.iss_retido || false,
       },
-
-      certificadoId: certificadoId,
     };
 
-    console.log("Emitindo NFS-e:", JSON.stringify(dadosNota, null, 2));
+    console.log("Emitindo NFS-e:", dadosNota.identificacaoRps.numero);
 
-    // Chamar a API GINFES para emissão (implementação simplificada)
-    // Em produção, aqui seria a chamada real para a GINFES
-    const resultado = await emitirNfseGinfes(dadosNota, certificado);
+    const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
+
+    let resultado;
+
+    if (ambiente === "homologacao") {
+      // Modo homologacao - resposta simulada
+      resultado = emitirHomologacao(dadosNota);
+    } else {
+      // Modo producao - chamada real GINFES
+      resultado = await emitirProducao(dadosNota, certDigital);
+    }
 
     // Atualizar nota com resultado
     const updateData: any = {
-      status: resultado.sucesso ? "autorizada" : "erro",
+      status: resultado.sucesso ? "autorizada" : "rejeitada",
       xml_envio: resultado.xmlEnvio || null,
       xml_retorno: resultado.xmlRetorno || null,
       link_pdf: resultado.linkPdf || null,
       link_xml: resultado.linkXml || null,
       numero_nota: resultado.numeroNfse || nota.numero_nota,
       protocolo: resultado.protocolo || null,
-      codigo_verificacao: (resultado as any).codigoVerificacao || null,
-      link_nfse: (resultado as any).linkNfse || null,
+      codigo_verificacao: resultado.codigoVerificacao || null,
+      link_nfse: resultado.linkNfse || null,
+      data_autorizacao: resultado.sucesso ? new Date().toISOString() : null,
+      mensagem_erro: resultado.sucesso ? null : resultado.mensagens?.map((m: any) => m.mensagem).join("; "),
     };
 
-    await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/notas_fiscais_servico?id=eq.${notaId}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      }
-    );
+    await supabase
+      .from("notas_fiscais_servico")
+      .update(updateData)
+      .eq("id", notaId)
+      .eq("user_id", user.id);
 
     return new Response(
       JSON.stringify(resultado),
@@ -190,166 +209,71 @@ serve(async (req) => {
   } catch (err) {
     console.error("Erro ao emitir NFS-e:", err);
 
-    // Tenta atualizar status para erro
-    try {
-      const { notaId } = await req.json().catch(() => ({}));
-      if (notaId) {
-        await fetch(
-          `${Deno.env.get("SUPABASE_URL")}/rest/v1/notas_fiscais_servico?id=eq.${notaId}`,
-          {
-            method: "PATCH",
-            headers: {
-              "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-              "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ status: "erro" }),
-          }
-        );
-      }
-    } catch {}
+    if (notaId) {
+      try {
+        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        await supabase
+          .from("notas_fiscais_servico")
+          .update({ status: "erro", mensagem_erro: (err as Error).message })
+          .eq("id", notaId);
+      } catch {}
+    }
 
     return new Response(
-      JSON.stringify({ sucesso: false, mensagens: [{ codigo: "ERROR", mensagem: (err as Error).message, tipo: "Erro" }] }),
+      JSON.stringify({
+        sucesso: false,
+        mensagens: [{ codigo: "ERROR", mensagem: (err as Error).message, tipo: "Erro" }],
+      }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
-// Função para gerar número de RPS
 function gerarNumeroRps(): string {
   const timestamp = Date.now().toString().slice(-8);
   const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
   return `${timestamp}${random}`;
 }
 
-// Função simulada para emissão GINFES
-// Em produção, substituir pela implementação real da API GINFES
-async function emitirNfseGinfes(dadosNota: any, certificado: any): Promise<{
-  sucesso: boolean;
-  numeroNfse?: string;
-  protocolo?: string;
-  codigoVerificacao?: string;
-  linkNfse?: string;
-  xmlEnvio?: string;
-  xmlRetorno?: string;
-  linkPdf?: string;
-  linkXml?: string;
-  mensagens: Array<{ codigo: string; mensagem: string; tipo: string }>;
-}> {
-  console.log("Iniciando emissão GINFES...", dadosNota.identificacaoRps.numero);
-
-  try {
-    // Preparar XML de envio (simplificado)
-    const xmlEnvio = construirXmlEnvio(dadosNota);
-
-    // Para ambiente de homologação, retornar sucesso simulado
-    // Em produção, aqui seria a chamada real para a API GINFES
-    const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
-
-    if (ambiente === "homologacao") {
-      console.log("Ambiente de homologação - retornando resposta simulada");
-      return {
-        sucesso: true,
-        numeroNfse: dadosNota.identificacaoRps.numero,
-        protocolo: `PROT${Date.now()}`,
-        codigoVerificacao: `HOM${Date.now().toString(36).toUpperCase()}`,
-        linkNfse: `https://homologacao.ginfes.com.br/visualizar/${dadosNota.identificacaoRps.numero}`,
-        xmlEnvio,
-        xmlRetorno: "<Compl>true</Compl>",
-        linkPdf: undefined,
-        linkXml: undefined,
-        mensagens: [{
-          codigo: "AA001",
-          mensagem: "RPS processado com sucesso - ambiente de homologação",
-          tipo: "Sucesso",
-        }],
-      };
-    }
-
-    // Código para produção seria aqui
-    // Por enquanto, retornar sucesso como fallback
-    return {
-      sucesso: true,
-      numeroNfse: dadosNota.identificacaoRps.numero,
-      protocolo: `PROT${Date.now()}`,
-      codigoVerificacao: `PRD${Date.now().toString(36).toUpperCase()}`,
-      linkNfse: `https://producao.ginfes.com.br/visualizar/${dadosNota.identificacaoRps.numero}`,
-      xmlEnvio,
-      xmlRetorno: "<Compl>true</Compl>",
-      mensagens: [{
-        codigo: "0000",
-        mensagem: "Nota fiscal processada com sucesso",
-        tipo: "Sucesso",
-      }],
-    };
-
-  } catch (error) {
-    return {
-      sucesso: false,
-      xmlEnvio: "",
-      xmlRetorno: "",
-      mensagens: [{
-        codigo: "ERR_EMISSAO",
-        mensagem: error instanceof Error ? error.message : "Erro desconhecido",
-        tipo: "Erro",
-      }],
-    };
-  }
+function emitirHomologacao(dadosNota: DadosNota) {
+  console.log("Ambiente de homologação - retornando resposta simulada");
+  return {
+    sucesso: true,
+    numeroNfse: dadosNota.identificacaoRps.numero,
+    protocolo: `PROT${Date.now()}`,
+    codigoVerificacao: `HOM${Date.now().toString(36).toUpperCase()}`,
+    linkNfse: `https://homologacao.ginfes.com.br/visualizar/${dadosNota.identificacaoRps.numero}`,
+    xmlEnvio: "<homologacao>simulado</homologacao>",
+    xmlRetorno: "<Compl>true</Compl>",
+    mensagens: [{
+      codigo: "AA001",
+      mensagem: "RPS processado com sucesso - ambiente de homologação",
+      tipo: "Sucesso",
+    }],
+  };
 }
 
-// Constrói XML simplificado para envio
-function construirXmlEnvio(dadosNota: any): string {
-  const numeroLote = Date.now().toString();
-  const valorServico = dadosNota.servico.valores.valorServicos || 0;
-  const valorIss = dadosNota.servico.valores.valorIss || 0;
+async function emitirProducao(dadosNota: DadosNota, certDigital: CertificadoDigital) {
+  // Build RPS XML
+  const xmlRps = construirXmlRps(dadosNota);
+  const rpsId = `R${dadosNota.emitente.cnpj}${dadosNota.identificacaoRps.numero}`;
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsEnvio xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta">
-  <LoteRps Id="L${numeroLote}">
-    <NumeroLote>${numeroLote}</NumeroLote>
-    <Cnpj>${dadosNota.emitente.cnpj}</Cnpj>
-    <InscricaoMunicipal>${dadosNota.emitente.inscricaoMunicipal}</InscricaoMunicipal>
-    <QuantidadeRps>1</QuantidadeRps>
-    <ListaRps>
-      <Rps>
-        <InfRps Id="R${dadosNota.identificacaoRps.numero}">
-          <IdentificacaoRps>
-            <Numero>${dadosNota.identificacaoRps.numero}</Numero>
-            <Serie>${dadosNota.identificacaoRps.serie}</Serie>
-            <Tipo>${dadosNota.identificacaoRps.tipo}</Tipo>
-          </IdentificacaoRps>
-          <DataEmissao>${dadosNota.dataEmissao}</DataEmissao>
-          <NaturezaOperacao>${dadosNota.naturezaOperacao}</NaturezaOperacao>
-          <RegimeTributario>${dadosNota.regimeTributario}</RegimeTributario>
-          <OptanteSimplesNacional>${dadosNota.optanteSimplesNacional ? "S" : "N"}</OptanteSimplesNacional>
-          <Status>1</Status>
-          <Servico>
-            <Valores>
-              <ValorServicos>${valorServico.toFixed(2)}</ValorServicos>
-              <ValorIss>${valorIss.toFixed(2)}</ValorIss>
-              <IssRetido>${dadosNota.servico.issRetido ? "1" : "2"}</IssRetido>
-            </Valores>
-            <ItemListaServico>${dadosNota.servico.itemListaServico}</ItemListaServico>
-            <Discriminacao>${dadosNota.servico.descricao}</Discriminacao>
-          </Servico>
-          <Prestador>
-            <Cnpj>${dadosNota.emitente.cnpj}</Cnpj>
-            <InscricaoMunicipal>${dadosNota.emitente.inscricaoMunicipal}</InscricaoMunicipal>
-          </Prestador>
-          <Tomador>
-            <RazaoSocial>${dadosNota.tomador.razaoSocial}</RazaoSocial>
-            <Cnpj>${dadosNota.tomador.cnpjCpf}</Cnpj>
-            <Endereco>
-              <Uf>${dadosNota.tomador.endereco.uf}</Uf>
-            </Endereco>
-            <Contato>
-              <Email>${dadosNota.tomador.email}</Email>
-            </Contato>
-          </Tomador>
-        </InfRps>
-      </Rps>
-    </ListaRps>
-  </LoteRps>
-</EnviarLoteRpsEnvio>`;
+  // Sign the RPS
+  const signedRps = assinarXml(`<Rps xmlns="${"http://www.ginfes.com.br/tipos_v03.xsd"}">${xmlRps}</Rps>`, certDigital, rpsId);
+
+  // Build LoteRps
+  const xmlLote = construirXmlLoteRps(dadosNota, signedRps, certDigital);
+  const loteId = `LOTE${Date.now()}`;
+
+  // Sign the LoteRps
+  const signedLote = assinarXml(xmlLote, certDigital, loteId);
+
+  // Create SOAP envelope
+  const soapEnvelope = criarEnvelopeSOAP("RecepcionarLoteRpsV3", signedLote, dadosNota.emitente.cnpj, dadosNota.emitente.inscricaoMunicipal);
+
+  // Send to GINFES
+  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
+
+  // Parse response
+  return parsearRespostaEmissao(soapResponse);
 }

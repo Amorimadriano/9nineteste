@@ -1,4 +1,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  carregarCertificado,
+  construirXmlCancelamento,
+  assinarXml,
+  criarEnvelopeSOAP,
+  enviarRequisicaoSOAP,
+  parsearRespostaCancelamento,
+  type CertificadoDigital,
+} from "../_shared/nfse-ginfes-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,8 +21,33 @@ serve(async (req) => {
     return new Response(null, { status: 204, headers: corsHeaders });
   }
 
+  let notaId: string | undefined;
+
   try {
-    const { notaId, motivoCancelamento } = await req.json();
+    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    // Auth validation
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: "Missing authorization" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabaseAuth = createClient(SUPABASE_URL, Deno.env.get("SUPABASE_ANON_KEY")!, {
+      global: { headers: { Authorization: authHeader } },
+    });
+    const { data: { user }, error: authError } = await supabaseAuth.auth.getUser();
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const body = await req.json();
+    notaId = body.notaId;
+    const motivoCancelamento = body.motivoCancelamento || "E007";
 
     if (!notaId) {
       return new Response(
@@ -21,69 +56,85 @@ serve(async (req) => {
       );
     }
 
-    // Buscar dados da nota
-    const notaResponse = await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/notas_fiscais_servico?id=eq.${notaId}&select=*`,
-      {
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-        },
-      }
-    );
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    const notas = await notaResponse.json();
-    if (!notas || notas.length === 0) {
+    // Buscar nota
+    const { data: nota, error: notaError } = await supabase
+      .from("notas_fiscais_servico")
+      .select("*")
+      .eq("id", notaId)
+      .eq("user_id", user.id)
+      .single();
+
+    if (notaError || !nota) {
       throw new Error("Nota fiscal não encontrada");
     }
 
-    const nota = notas[0];
+    // Verificar se a nota pode ser cancelada
+    if (nota.status !== "autorizada") {
+      throw new Error(`Nota não pode ser cancelada. Status atual: ${nota.status}. Apenas notas autorizadas podem ser canceladas.`);
+    }
+
+    // Regra SP: so pode cancelar no mesmo dia da autorizacao
+    if (nota.data_autorizacao) {
+      const dataAut = new Date(nota.data_autorizacao);
+      const hoje = new Date();
+      if (dataAut.toDateString() !== hoje.toDateString()) {
+        throw new Error("Nota não pode ser cancelada. Só é permitido cancelar no mesmo dia da autorização (regra São Paulo).");
+      }
+    }
 
     // Buscar certificado
-    const certificadoResponse = await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/certificados_nfse?id=eq.${nota.certificado_id}&select=*`,
-      {
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    if (!nota.certificado_id) {
+      throw new Error("Certificado não vinculado à nota fiscal");
+    }
 
-    const certificados = await certificadoResponse.json();
-    if (!certificados || certificados.length === 0) {
+    const { data: certificado, error: certError } = await supabase
+      .from("certificados_nfse")
+      .select("*")
+      .eq("id", nota.certificado_id)
+      .single();
+
+    if (certError || !certificado) {
       throw new Error("Certificado não encontrado");
     }
 
-    const certificado = certificados[0];
+    if (!certificado.arquivo_pfx) {
+      throw new Error("Certificado não possui arquivo PFX. Faça upload novamente.");
+    }
+
+    // Carregar certificado digital
+    const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
 
     console.log(`Cancelando NFS-e número: ${nota.numero_nota || nota.numero_rps}`);
 
-    // Chamar API GINFES para cancelamento
-    const resultado = await cancelarNfseGinfes(nota, certificado, motivoCancelamento);
+    const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
+    let resultado;
 
-    // Atualizar nota com resultado do cancelamento
+    if (ambiente === "homologacao") {
+      resultado = cancelarHomologacao(nota, certificado, motivoCancelamento);
+    } else {
+      resultado = await cancelarProducao(nota, certDigital, motivoCancelamento);
+    }
+
+    // Atualizar nota com resultado
     const updateData: any = {
       status: resultado.sucesso ? "cancelada" : "erro",
+      motivo_cancelamento: motivoCancelamento,
     };
 
     if (resultado.xmlRetorno) {
       updateData.xml_retorno = resultado.xmlRetorno;
     }
+    if (!resultado.sucesso) {
+      updateData.mensagem_erro = resultado.mensagens?.map((m: any) => m.mensagem).join("; ");
+    }
 
-    await fetch(
-      `${Deno.env.get("SUPABASE_URL")}/rest/v1/notas_fiscais_servico?id=eq.${notaId}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          "apikey": Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updateData),
-      }
-    );
+    await supabase
+      .from("notas_fiscais_servico")
+      .update(updateData)
+      .eq("id", notaId)
+      .eq("user_id", user.id);
 
     return new Response(
       JSON.stringify(resultado),
@@ -92,94 +143,65 @@ serve(async (req) => {
 
   } catch (err) {
     console.error("Erro ao cancelar NFS-e:", err);
+
+    if (notaId) {
+      try {
+        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+        await supabase
+          .from("notas_fiscais_servico")
+          .update({ status: "erro", mensagem_erro: (err as Error).message })
+          .eq("id", notaId);
+      } catch {}
+    }
+
     return new Response(
       JSON.stringify({
         sucesso: false,
-        mensagens: [{ codigo: "ERROR", mensagem: (err as Error).message, tipo: "Erro" }]
+        mensagens: [{ codigo: "ERROR", mensagem: (err as Error).message, tipo: "Erro" }],
       }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
-// Função para cancelar na GINFES
-async function cancelarNfseGinfes(
-  nota: any,
-  certificado: any,
-  motivoCancelamento?: string
-): Promise<{
-  sucesso: boolean;
-  xmlEnvio?: string;
-  xmlRetorno?: string;
-  mensagens: Array<{ codigo: string; mensagem: string; tipo: string }>;
-}> {
-  console.log("Iniciando cancelamento GINFES...");
-
-  try {
-    // Preparar XML de cancelamento
-    const xmlEnvio = construirXmlCancelamento(nota, certificado, motivoCancelamento);
-
-    const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
-
-    if (ambiente === "homologacao") {
-      console.log("Ambiente de homologação - retornando cancelamento simulado");
-      return {
-        sucesso: true,
-        xmlEnvio,
-        xmlRetorno: "<Cancelamento>true</Cancelamento>",
-        mensagens: [{
-          codigo: "E001",
-          mensagem: "Cancelamento processado com sucesso - ambiente de homologação",
-          tipo: "Sucesso",
-        }],
-      };
-    }
-
-    // Em produção, aqui seria a chamada real para a API GINFES
-    // Por enquanto, retornar sucesso como fallback
-    return {
-      sucesso: true,
-      xmlEnvio,
-      xmlRetorno: "<Cancelamento>true</Cancelamento>",
-      mensagens: [{
-        codigo: "0000",
-        mensagem: "Cancelamento realizado com sucesso",
-        tipo: "Sucesso",
-      }],
-    };
-
-  } catch (error) {
-    return {
-      sucesso: false,
-      xmlEnvio: "",
-      xmlRetorno: "",
-      mensagens: [{
-        codigo: "ERR_CANCELAMENTO",
-        mensagem: error instanceof Error ? error.message : "Erro desconhecido",
-        tipo: "Erro",
-      }],
-    };
-  }
+function cancelarHomologacao(nota: any, certificado: any, motivoCancelamento: string) {
+  console.log("Ambiente de homologação - retornando cancelamento simulado");
+  const xmlEnvio = construirXmlCancelamento(
+    nota.numero_nota || nota.numero_rps || "",
+    certificado.cnpj || "",
+    certificado.inscricao_municipal || "",
+    motivoCancelamento
+  );
+  return {
+    sucesso: true,
+    xmlEnvio,
+    xmlRetorno: "<Cancelamento>true</Cancelamento>",
+    mensagens: [{
+      codigo: "E001",
+      mensagem: "Cancelamento processado com sucesso - ambiente de homologação",
+      tipo: "Sucesso",
+    }],
+  };
 }
 
-// Constrói XML de cancelamento
-function construirXmlCancelamento(nota: any, certificado: any, motivo?: string): string {
+async function cancelarProducao(nota: any, certDigital: CertificadoDigital, motivoCancelamento: string) {
   const numeroNfse = nota.numero_nota || nota.numero_rps || "";
-  const cnpj = certificado.cnpj || "";
-  const inscricaoMunicipal = certificado.inscricao_municipal || "";
+  const cnpj = certDigital.cnpj;
+  const inscricaoMunicipal = certDigital.inscricaoMunicipal;
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<CancelarNfseEnvio xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta">
-  <Pedido>
-    <InfPedidoCancelamento Id="CANC${numeroNfse}">
-      <IdentificacaoNfse>
-        <Numero>${numeroNfse}</Numero>
-        <Cnpj>${cnpj}</Cnpj>
-        <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
-        <CodigoMunicipio>3550308</CodigoMunicipio>
-      </IdentificacaoNfse>
-      <CodigoCancelamento>${motivo || "E007"}</CodigoCancelamento>
-    </InfPedidoCancelamento>
-  </Pedido>
-</CancelarNfseEnvio>`;
+  // Build cancellation XML
+  const xmlCancelamento = construirXmlCancelamento(numeroNfse, cnpj, inscricaoMunicipal, motivoCancelamento);
+  const pedidoId = `CANC${numeroNfse}`;
+
+  // Sign the cancellation
+  const signedXml = assinarXml(xmlCancelamento, certDigital, pedidoId);
+
+  // Create SOAP envelope
+  const soapEnvelope = criarEnvelopeSOAP("CancelarNfseV3", signedXml, cnpj, inscricaoMunicipal);
+
+  // Send to GINFES
+  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
+
+  // Parse response
+  return parsearRespostaCancelamento(soapResponse);
 }

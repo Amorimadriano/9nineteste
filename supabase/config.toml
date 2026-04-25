@@ -9,6 +9,18 @@ verify_jwt = false
 [functions.check-payment-status]
 verify_jwt = false
 
+[functions.emitir-nfse]
+verify_jwt = false
+
+[functions.cancelar-nfse]
+verify_jwt = false
+
+[functions.sync-nfse]
+verify_jwt = false
+
+[functions.validar-certificado-nfse]
+verify_jwt = false
+
 [functions.pagarme-webhook]
 verify_jwt = false
 

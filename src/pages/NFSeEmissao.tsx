@@ -48,7 +48,6 @@ import {
   AlertCircle,
   Loader2,
   RotateCcw,
-  XCircle,
 } from "lucide-react";
 
 // Interface para rascunho salvo
@@ -435,49 +434,6 @@ export default function NFSeEmissao() {
     }
   };
 
-  // Função para cancelar nota na GINFES
-  const cancelarNota = async () => {
-    if (!notaId) {
-      toast({
-        title: "Nenhuma nota para cancelar",
-        description: "Emitir uma nota primeiro antes de cancelar.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const confirmar = window.confirm("Tem certeza que deseja cancelar esta nota fiscal?");
-    if (!confirmar) return;
-
-    setIsSubmitting(true);
-    try {
-      const { error } = await supabase.functions.invoke("cancelar-nfse", {
-        body: {
-          notaId,
-          motivoCancelamento: "Cancelamento a pedido do prestador",
-        },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Nota cancelada",
-        description: "A nota fiscal foi cancelada com sucesso.",
-      });
-
-      limparFormulario();
-      await carregarNotasRecentes();
-    } catch (error: any) {
-      toast({
-        title: "Erro ao cancelar",
-        description: error.message || "Não foi possível cancelar a nota fiscal.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   // Navegação entre steps
   const nextStep = () => {
     if (currentStep < 4) {
@@ -712,14 +668,6 @@ export default function NFSeEmissao() {
                     </Button>
                   ) : (
                     <div className="flex gap-2">
-                      <Button
-                        variant="destructive"
-                        onClick={cancelarNota}
-                        disabled={isSubmitting || !notaId}
-                      >
-                        <XCircle className="mr-2 h-4 w-4" />
-                        {isSubmitting ? "Cancelando..." : "Cancelar Nota"}
-                      </Button>
                       <Button
                         onClick={emitirNota}
                         disabled={isSubmitting || !certificado?.ativo}
