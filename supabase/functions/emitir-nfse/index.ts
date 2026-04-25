@@ -94,7 +94,8 @@ function getElementName(xml: string, id: string): string {
 }
 
 async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
-  const forge = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
+  const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+  const forge = forgeModule.default || forgeModule;
   (globalThis as any).forge = forge;
   const pfxDer = forge.util.decode64(pfxBase64);
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
