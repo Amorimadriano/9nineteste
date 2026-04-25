@@ -28,9 +28,16 @@ serve(async (req) => {
     // Import node-forge for PKCS12 parsing
     let forge: any;
     try {
-      const forgeModule = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
-      forge = forgeModule.default?.util ? forgeModule.default : forgeModule;
-      console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki);
+      const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+      // esm.sh may wrap the module in { default: ... } or expose it directly
+      forge = forgeModule.default?.util ? forgeModule.default
+        : forgeModule.util ? forgeModule
+        : (forgeModule as any).default?.default?.util ? (forgeModule as any).default.default
+        : forgeModule;
+      console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki, "has pkcs12:", !!forge.pkcs12);
+      if (!forge.util || !forge.pki || !forge.pkcs12) {
+        throw new Error("node-forge carregado mas módulos necessários (util, pki, pkcs12) não estão disponíveis");
+      }
     } catch (importErr) {
       console.error("validar-certificado: erro ao importar node-forge:", importErr);
       return new Response(
@@ -202,9 +209,11 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error("validar-certificado: erro geral:", error);
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errStack = error instanceof Error ? error.stack : "";
+    console.error("validar-certificado: erro geral:", errMsg, errStack);
     return new Response(
-      JSON.stringify({ valido: false, mensagem: (error as Error).message || "Erro interno do servidor" }),
+      JSON.stringify({ valido: false, mensagem: errMsg || "Erro interno do servidor" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

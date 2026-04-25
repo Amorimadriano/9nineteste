@@ -107,8 +107,11 @@ function getAmbiente(): "homologacao" | "producao" {
 
 // --- Certificate Loading ---
 export async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
-  const forgeModule = await import("https://esm.sh/node-forge@1.3.1/dist/forge.js");
-  const forge: any = forgeModule.default?.util ? forgeModule.default : forgeModule;
+  const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
+  const forge: any = forgeModule.default?.util ? forgeModule.default
+    : forgeModule.util ? forgeModule
+    : (forgeModule as any).default?.default?.util ? (forgeModule as any).default.default
+    : forgeModule;
 
   const pfxDer = forge.util.decode64(pfxBase64);
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
