@@ -44,7 +44,8 @@
       "WebFetch(domain:upyo.org)",
       "Bash(ls dist/.htaccess)",
       "Bash(ls public/.htaccess)",
-      "WebFetch(domain:brasilapi.com.br)"
+      "WebFetch(domain:brasilapi.com.br)",
+      "WebFetch(domain:www.cigam.com.br)"
     ]
   }
 }

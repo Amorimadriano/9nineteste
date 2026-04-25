@@ -296,20 +296,22 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
   }
 }
 
-function criarEnvelopeSOAP(_soapAction: string, xmlBody: string): string {
+function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap12:Header>
-    <ns2:cabecalho xmlns:ns2="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3">
-      <versaoDados>4</versaoDados>
-    </ns2:cabecalho>
-  </soap12:Header>
   <soap12:Body>
-    ${xmlBody}
+    <${soapAction} xmlns="http://www.ginfes.com.br/">
+      <arg0>${cabecalhoXml}</arg0>
+      <arg1><![CDATA[${dadosXml}]]></arg1>
+    </${soapAction}>
   </soap12:Body>
 </soap12:Envelope>`;
+}
+
+function criarCabecalhoGinfes(): string {
+  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 }
 
 async function enviarRequisicaoSOAP(soapEnvelope: string): Promise<string> {
@@ -618,13 +620,24 @@ function emitirHomologacao(dadosNota: DadosNota) {
 }
 
 async function emitirProducao(dadosNota: DadosNota, certDigital: CertificadoDigital) {
+  // GINFES v03: RPS não é assinado individualmente, apenas o Lote
   const xmlRps = construirXmlRps(dadosNota);
-  const rpsId = `R${dadosNota.emitente.cnpj}${dadosNota.identificacaoRps.numero}`;
-  const signedRps = assinarXml(`<Rps xmlns="${ABRASF_NAMESPACES.tip}">${xmlRps}</Rps>`, certDigital, rpsId);
-  const xmlLote = construirXmlLoteRps(dadosNota, signedRps, certDigital);
+  const xmlLote = construirXmlLoteRps(dadosNota, xmlRps, certDigital);
   const loteId = `LOTE${Date.now()}`;
   const signedLote = assinarXml(xmlLote, certDigital, loteId);
-  const soapEnvelope = criarEnvelopeSOAP("RecepcionarLoteRpsV3", signedLote);
+
+  // Envelope SOAP no formato GINFES v03: arg0=cabecalho, arg1=dados
+  const cabecalho = criarCabecalhoGinfes();
+  const soapEnvelope = criarEnvelopeSOAPGinfes("RecepcionarLoteRpsV3", cabecalho, signedLote);
+
+  console.log("=== NFS-e Emissão Produção ===");
+  console.log("CNPJ:", dadosNota.emitente.cnpj);
+  console.log("IM:", dadosNota.emitente.inscricaoMunicipal);
+  console.log("RPS:", dadosNota.identificacaoRps.numero);
+  console.log("Ambiente:", Deno.env.get("NFSE_AMBIENTE") || "homologacao");
+
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
+  console.log("Resposta GINFES (primeiros 500 chars):", soapResponse.substring(0, 500));
+
   return parsearRespostaEmissao(soapResponse);
 }

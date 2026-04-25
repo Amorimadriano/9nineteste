@@ -171,20 +171,22 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
   }
 }
 
-function criarEnvelopeSOAP(_soapAction: string, xmlBody: string): string {
+function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"
                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                   xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap12:Header>
-    <ns2:cabecalho xmlns:ns2="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3">
-      <versaoDados>4</versaoDados>
-    </ns2:cabecalho>
-  </soap12:Header>
   <soap12:Body>
-    ${xmlBody}
+    <${soapAction} xmlns="http://www.ginfes.com.br/">
+      <arg0>${cabecalhoXml}</arg0>
+      <arg1><![CDATA[${dadosXml}]]></arg1>
+    </${soapAction}>
   </soap12:Body>
 </soap12:Envelope>`;
+}
+
+function criarCabecalhoGinfes(): string {
+  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 }
 
 async function enviarRequisicaoSOAP(soapEnvelope: string): Promise<string> {
@@ -411,7 +413,13 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
   const xmlCancelamento = construirXmlCancelamento(numeroNfse, cnpj, inscricaoMunicipal, motivoCancelamento);
   const pedidoId = `CANC${numeroNfse}`;
   const signedXml = assinarXml(xmlCancelamento, certDigital, pedidoId);
-  const soapEnvelope = criarEnvelopeSOAP("CancelarNfseV3", signedXml);
+  const cabecalho = criarCabecalhoGinfes();
+  const soapEnvelope = criarEnvelopeSOAPGinfes("CancelarNfseV3", cabecalho, signedXml);
+
+  console.log("=== NFS-e Cancelamento Produção ===");
+  console.log("NFS-e:", numeroNfse, "CNPJ:", cnpj);
+
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
+  console.log("Resposta GINFES Cancelamento:", soapResponse.substring(0, 500));
   return parsearRespostaCancelamento(soapResponse);
 }
