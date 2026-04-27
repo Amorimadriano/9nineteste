@@ -174,9 +174,7 @@ export default function NFSeEmissao() {
 
       if (error && error.code !== "PGRST116") throw error;
 
-      if (data) {
-        setCertificado(data);
-      }
+      setCertificado(data || null);
     } catch (error) {
       console.error("Erro ao carregar certificado:", error);
     }
