@@ -19,7 +19,7 @@ const express = require("express");
 const app = express();
 app.use(express.json({ limit: "5mb" }));
 
-const PORT = parseInt(process.env.PROXY_PORT || "3001", 10);
+const PORT = parseInt(process.env.PORT || process.env.PROXY_PORT || "3001", 10);
 const API_KEY = process.env.PROXY_API_KEY || "";
 
 // URLs da GINFES
