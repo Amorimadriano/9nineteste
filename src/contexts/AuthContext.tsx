@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -22,22 +22,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
     // Verificar sessão inicial primeiro
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setIsInitialized(true);
+      initializedRef.current = true;
       setLoading(false);
     });
 
     // Escutar mudanças de autenticação
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // Só atualizar se não for o evento inicial (já tratado acima)
-        if (isInitialized) {
+      (_event, session) => {
+        if (initializedRef.current) {
           setSession(session);
           setUser(session?.user ?? null);
         }
@@ -46,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => subscription.unsubscribe();
-  }, [isInitialized]);
+  }, []);
 
   const signOut = async () => {
     await supabase.auth.signOut();
