@@ -446,66 +446,68 @@ export default function NFSeEmissao() {
         throw new Error("Sessão expirada. Faça login novamente antes de emitir.");
       }
 
-      // Chama Edge Function para emitir (com retry para erros transitórios como cold start)
-      let emitData: any = null;
-      let emitError: any = null;
+      // Chama Edge Function via fetch para poder ler o corpo do erro 500
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const maxRetries = 2;
+      let emitData: any = null;
+      let lastError: string | null = null;
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        const result = await supabase.functions.invoke("emitir-nfse", {
-          body: {
-            notaId: nota.id,
-            certificadoId: certificado.id,
-          },
-        });
-
-        emitData = result.data;
-        emitError = result.error;
-
-        if (!emitError) break;
-
-        const errMsg = emitError.message || "";
-        const isTransient = errMsg.includes("406")
-          || errMsg.includes("Failed to fetch")
-          || errMsg.includes("NetworkError")
-          || errMsg.includes("timeout")
-          || errMsg.includes("non-2xx status code");
-
-        if (isTransient && attempt < maxRetries) {
-          console.warn(`[NFSeEmissao] Tentativa ${attempt + 1} falhou (${errMsg}), tentando novamente em 3s...`);
-          // Refresh token antes de retry
-          await supabase.auth.refreshSession();
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          continue;
-        }
-
-        break;
-      }
-
-      if (emitError) {
-        // Tenta extrair detalhes do erro da resposta HTTP
-        let errorMsg = emitError.message || "Erro na função de emissão";
         try {
-          // FunctionsHttpError pode ter o body na propriedade context ou direto
-          const funcError = emitError as any;
-          const errorBody = funcError.context?.response
-            ? await funcError.context.response.clone().json()
-            : funcError.context?.json
-              ? funcError.context.json
-              : funcError.data
-                ? funcError.data
-                : null;
-          if (errorBody?.mensagens?.length) {
-            errorMsg = errorBody.mensagens.map((m: any) => m.mensagem || m).join("; ");
-          } else if (errorBody?.error) {
-            errorMsg = errorBody.error;
+          const response = await fetch(`${supabaseUrl}/functions/v1/emitir-nfse`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${currentSession.access_token}`,
+            },
+            body: JSON.stringify({ notaId: nota.id, certificadoId: certificado.id }),
+          });
+
+          const responseBody = await response.json();
+
+          if (!response.ok) {
+            lastError = responseBody?.mensagens?.map((m: any) => m.mensagem || m).join("; ")
+              || responseBody?.error
+              || responseBody?.mensagem
+              || `Erro HTTP ${response.status}`;
+            console.error(`[NFSeEmissao] Edge Function retornou ${response.status}:`, responseBody);
+
+            const isTransient = response.status >= 500 || response.status === 406;
+            if (isTransient && attempt < maxRetries) {
+              console.warn(`[NFSeEmissao] Tentativa ${attempt + 1} falhou (${lastError}), tentando novamente em 3s...`);
+              await supabase.auth.refreshSession();
+              await new Promise(resolve => setTimeout(resolve, 3000));
+              // Atualiza token para retry
+              const { data: { session: refreshedSession } } = await supabase.auth.getSession();
+              if (refreshedSession) {
+                (currentSession as any).access_token = refreshedSession.access_token;
+              }
+              continue;
+            }
+            throw new Error(lastError);
           }
-        } catch { /* ignora erros de parsing */ }
-        console.error("[NFSeEmissao] Erro na emissão:", emitError);
-        throw new Error(errorMsg);
+
+          emitData = responseBody;
+          break;
+        } catch (fetchErr: any) {
+          if (fetchErr.message === lastError) throw fetchErr;
+          const isNetworkError = fetchErr.message?.includes("Failed to fetch")
+            || fetchErr.message?.includes("NetworkError")
+            || fetchErr.message?.includes("timeout");
+          if (isNetworkError && attempt < maxRetries) {
+            console.warn(`[NFSeEmissao] Tentativa ${attempt + 1} falhou (erro de rede), tentando novamente em 3s...`);
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            continue;
+          }
+          throw fetchErr;
+        }
       }
 
-      if (emitData && !emitData.sucesso) {
+      if (!emitData) {
+        throw new Error(lastError || "Nenhuma resposta recebida da função de emissão");
+      }
+
+      if (!emitData.sucesso) {
         const msgs = emitData.mensagens?.map((m: any) => m.mensagem).join("; ") || emitData.error || "Erro desconhecido na emissão";
         throw new Error(msgs);
       }
