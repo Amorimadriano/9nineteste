@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enviarRequisicaoSOAP } from "../_shared/mtls-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,10 +26,6 @@ interface CertificadoDigital {
 const ABRASF_NAMESPACES = {
   servicoCancelar: "http://www.ginfes.com.br/servico_cancelar_nfse_envio_v03.xsd",
 };
-
-function getAmbiente(): "homologacao" | "producao" {
-  return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
-}
 
 /**
  * Proper C14N canonicalization for XMLDSIG.
@@ -263,24 +260,6 @@ function criarCabecalhoGinfes(): string {
   return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 }
 
-async function enviarRequisicaoSOAP(soapEnvelope: string): Promise<string> {
-  const config = {
-    homologacao: { url: "https://homologacao.ginfes.com.br/ServiceGinfesImpl" },
-    producao: { url: "https://producao.ginfes.com.br/ServiceGinfesImpl" },
-  };
-  const env = getAmbiente();
-  const response = await fetch(config[env].url, {
-    method: "POST",
-    headers: { "Content-Type": "application/soap+xml; charset=utf-8", "SOAPAction": "" },
-    body: soapEnvelope,
-  });
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Erro HTTP ${response.status}: ${text.substring(0, 500)}`);
-  }
-  return await response.text();
-}
-
 function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
   const ERROS_GINFES: Record<string, string> = {
@@ -401,7 +380,7 @@ serve(async (req) => {
 
     const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
     certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
-    certDigital.cnpj = certificado.cnpj || "";
+    certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
 
     console.log(`Cancelando NFS-e número: ${nota.numero_nota || nota.numero_rps}`);
 
@@ -500,7 +479,10 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
   console.log("=== NFS-e Cancelamento Produção ===");
   console.log("NFS-e:", numeroNfse, "CNPJ:", cnpj);
 
-  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope);
+  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, {
+    certPem: certDigital.certPem,
+    keyPem: certDigital.keyPem,
+  });
   console.log("Resposta GINFES Cancelamento:", soapResponse.substring(0, 500));
   const resultado = parsearRespostaCancelamento(soapResponse);
   return { ...resultado, xmlEnvio: signedXml };
