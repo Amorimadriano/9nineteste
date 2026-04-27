@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { enviarRequisicaoSOAP } from "../_shared/mtls-client.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -258,6 +257,156 @@ function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dados
 
 function criarCabecalhoGinfes(): string {
   return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+}
+
+function getAmbiente(): "homologacao" | "producao" {
+  return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
+}
+
+const GINFES_URLS = {
+  homologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
+  producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
+};
+
+async function enviarRequisicaoSOAP(
+  soapEnvelope: string,
+  certificado?: { certPem: string; keyPem: string },
+): Promise<string> {
+  const env = getAmbiente();
+  const url = GINFES_URLS[env];
+
+  if (env === "homologacao" || !certificado) {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/soap+xml; charset=utf-8", "SOAPAction": "" },
+      body: soapEnvelope,
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Erro HTTP ${response.status}: ${text.substring(0, 500)}`);
+    }
+    return await response.text();
+  }
+
+  try {
+    const client = Deno.createHttpClient({
+      certChain: certificado.certPem,
+      privateKey: certificado.keyPem,
+    });
+    console.log("cancelar-nfse: usando mTLS via Deno.createHttpClient");
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/soap+xml; charset=utf-8", "SOAPAction": "" },
+        body: soapEnvelope,
+        client,
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Erro HTTP ${response.status}: ${text.substring(0, 500)}`);
+      }
+      return await response.text();
+    } finally {
+      client.close();
+    }
+  } catch (httpClientErr: any) {
+    const errMsg = httpClientErr?.message || String(httpClientErr);
+    console.warn("cancelar-nfse: createHttpClient falhou:", errMsg.substring(0, 200));
+
+    try {
+      return await enviarRequisicaoMTLSManual(url, soapEnvelope, certificado);
+    } catch (tlsErr: any) {
+      const tlsMsg = tlsErr?.message || String(tlsErr);
+      if (tlsMsg.includes("connectTLS") || tlsMsg.includes("is not a function")) {
+        throw new Error(
+          "O ambiente Supabase Edge Functions não suporta mTLS. " +
+          "A emissão em produção requer um proxy intermediário com suporte a mTLS. " +
+          "Erro: " + tlsMsg
+        );
+      }
+      throw tlsErr;
+    }
+  }
+}
+
+async function enviarRequisicaoMTLSManual(
+  url: string,
+  soapEnvelope: string,
+  certificado: { certPem: string; keyPem: string },
+): Promise<string> {
+  const parsedUrl = new URL(url);
+  const hostname = parsedUrl.hostname;
+  const port = parseInt(parsedUrl.port) || 443;
+
+  const conn = await Deno.connectTLS({
+    hostname,
+    port,
+    certChain: certificado.certPem,
+    privateKey: certificado.keyPem,
+  });
+
+  try {
+    const path = parsedUrl.pathname;
+    const contentLength = new TextEncoder().encode(soapEnvelope).length;
+
+    const httpRequest = [
+      `POST ${path} HTTP/1.1`,
+      `Host: ${hostname}`,
+      "Content-Type: application/soap+xml; charset=utf-8",
+      "SOAPAction: \"\"",
+      `Content-Length: ${contentLength}`,
+      "Connection: close",
+      "",
+      soapEnvelope,
+    ].join("\r\n");
+
+    await conn.write(new TextEncoder().encode(httpRequest));
+
+    const chunks: Uint8Array[] = [];
+    const reader = conn.readable.getReader();
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        chunks.push(value);
+      }
+    } catch { /* connection closed */ }
+
+    const totalLength = chunks.reduce((sum, c) => sum + c.length, 0);
+    const responseBytes = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const c of chunks) { responseBytes.set(c, offset); offset += c.length; }
+
+    const responseText = new TextDecoder().decode(responseBytes);
+    const headerEnd = responseText.indexOf("\r\n\r\n");
+    if (headerEnd === -1) throw new Error("Resposta HTTP mal formatada");
+
+    const headers = responseText.substring(0, headerEnd);
+    const body = responseText.substring(headerEnd + 4);
+
+    const statusMatch = headers.match(/^HTTP\/\d\.\d\s+(\d+)/);
+    if (!statusMatch) throw new Error(`Resposta HTTP inválida: ${headers.substring(0, 200)}`);
+
+    const statusCode = parseInt(statusMatch[1]);
+    if (statusCode >= 300) throw new Error(`Erro HTTP ${statusCode}: ${body.substring(0, 500)}`);
+
+    if (headers.toLowerCase().includes("transfer-encoding: chunked")) {
+      let result = ""; let pos = 0;
+      while (pos < body.length) {
+        const lineEnd = body.indexOf("\r\n", pos);
+        if (lineEnd === -1) break;
+        const chunkSize = parseInt(body.substring(pos, lineEnd), 16);
+        if (isNaN(chunkSize) || chunkSize === 0) break;
+        pos = lineEnd + 2;
+        result += body.substring(pos, pos + chunkSize);
+        pos += chunkSize + 2;
+      }
+      return result;
+    }
+    return body;
+  } finally {
+    try { conn.close(); } catch { /* ignore */ }
+  }
 }
 
 function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
