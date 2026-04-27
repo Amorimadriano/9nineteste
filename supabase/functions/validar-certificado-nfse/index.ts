@@ -65,46 +65,88 @@ serve(async (req) => {
       const subject = cert.subject;
       const issuer = cert.issuer;
 
+      // Log all subject attributes for debugging
+      console.log("validar-certificado: subject attributes:", subject.attributes.map((a: any) => ({
+        oid: a.oid, shortName: a.shortName || "(none)", value: a.value?.substring(0, 80)
+      })));
+
       // Extract CNPJ and name from subject
       let emitidoPara = "";
       let cnpj = "";
       for (const attr of subject.attributes) {
         if (attr.shortName === "CN") {
           emitidoPara = attr.value;
-          const cnpjMatch = attr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
-          if (cnpjMatch) {
-            cnpj = cnpjMatch[0].replace(/\D/g, "");
+        }
+      }
+
+      // ICP-Brasil: CNPJ está no OID 2.16.76.4.3.3 (pessoa jurídica)
+      const icpCnpjAttr = subject.attributes.find((a: any) => a.oid === "2.16.76.4.3.3");
+      if (icpCnpjAttr) {
+        const raw = icpCnpjAttr.value;
+        const digits = raw.replace(/\D/g, "");
+        if (digits.length >= 14) {
+          cnpj = digits.substring(digits.length - 14);
+        }
+      }
+
+      // Fallback: CNPJ em OU (ICP-Brasil comum)
+      if (!cnpj) {
+        const ouAttr = subject.attributes.find((a: any) =>
+          a.oid === "2.5.4.11" && /CNPJ/i.test(a.value)
+        );
+        if (ouAttr) {
+          const cnpjMatch = ouAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+          if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+        }
+      }
+
+      // Fallback: CNPJ no CN (Common Name)
+      if (!cnpj) {
+        const cnAttr = subject.attributes.find((a: any) => a.shortName === "CN");
+        if (cnAttr) {
+          const cnpjMatch = cnAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+          if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+        }
+      }
+
+      // Fallback: CNPJ em serialNumber (OID 2.5.4.5)
+      if (!cnpj) {
+        const serialAttr = subject.attributes.find((a: any) => a.oid === "2.5.4.5");
+        if (serialAttr) {
+          const digits = serialAttr.value.replace(/\D/g, "");
+          if (digits.length >= 14) {
+            cnpj = digits.substring(digits.length - 14);
           }
         }
       }
 
-      // If no CNPJ in CN, try subjectAltName or OID
+      // Fallback: buscar 14 dígitos consecutivos em qualquer atributo
       if (!cnpj) {
-        const extensions = cert.extensions || [];
-        for (const ext of extensions) {
-          if (ext.name === "subjectAltName" && ext.altNames) {
-            for (const altName of ext.altNames) {
-              if (altName.type === 6 && typeof altName.value === "string") {
-                const match = altName.value.match(/(\d{14})/);
-                if (match) {
-                  cnpj = match[1];
-                  break;
-                }
-              }
-            }
-          }
-          if (ext.id === "2.16.860.1.5.5.1" || ext.id === "2.16.76.1.3.5") {
-            try {
-              const value = ext.value;
-              const match = (typeof value === "string" ? value : "").match(/(\d{14})/);
-              if (match) {
-                cnpj = match[1];
-                break;
-              }
-            } catch {}
+        for (const attr of subject.attributes) {
+          const digits = (attr.value || "").replace(/\D/g, "");
+          if (digits.length >= 14) {
+            cnpj = digits.substring(digits.length - 14);
+            break;
           }
         }
       }
+
+      // Fallback: subjectAltName extension
+      if (!cnpj && cert.extensions) {
+        for (const ext of cert.extensions) {
+          if (ext.name === "subjectAltName" && (ext as any).altNames) {
+            for (const altName of (ext as any).altNames) {
+              if (altName.type === 6 && typeof altName.value === "string") {
+                const match = altName.value.match(/(\d{14})/);
+                if (match) { cnpj = match[1]; break; }
+              }
+            }
+          }
+          if (cnpj) break;
+        }
+      }
+
+      console.log("validar-certificado: CNPJ extraído:", cnpj || "(não encontrado)");
 
       // Extract issuer name
       let emissor = "";

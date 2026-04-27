@@ -220,15 +220,82 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
     certPem = forge.pki.certificateToPem(cert.cert!);
     validoAte = cert.cert!.validity.notAfter;
     const subject = cert.cert!.subject;
+
+    // Log all subject attributes for debugging
+    console.log("emitir-nfse: subject attributes:", subject.attributes.map((a: any) => ({
+      oid: a.oid, shortName: a.shortName || "(none)", value: a.value?.substring(0, 80)
+    })));
+
     for (const attr of subject.attributes) {
       if (attr.shortName === "CN") razaoSocial = attr.value;
     }
-    const cnAttr = subject.attributes.find((a: any) =>
-      a.oid === "2.5.4.5" || a.oid === "2.16.840.1.113730.4.1" || a.oid === "0.9.2342.19200300.100.1.1" || a.shortName === "CN"
-    );
-    if (cnAttr) {
-      const cnpjMatch = cnAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
-      if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+
+    // ICP-Brasil: CNPJ está no OID 2.16.76.4.3.3 (pessoa jurídica)
+    const icpCnpjAttr = subject.attributes.find((a: any) => a.oid === "2.16.76.4.3.3");
+    if (icpCnpjAttr) {
+      const raw = icpCnpjAttr.value;
+      // Valor pode ser string direta, hex-encoded, ou DER-encoded
+      const digits = raw.replace(/\D/g, "");
+      if (digits.length >= 14) {
+        cnpj = digits.substring(digits.length - 14);
+      }
+    }
+
+    // Fallback: procurar CNPJ em OU (Organizational Unit) - comum em certificados ICP-Brasil
+    if (!cnpj) {
+      const ouAttr = subject.attributes.find((a: any) =>
+        a.oid === "2.5.4.11" && /CNPJ/i.test(a.value)
+      );
+      if (ouAttr) {
+        const cnpjMatch = ouAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+        if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+      }
+    }
+
+    // Fallback: procurar CNPJ no CN (Common Name)
+    if (!cnpj) {
+      const cnAttr = subject.attributes.find((a: any) => a.shortName === "CN");
+      if (cnAttr) {
+        const cnpjMatch = cnAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+        if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+      }
+    }
+
+    // Fallback: procurar CNPJ em serialNumber (OID 2.5.4.5)
+    if (!cnpj) {
+      const serialAttr = subject.attributes.find((a: any) => a.oid === "2.5.4.5");
+      if (serialAttr) {
+        const digits = serialAttr.value.replace(/\D/g, "");
+        if (digits.length >= 14) {
+          cnpj = digits.substring(digits.length - 14);
+        }
+      }
+    }
+
+    // Fallback: buscar 14 dígitos consecutivos em qualquer atributo do subject
+    if (!cnpj) {
+      for (const attr of subject.attributes) {
+        const digits = (attr.value || "").replace(/\D/g, "");
+        if (digits.length >= 14) {
+          cnpj = digits.substring(digits.length - 14);
+          break;
+        }
+      }
+    }
+
+    // Fallback: buscar em extensions (subjectAltName)
+    if (!cnpj && cert.cert!.extensions) {
+      for (const ext of cert.cert!.extensions) {
+        if (ext.name === "subjectAltName" && (ext as any).altNames) {
+          for (const altName of (ext as any).altNames) {
+            if (altName.type === 6 && typeof altName.value === "string") {
+              const match = altName.value.match(/(\d{14})/);
+              if (match) { cnpj = match[1]; break; }
+            }
+          }
+        }
+        if (cnpj) break;
+      }
     }
   }
 
@@ -589,7 +656,8 @@ serve(async (req) => {
     try {
       certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
       certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
-      certDigital.cnpj = certificado.cnpj || "";
+      // Usa CNPJ do banco se disponível, senão mantém o extraído do certificado
+      certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
       console.log("emitir-nfse: certificado carregado, CNPJ=", certDigital.cnpj, "IM=", certDigital.inscricaoMunicipal);
     } catch (certErr: any) {
       console.error("emitir-nfse: erro ao carregar certificado:", certErr?.message || certErr);
