@@ -227,7 +227,10 @@ function construirXmlConsultaRps(numeroRps: string, serie: string, tipo: string,
   const consultaId = `CONSULTA${numeroRps}`;
   // ABRASF Tipo codes: 1=RPS, 2=RPS-M, 3=Cupom
   const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "RPS-M" || tipo === "2" ? "2" : tipo === "Cupom" || tipo === "3" ? "3" : "1";
+  // GINFES requires cabecalho INSIDE the ConsultarNfseRpsEnvio XML (E185 correction)
+  const cabecalhoInterno = `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
   return `<ConsultarNfseRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoConsultar}" Id="${consultaId}">
+  ${cabecalhoInterno}
   <IdentificacaoRps>
     <Numero>${numeroRps}</Numero>
     <Serie>${serie}</Serie>
@@ -785,6 +788,7 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
   const cnpj = certDigital.cnpj;
   const inscricaoMunicipal = certDigital.inscricaoMunicipal;
 
+  // Build XML with cabecalho embedded inside (E185 correction requires this)
   const xmlConsulta = construirXmlConsultaRps(numeroRps, serie, tipo, cnpj, inscricaoMunicipal);
   const consultaId = `CONSULTA${numeroRps}`;
   const signedXml = assinarXml(xmlConsulta, certDigital, consultaId);
@@ -793,6 +797,7 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
 
   console.log("=== NFS-e Consulta Producao ===");
   console.log("RPS:", numeroRps, "CNPJ:", cnpj, "IM:", inscricaoMunicipal);
+  console.log("XML Envio (primeiro 2000 chars):", xmlConsulta.substring(0, 2000));
 
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, {
     certPem: certDigital.certPem,
