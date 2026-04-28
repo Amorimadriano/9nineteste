@@ -95,7 +95,7 @@ function sendWithoutMTLS(targetUrl, soapEnvelope, res) {
     path: parsedUrl.pathname,
     method: "POST",
     headers: {
-      "Content-Type": "application/soap+xml; charset=utf-8",
+      "Content-Type": "text/xml; charset=utf-8",
       "SOAPAction": "",
       "Content-Length": payload.length,
     },
@@ -135,7 +135,7 @@ function sendWithMTLS(targetUrl, soapEnvelope, certPem, keyPem, res) {
     path: parsedUrl.pathname,
     method: "POST",
     headers: {
-      "Content-Type": "application/soap+xml; charset=utf-8",
+      "Content-Type": "text/xml; charset=utf-8",
       "SOAPAction": "",
       "Content-Length": payload.length,
     },

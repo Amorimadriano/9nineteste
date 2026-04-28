@@ -243,16 +243,16 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
 
 function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope"
-                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
     <${soapAction} xmlns="http://www.ginfes.com.br/">
       <arg0>${cabecalhoXml}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 }
 
 function criarCabecalhoGinfes(): string {
@@ -277,7 +277,7 @@ async function enviarRequisicaoSOAP(
   if (env === "homologacao") {
     const response = await fetch(GINFES_URLS[env], {
       method: "POST",
-      headers: { "Content-Type": "application/soap+xml; charset=utf-8", "SOAPAction": "" },
+      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
       body: soapEnvelope,
     });
     if (!response.ok) {
