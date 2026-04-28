@@ -241,13 +241,17 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
   }
 }
 
-function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string): string {
+function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  const ginfesNs = ambiente === "producao"
+    ? "http://producao.ginfes.com.br"
+    : "http://homologacao.ginfes.com.br";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="http://www.ginfes.com.br/">
+    <${soapAction} xmlns="${ginfesNs}">
       <arg0>${cabecalhoXml}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
@@ -540,7 +544,7 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
   const pedidoId = `CANC${numeroNfse}`;
   const signedXml = assinarXml(xmlCancelamento, certDigital, pedidoId);
   const cabecalho = criarCabecalhoGinfes();
-  const soapEnvelope = criarEnvelopeSOAPGinfes("CancelarNfseV3", cabecalho, signedXml);
+  const soapEnvelope = criarEnvelopeSOAPGinfes("CancelarNfseV3", cabecalho, signedXml, "producao");
 
   console.log("=== NFS-e Cancelamento Produção ===");
   console.log("NFS-e:", numeroNfse, "CNPJ:", cnpj);

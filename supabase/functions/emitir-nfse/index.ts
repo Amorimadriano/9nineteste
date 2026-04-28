@@ -488,13 +488,20 @@ function assinarLoteCompleto(xmlLote: string, certificado: CertificadoDigital): 
   return xml;
 }
 
-function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string): string {
+function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  // GINFES exige namespace diferente por ambiente:
+  // Produção: http://producao.ginfes.com.br
+  // Homologação: http://homologacao.ginfes.com.br
+  const ginfesNs = ambiente === "producao"
+    ? "http://producao.ginfes.com.br"
+    : "http://homologacao.ginfes.com.br";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="http://www.ginfes.com.br/">
+    <${soapAction} xmlns="${ginfesNs}">
       <arg0>${cabecalhoXml}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
@@ -907,7 +914,7 @@ async function emitirProducao(dadosNota: DadosNota, certDigital: CertificadoDigi
 
   // Envelope SOAP no formato GINFES v03: arg0=cabecalho, arg1=dados
   const cabecalho = criarCabecalhoGinfes();
-  const soapEnvelope = criarEnvelopeSOAPGinfes("RecepcionarLoteRpsV3", cabecalho, signedLote);
+  const soapEnvelope = criarEnvelopeSOAPGinfes("RecepcionarLoteRpsV3", cabecalho, signedLote, ambiente);
 
   console.log("=== NFS-e Emissão Produção ===");
   console.log("CNPJ:", dadosNota.emitente.cnpj);
