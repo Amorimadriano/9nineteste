@@ -59,7 +59,9 @@
       "WebFetch(domain:desenvolvimentonfse.forumeiros.com)",
       "WebFetch(domain:abrasf.org.br)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(python3 -m json.tool)"
+      "Bash(python3 -m json.tool)",
+      "Bash(git mv *)",
+      "Bash(awk '/^   2026/ && $2 == \"|\" {print $1}')"
     ]
   }
 }
