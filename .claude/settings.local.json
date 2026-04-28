@@ -45,7 +45,14 @@
       "Bash(ls dist/.htaccess)",
       "Bash(ls public/.htaccess)",
       "WebFetch(domain:brasilapi.com.br)",
-      "WebFetch(domain:www.cigam.com.br)"
+      "WebFetch(domain:www.cigam.com.br)",
+      "Bash(railway whoami *)",
+      "Bash(railway login *)",
+      "Bash(railway init *)",
+      "Bash(railway status *)",
+      "Bash(railway list *)",
+      "WebFetch(domain:ninenineteste.onrender.com)",
+      "WebFetch(domain:nfse-mtls-proxy.onrender.com)"
     ]
   }
 }
