@@ -394,31 +394,53 @@ function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; ti
  */
 function parsearRespostaConsulta(xml: string) {
   try {
-    const erros = parsearErros(xml);
-    if (erros.length > 0 && !xml.includes("<CompNfse")) {
+    // Strip XML namespaces to simplify regex parsing (e.g. <tip:Numero> -> <Numero>)
+    const cleanXml = xml.replace(/<\/?[a-zA-Z0-9]+:/g, (match) => {
+      // Remove namespace prefix from opening/closing tags: <ns2:Element> -> <Element>
+      return match.startsWith("</") ? "</" : "<";
+    });
+
+    const erros = parsearErros(cleanXml);
+    if (erros.length > 0 && !cleanXml.includes("<CompNfse") && !cleanXml.includes("<InfNfse") && !cleanXml.includes("<Numero")) {
       return { sucesso: false, xmlRetorno: xml, mensagens: erros };
     }
 
-    // Extract NFS-e number
-    const numeroNfseMatch = xml.match(/<NumeroNfse>([^<]+)<\/NumeroNfse>/i)
-      || xml.match(/<Numero>([^<]+)<\/Numero>/i);
-    const numeroNfse = numeroNfseMatch?.[1];
+    // Extract InfNfse section (contains the NFS-e data)
+    const infNfseMatch = cleanXml.match(/<InfNfse[^>]*>([\s\S]*?)<\/InfNfse>/i);
+    const infNfse = infNfseMatch ? infNfseMatch[1] : cleanXml;
+
+    // Extract NFS-e number - look inside InfNfse, NOT inside IdentificacaoRps
+    // In ABRASF, <Numero> appears twice: first as NFS-e number, then as RPS number inside <IdentificacaoRps>
+    // We want the FIRST <Numero> which is the NFS-e number
+    const numeroNfseMatch = infNfse.match(/<NumeroNfse>([^<]+)<\/NumeroNfse>/i);
+    let numeroNfse: string | undefined;
+    if (numeroNfseMatch) {
+      numeroNfse = numeroNfseMatch[1];
+    } else {
+      // Find <Numero> that is NOT inside <IdentificacaoRps>
+      // Strategy: find all <Numero> matches, prefer the one before <IdentificacaoRps>
+      const beforeRps = infNfse.split(/<IdentificacaoRps/i)[0];
+      const numeroMatch = beforeRps.match(/<Numero>([^<]+)<\/Numero>/i);
+      numeroNfse = numeroMatch?.[1];
+    }
 
     // Extract verification code
-    const codigoVerificacaoMatch = xml.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i);
+    const codigoVerificacaoMatch = infNfse.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i);
     const codigoVerificacao = codigoVerificacaoMatch?.[1];
 
     // Extract emission date
-    const dataEmissaoMatch = xml.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i)
-      || xml.match(/<DataEmissao>([^<]+)<\/DataEmissao>/i);
+    const dataEmissaoMatch = infNfse.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i)
+      || infNfse.match(/<DataEmissao>([^<]+)<\/DataEmissao>/i);
     const dataEmissao = dataEmissaoMatch?.[1];
 
     // Extract authorization date
-    const dataAutorizacaoMatch = xml.match(/<DataAutorizacao>([^<]+)<\/DataAutorizacao>/i);
+    const dataAutorizacaoMatch = infNfse.match(/<DataAutorizacao>([^<]+)<\/DataAutorizacao>/i)
+      || infNfse.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i);
     const dataAutorizacao = dataAutorizacaoMatch?.[1];
 
     // Extract situacao (1=Normal/Active, 2=Cancelled, 3=Substituted)
-    const situacaoMatch = xml.match(/<SituacaoNfse>([^<]+)<\/SituacaoNfse>/i);
+    const situacaoMatch = infNfse.match(/<SituacaoNfse>([^<]+)<\/SituacaoNfse>/i)
+      || infNfse.match(/<Situacao>([^<]+)<\/Situacao>/i);
     const situacao = situacaoMatch?.[1];
     let status: string;
     if (situacao === "2") {
@@ -430,60 +452,70 @@ function parsearRespostaConsulta(xml: string) {
     }
 
     // Extract service value
-    const valorServicosMatch = xml.match(/<ValorServicos>([^<]+)<\/ValorServicos>/i);
+    const valorServicosMatch = infNfse.match(/<ValorServicos>([^<]+)<\/ValorServicos>/i);
     const valorServicos = valorServicosMatch?.[1];
 
     // Extract ISS value
-    const valorIssMatch = xml.match(/<ValorIss>([^<]+)<\/ValorIss>/i);
+    const valorIssMatch = infNfse.match(/<ValorIss>([^<]+)<\/ValorIss>/i);
     const valorIss = valorIssMatch?.[1];
 
     // Extract base calculation
-    const baseCalculoMatch = xml.match(/<BaseCalculo>([^<]+)<\/BaseCalculo>/i);
+    const baseCalculoMatch = infNfse.match(/<BaseCalculo>([^<]+)<\/BaseCalculo>/i);
     const baseCalculo = baseCalculoMatch?.[1];
 
     // Extract ISS rate
-    const aliquotaMatch = xml.match(/<Aliquota>([^<]+)<\/Aliquota>/i);
+    const aliquotaMatch = infNfse.match(/<Aliquota>([^<]+)<\/Aliquota>/i);
     const aliquotaIss = aliquotaMatch?.[1];
 
     // Extract ISS retained
-    const issRetidoMatch = xml.match(/<IssRetido>([^<]+)<\/IssRetido>/i);
+    const issRetidoMatch = infNfse.match(/<IssRetido>([^<]+)<\/IssRetido>/i);
     const issRetido = issRetidoMatch?.[1] === "1" || issRetidoMatch?.[1]?.toLowerCase() === "sim" || issRetidoMatch?.[1]?.toLowerCase() === "true";
 
     // Extract tomador (service taker)
     let tomadorRazaoSocial = "";
     let tomadorCnpjCpf = "";
-    const tomadorRazaoMatch = xml.match(/<TomadorServico>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i)
-      || xml.match(/<Tomador>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i);
+    const tomadorRazaoMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i)
+      || cleanXml.match(/<Tomador>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i)
+      || cleanXml.match(/<InfDeclaracaoPrestacaoServico>[\s\S]*?<Tomador>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i);
     if (tomadorRazaoMatch) tomadorRazaoSocial = tomadorRazaoMatch[1];
 
-    const tomadorCnpjMatch = xml.match(/<TomadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i)
-      || xml.match(/<Tomador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
-    const tomadorCpfMatch = xml.match(/<TomadorServico>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i)
-      || xml.match(/<Tomador>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i);
+    const tomadorCnpjMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i)
+      || cleanXml.match(/<Tomador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
+    const tomadorCpfMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i)
+      || cleanXml.match(/<Tomador>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i);
     tomadorCnpjCpf = tomadorCnpjMatch?.[1] || tomadorCpfMatch?.[1] || "";
 
     // Extract prestador (service provider)
     let prestadorCnpj = "";
     let prestadorIM = "";
-    const prestadorCnpjMatch = xml.match(/<PrestadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i)
-      || xml.match(/<Prestador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
+    const prestadorCnpjMatch = cleanXml.match(/<PrestadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i)
+      || cleanXml.match(/<Prestador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
     if (prestadorCnpjMatch) prestadorCnpj = prestadorCnpjMatch[1];
 
-    const prestadorIMMatch = xml.match(/<PrestadorServico>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i)
-      || xml.match(/<Prestador>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i);
+    const prestadorIMMatch = cleanXml.match(/<PrestadorServico>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i)
+      || cleanXml.match(/<Prestador>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i);
     if (prestadorIMMatch) prestadorIM = prestadorIMMatch[1];
 
     // Extract links (PDF, XML, NFS-e page) if provided by municipality
-    const linkPdfMatch = xml.match(/<LinkPdf>([^<]+)<\/LinkPdf>/i)
-      || xml.match(/<linkPdf>([^<]+)<\/linkPdf>/i);
-    const linkXmlMatch = xml.match(/<LinkXml>([^<]+)<\/LinkXml>/i)
-      || xml.match(/<linkXml>([^<]+)<\/linkXml>/i);
-    const linkNfseMatch = xml.match(/<LinkNfse>([^<]+)<\/LinkNfse>/i)
-      || xml.match(/<linkNfse>([^<]+)<\/linkNfse>/i);
+    let linkPdf = (cleanXml.match(/<LinkPdf>([^<]+)<\/LinkPdf>/i) || cleanXml.match(/<linkPdf>([^<]+)<\/linkPdf>/i))?.[1];
+    let linkXml = (cleanXml.match(/<LinkXml>([^<]+)<\/LinkXml>/i) || cleanXml.match(/<linkXml>([^<]+)<\/linkXml>/i))?.[1];
+    let linkNfse = (cleanXml.match(/<LinkNfse>([^<]+)<\/LinkNfse>/i) || cleanXml.match(/<linkNfse>([^<]+)<\/linkNfse>/i))?.[1];
+
+    // If no links provided by GINFES, construct them from numero + codigoVerificacao
+    // São Paulo GINFES typically provides a visualizacao link
+    if (!linkNfse && numeroNfse && codigoVerificacao) {
+      const ambiente = Deno.env.get("NFSE_AMBIENTE") || "homologacao";
+      const baseUrl = ambiente === "producao"
+        ? "https://producao.ginfes.com.br"
+        : "https://homologacao.ginfes.com.br";
+      linkNfse = `${baseUrl}/VisualizarNfse?num=${numeroNfse}&cod=${codigoVerificacao}`;
+    }
 
     // Extract service description/discrimination
-    const discriminacaoMatch = xml.match(/<Discriminacao>([^<]+)<\/Discriminacao>/i);
-    const itemListaServicoMatch = xml.match(/<ItemListaServico>([^<]+)<\/ItemListaServico>/i);
+    const discriminacaoMatch = cleanXml.match(/<Discriminacao>([^<]+)<\/Discriminacao>/i);
+    const itemListaServicoMatch = cleanXml.match(/<ItemListaServico>([^<]+)<\/ItemListaServico>/i);
+
+    console.log("consultar-nfse: parseado numeroNfse=", numeroNfse, "codigoVerificacao=", codigoVerificacao, "dataEmissao=", dataEmissao, "status=", status);
 
     return {
       sucesso: true,
@@ -505,9 +537,9 @@ function parsearRespostaConsulta(xml: string) {
         cnpj: prestadorCnpj,
         inscricaoMunicipal: prestadorIM,
       },
-      linkPdf: linkPdfMatch?.[1],
-      linkXml: linkXmlMatch?.[1],
-      linkNfse: linkNfseMatch?.[1],
+      linkPdf,
+      linkXml,
+      linkNfse,
       discriminacao: discriminacaoMatch?.[1],
       itemListaServico: itemListaServicoMatch?.[1],
       xmlRetorno: xml,
