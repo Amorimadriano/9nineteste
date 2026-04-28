@@ -394,9 +394,23 @@ function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; ti
  */
 function parsearRespostaConsulta(xml: string) {
   try {
+    // GINFES wraps response data in <return><![CDATA[...]]></return> inside SOAP body
+    // Extract the CDATA content first if present
+    let workXml = xml;
+
+    // Try to extract content from <return> element (may contain CDATA)
+    const returnMatch = workXml.match(/<return[^>]*>([\s\S]*?)<\/return>/i);
+    if (returnMatch) {
+      let returnContent = returnMatch[1].trim();
+      // Remove CDATA wrapper if present
+      returnContent = returnContent.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
+      if (returnContent.length > 10) {
+        workXml = returnContent;
+      }
+    }
+
     // Strip XML namespaces to simplify regex parsing (e.g. <tip:Numero> -> <Numero>)
-    const cleanXml = xml.replace(/<\/?[a-zA-Z0-9]+:/g, (match) => {
-      // Remove namespace prefix from opening/closing tags: <ns2:Element> -> <Element>
+    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9]+:/g, (match) => {
       return match.startsWith("</") ? "</" : "<";
     });
 
@@ -747,7 +761,20 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
     keyPem: certDigital.keyPem,
   });
 
-  console.log("Resposta GINFES Consulta:", soapResponse.substring(0, 500));
+  console.log("Resposta GINFES Consulta:", soapResponse.substring(0, 2000));
+
+  // Log raw response for debugging - strip SOAP envelope to see inner XML
+  const soapBodyMatch = soapResponse.match(/<soap:Body[^>]*>([\s\S]*?)<\/soap:Body>/i)
+    || soapResponse.match(/<Body[^>]*>([\s\S]*?)<\/Body>/i);
+  const innerXml = soapBodyMatch ? soapBodyMatch[1] : soapResponse;
+  console.log("Resposta Inner XML (primeiro 3000 chars):", innerXml.substring(0, 3000));
+
   const resultado = parsearRespostaConsulta(soapResponse);
+
+  // If no key data found, log full response for debugging
+  if (!resultado.numeroNfse && !resultado.codigoVerificacao) {
+    console.log("AVISO: Parser nao encontrou dados chave. Resposta completa:", soapResponse.substring(0, 5000));
+  }
+
   return { ...resultado, xmlEnvio: signedXml };
 }
