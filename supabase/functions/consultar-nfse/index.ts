@@ -226,11 +226,11 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
  * Constroi XML de consulta NFS-e por RPS (ABRASF 2.04 / GINFES v03)
  */
 function construirXmlConsultaRps(numeroRps: string, serie: string, tipo: string, cnpj: string, inscricaoMunicipal: string): string {
-  const consultaId = `CONSULTA${numeroRps}`;
   // ABRASF Tipo codes: 1=RPS, 2=RPS-M, 3=Cupom
   const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "RPS-M" || tipo === "2" ? "2" : tipo === "Cupom" || tipo === "3" ? "3" : "1";
   // GINFES requires: default ns on root, tipos: prefix on child elements (elementFormDefault=qualified)
-  return `<ConsultarNfseRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoConsultar}" xmlns:tipos="http://www.ginfes.com.br/tipos_v03.xsd" Id="${consultaId}">
+  // No Id attribute needed: ConsultarNfsePorRpsV3 does not use XML signature.
+  return `<ConsultarNfseRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoConsultar}" xmlns:tipos="http://www.ginfes.com.br/tipos_v03.xsd">
   <IdentificacaoRps>
     <tipos:Numero>${numeroRps}</tipos:Numero>
     <tipos:Serie>${serie}</tipos:Serie>
@@ -316,20 +316,23 @@ function criarEnvelopeConsultaNfsePorRps(soapAction: string, cabecalhoXml: strin
     ? "http://producao.ginfes.com.br"
     : "http://homologacao.ginfes.com.br";
 
+  // GINFES requires xmlns="" on arg0/arg1 to unqualify the inner XML from the SOAP operation namespace.
+  // Using default xmlns (not prefixed) for the operation element matches the emission envelope pattern.
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="${ginfesNs}">
-  <soapenv:Header/>
-  <soapenv:Body>
-    <ns1:${soapAction}>
-      <arg0>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
+               xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+               xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${ginfesNs}">
+      <arg0 xmlns="">
 ${cabecalhoXml}
       </arg0>
-      <arg1>
+      <arg1 xmlns="">
 ${dadosXml}
       </arg1>
-    </ns1:${soapAction}>
-  </soapenv:Body>
-</soapenv:Envelope>`;
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
 }
 
 function criarCabecalhoGinfes(): string {
@@ -821,16 +824,17 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
   const inscricaoMunicipal = certDigital.inscricaoMunicipal;
 
   // Build XML with default ns on root, tipos: prefix on children (E185 fix)
+  // IMPORTANT: ConsultaNfsePorRpsV3 does NOT require XML signature (unlike emission/cancellation).
+  // The GINFES schema servico_consultar_nfse_rps_envio_v03.xsd has no Signature element.
+  // Authentication is done via mTLS client certificate only.
   const xmlConsulta = construirXmlConsultaRps(numeroRps, serie, tipo, cnpj, inscricaoMunicipal);
-  const consultaId = `CONSULTA${numeroRps}`;
-  const signedXml = assinarXml(xmlConsulta, certDigital, consultaId);
   const cabecalho = criarCabecalhoGinfes();
-  // Use Consulta-specific envelope: no CDATA, ns2:cabecalho, direct XML in arg1
-  const soapEnvelope = criarEnvelopeConsultaNfsePorRps("ConsultarNfsePorRpsV3", cabecalho, signedXml, "producao");
+  // Use Consulta-specific envelope: no CDATA, ns2:cabecalho, direct XML in arg1, xmlns="" on args
+  const soapEnvelope = criarEnvelopeConsultaNfsePorRps("ConsultarNfsePorRpsV3", cabecalho, xmlConsulta, "producao");
 
   console.log("=== NFS-e Consulta Producao ===");
   console.log("RPS:", numeroRps, "CNPJ:", cnpj, "IM:", inscricaoMunicipal);
-  console.log("Signed XML (primeiro 2000 chars):", signedXml.substring(0, 2000));
+  console.log("Consulta XML (primeiro 2000 chars):", xmlConsulta.substring(0, 2000));
   console.log("Envelope SOAP (primeiro 2000 chars):", soapEnvelope.substring(0, 2000));
 
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, {
@@ -854,5 +858,5 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
   }
 
   // Include raw XML in response for frontend debugging (truncated)
-  return { ...resultado, xmlEnvio: signedXml, xmlBruto: soapResponse.substring(0, 8000) };
+  return { ...resultado, xmlEnvio: xmlConsulta, xmlBruto: soapResponse.substring(0, 8000) };
 }
