@@ -16,6 +16,8 @@ interface BrasilApiCnpjResponse {
   bairro?: string | null;
   municipio?: string | null;
   uf?: string | null;
+  cnae_fiscal_descricao?: string | null;
+  natureza_juridica?: string | null;
 }
 
 /**
@@ -35,6 +37,8 @@ interface FieldMapping {
   bairro?: string;
   cidade?: string;
   estado?: string;
+  cnae?: string;              // CNAE principal descricao
+  naturezaJuridica?: string;   // natureza juridica
 }
 
 /**
@@ -79,6 +83,8 @@ export function useCnpjLookup(
     bairro: "bairro",
     cidade: "cidade",
     estado: "estado",
+    cnae: "cnae",
+    naturezaJuridica: "natureza_juridica",
     ...mapping,
   };
 
@@ -200,6 +206,16 @@ export function useCnpjLookup(
           // Estado
           if (data.uf && defaultMapping.estado && defaultMapping.estado !== "-") {
             next[defaultMapping.estado] = data.uf;
+          }
+
+          // CNAE Principal
+          if (data.cnae_fiscal_descricao && defaultMapping.cnae && defaultMapping.cnae !== "-") {
+            next[defaultMapping.cnae] = data.cnae_fiscal_descricao;
+          }
+
+          // Natureza Juridica
+          if (data.natureza_juridica && defaultMapping.naturezaJuridica && defaultMapping.naturezaJuridica !== "-") {
+            next[defaultMapping.naturezaJuridica] = data.natureza_juridica;
           }
 
           console.log("[useCnpjLookup] Form atualizado:", next);

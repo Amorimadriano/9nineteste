@@ -16,8 +16,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Save, Building2 } from "lucide-react";
+import { ArrowLeft, Save, Building2, Search, Loader2 } from "lucide-react";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
+import { useCepLookup } from "@/hooks/useCepLookup";
 
 const SEGMENTOS = [
   "Advocacia",
@@ -49,6 +50,8 @@ export default function NovaEmpresa() {
     cnpj: "",
     razao_social: "",
     nome_fantasia: "",
+    cnae: "",
+    natureza_juridica: "",
     inscricao_estadual: "",
     inscricao_municipal: "",
     segmento: "",
@@ -63,28 +66,28 @@ export default function NovaEmpresa() {
     email: "",
   });
 
-  const { data: cnpjData, isLoading: loadingCnpj } = useCnpjLookup(
-    form.cnpj.replace(/\D/g, "")
-  );
+  const { lookup: lookupCnpj, loading: loadingCnpj } = useCnpjLookup(setForm, {
+    razaoSocial: "razao_social",
+    nomeFantasia: "nome_fantasia",
+    email: "email",
+    telefone: "telefone",
+    cep: "endereco_cep",
+    endereco: "endereco_logradouro",
+    numero: "endereco_numero",
+    complemento: "endereco_complemento",
+    bairro: "endereco_bairro",
+    cidade: "endereco_cidade",
+    estado: "endereco_uf",
+    cnae: "cnae",
+    naturezaJuridica: "natureza_juridica",
+  });
 
-  // Auto-preencher ao receber dados do CNPJ
-  useState(() => {
-    if (cnpjData) {
-      setForm((prev) => ({
-        ...prev,
-        razao_social: cnpjData.razao_social || prev.razao_social,
-        nome_fantasia: cnpjData.nome_fantasia || prev.nome_fantasia,
-        endereco_logradouro: cnpjData.logradouro || prev.endereco_logradouro,
-        endereco_numero: cnpjData.numero || prev.endereco_numero,
-        endereco_complemento:
-          cnpjData.complemento || prev.endereco_complemento,
-        endereco_bairro: cnpjData.bairro || prev.endereco_bairro,
-        endereco_cidade: cnpjData.municipio || prev.endereco_cidade,
-        endereco_uf: cnpjData.uf || prev.endereco_uf,
-        telefone: cnpjData.telefone || prev.telefone,
-        email: cnpjData.email || prev.email,
-      }));
-    }
+  const { lookup: lookupCep, loading: loadingCep } = useCepLookup(setForm, {
+    logradouro: "endereco_logradouro",
+    bairro: "endereco_bairro",
+    cidade: "endereco_cidade",
+    estado: "endereco_uf",
+    complemento: "endereco_complemento",
   });
 
   const handleChange = (field: string, value: string) => {
@@ -95,7 +98,6 @@ export default function NovaEmpresa() {
     if (!user) return;
     setSaving(true);
 
-    // 1. Criar empresa
     const { data: empresa, error: errEmp } = await supabase
       .from("empresas")
       .insert({
@@ -128,14 +130,12 @@ export default function NovaEmpresa() {
       return;
     }
 
-    // 2. Vincular usuário como admin
     await supabase.from("usuario_empresas").insert({
       user_id: user.id,
       empresa_id: empresa.id,
       role: "admin",
     });
 
-    // 3. Selecionar automaticamente
     await selecionarEmpresa(empresa.id);
 
     toast({ title: "Empresa criada com sucesso!" });
@@ -170,14 +170,32 @@ export default function NovaEmpresa() {
         <CardContent className="p-6 space-y-4">
           {step === 0 && (
             <div className="space-y-4">
+              {/* CNPJ com lupa */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>CNPJ *</Label>
-                  <Input
-                    placeholder="00.000.000/0000-00"
-                    value={form.cnpj}
-                    onChange={(e) => handleChange("cnpj", e.target.value)}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="00.000.000/0000-00"
+                      value={form.cnpj}
+                      onChange={(e) => handleChange("cnpj", e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => lookupCnpj(form.cnpj)}
+                      disabled={loadingCnpj}
+                      title="Consultar CNPJ"
+                    >
+                      {loadingCnpj ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                   {loadingCnpj && (
                     <p className="text-xs text-muted-foreground mt-1">
                       Consultando Receita Federal...
@@ -223,6 +241,28 @@ export default function NovaEmpresa() {
                 </div>
               </div>
 
+              {/* CNAE e Natureza Jurídica */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label>CNAE Principal</Label>
+                  <Input
+                    value={form.cnae}
+                    onChange={(e) => handleChange("cnae", e.target.value)}
+                    placeholder="Ex: Comércio varejista..."
+                  />
+                </div>
+                <div>
+                  <Label>Natureza Jurídica</Label>
+                  <Input
+                    value={form.natureza_juridica}
+                    onChange={(e) =>
+                      handleChange("natureza_juridica", e.target.value)
+                    }
+                    placeholder="Ex: Sociedade Empresária..."
+                  />
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <Label>Inscrição Estadual</Label>
@@ -244,13 +284,39 @@ export default function NovaEmpresa() {
                 </div>
               </div>
 
+              {/* CEP com lupa */}
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-1">
                   <Label>CEP</Label>
-                  <Input
-                    value={form.endereco_cep}
-                    onChange={(e) => handleChange("endereco_cep", e.target.value)}
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="00000-000"
+                      value={form.endereco_cep}
+                      onChange={(e) =>
+                        handleChange("endereco_cep", e.target.value)
+                      }
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => lookupCep(form.endereco_cep)}
+                      disabled={loadingCep}
+                      title="Consultar CEP"
+                    >
+                      {loadingCep ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Search className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {loadingCep && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Consultando ViaCEP...
+                    </p>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <Label>Logradouro</Label>
@@ -308,7 +374,9 @@ export default function NovaEmpresa() {
                   <Input
                     maxLength={2}
                     value={form.endereco_uf}
-                    onChange={(e) => handleChange("endereco_uf", e.target.value.toUpperCase())}
+                    onChange={(e) =>
+                      handleChange("endereco_uf", e.target.value.toUpperCase())
+                    }
                   />
                 </div>
               </div>
