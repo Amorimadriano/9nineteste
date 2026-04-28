@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { EmpresaProvider } from "@/contexts/EmpresaContext";
 import { useTrialGuard } from "@/hooks/useTrialGuard";
 import { useOnboarding } from "@/hooks/useOnboarding";
 import { AppLayout } from "@/components/AppLayout";
@@ -26,6 +27,8 @@ import SimuladorIbsCbs from "./pages/SimuladorIbsCbs";
 
 // Lazy loading de páginas pesadas - Code Splitting por rotas
 const Dashboard = lazy(() => import("./pages/Dashboard"));
+const DashboardMaster = lazy(() => import("./pages/DashboardMaster"));
+const NovaEmpresa = lazy(() => import("./pages/NovaEmpresa"));
 const ContasReceber = lazy(() => import("./pages/ContasReceber"));
 const ContasPagar = lazy(() => import("./pages/ContasPagar"));
 const FluxoCaixa = lazy(() => import("./pages/FluxoCaixa"));
@@ -175,6 +178,7 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
+        <EmpresaProvider>
           <AuthProvider>
             <Routes>
               <Route path="/site" element={<Site />} />
@@ -185,6 +189,16 @@ const App = () => (
               <Route path="/" element={
                 <Suspense fallback={<PageLoader />}>
                   <Dashboard />
+                </Suspense>
+              } />
+              <Route path="/painel-master" element={
+                <Suspense fallback={<PageLoader />}>
+                  <DashboardMaster />
+                </Suspense>
+              } />
+              <Route path="/nova-empresa" element={
+                <Suspense fallback={<PageLoader />}>
+                  <NovaEmpresa />
                 </Suspense>
               } />
               <Route path="/contas-receber" element={
@@ -373,6 +387,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AuthProvider>
+      </EmpresaProvider>
       </BrowserRouter>
     </TooltipProvider>
     </ErrorBoundary>

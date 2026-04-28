@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { useToast } from "@/hooks/use-toast";
 import { useMemo, useCallback } from "react";
 
@@ -107,6 +108,7 @@ function normalizeTableRows(table: TableName, data: any[]) {
  */
 export function useTableQuery(table: TableName, options?: { select?: string; orderBy?: string; ascending?: boolean }) {
   const { user } = useAuth();
+  const { empresaSelecionada } = useEmpresa();
 
   // Memoizar configurações de cache baseado na tabela
   const cacheConfig = useMemo(() => TABLE_CACHE_CONFIG[table] || {
@@ -115,9 +117,12 @@ export function useTableQuery(table: TableName, options?: { select?: string; ord
   }, [table]);
 
   return useQuery({
-    queryKey: [table, user?.id, options?.select, options?.orderBy],
+    queryKey: [table, user?.id, empresaSelecionada?.id, options?.select, options?.orderBy],
     queryFn: useCallback(async () => {
       let query = (supabase.from(table) as any).select(options?.select || "*");
+      if (empresaSelecionada?.id) {
+        query = query.eq("empresa_id", empresaSelecionada.id);
+      }
       if (options?.orderBy) {
         query = query.order(options.orderBy, { ascending: options.ascending ?? false });
       } else {
@@ -126,7 +131,7 @@ export function useTableQuery(table: TableName, options?: { select?: string; ord
       const { data, error } = await query;
       if (error) throw error;
       return normalizeTableRows(table, data ?? []);
-    }, [table, options?.select, options?.orderBy, options?.ascending]),
+    }, [table, options?.select, options?.orderBy, options?.ascending, empresaSelecionada?.id]),
     enabled: !!user,
     // Usar configurações de cache específicas por tabela
     staleTime: cacheConfig.staleTime,
@@ -168,6 +173,7 @@ export function useTableQuery(table: TableName, options?: { select?: string; ord
 export function useTableMutation(table: TableName) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { empresaSelecionada } = useEmpresa();
   const { toast } = useToast();
 
   // Memoizar função de invalidação para evitar re-criação
@@ -191,13 +197,17 @@ export function useTableMutation(table: TableName) {
 
   const insert = useMutation({
     mutationFn: useCallback(async (values: Record<string, any>) => {
+      const payload: Record<string, any> = { ...values, user_id: user!.id };
+      if (empresaSelecionada?.id) {
+        payload.empresa_id = empresaSelecionada.id;
+      }
       const { data, error } = await (supabase.from(table) as any)
-        .insert({ ...values, user_id: user!.id })
+        .insert(payload)
         .select()
         .single();
       if (error) throw error;
       return data;
-    }, [table, user]),
+    }, [table, user, empresaSelecionada?.id]),
     onSuccess: () => handleSuccess("criado"),
     onError: (error: any) => handleError("criar", error),
   });

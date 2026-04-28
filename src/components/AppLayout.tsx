@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useTrialGuard } from "@/hooks/useTrialGuard";
 import { AdminNotifications } from "@/components/AdminNotifications";
 import { AssistenteVirtual } from "@/components/AssistenteVirtual";
+import SeletorEmpresa from "@/components/SeletorEmpresa";
 
 function ThemeToggle() {
   const [dark, setDark] = useState(() => {
@@ -67,7 +68,10 @@ export function AppLayout() {
             </div>
           )}
           <header className="h-12 flex items-center justify-between border-b border-border bg-card px-4">
-            <SidebarTrigger />
+            <div className="flex items-center gap-3">
+              <SidebarTrigger />
+              <SeletorEmpresa />
+            </div>
             <div className="flex items-center gap-1">
               <AdminNotifications />
               <ThemeToggle />
