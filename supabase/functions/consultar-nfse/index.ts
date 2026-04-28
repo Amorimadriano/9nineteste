@@ -291,8 +291,8 @@ function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dados
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
     <${soapAction} xmlns="${ginfesNs}">
-      <arg0 xmlns=""><![CDATA[${cabecalhoXml}]]></arg0>
-      <arg1 xmlns=""><![CDATA[${dadosXml}]]></arg1>
+      <arg0 xmlns="">${cabecalhoXml}</arg0>
+      <arg1 xmlns="">${dadosXml}</arg1>
     </${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
@@ -392,44 +392,56 @@ function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; ti
  * Parse GINFES ConsultaNfseRps response
  * Extracts NFS-e details from <CompNfse> element
  */
+function decodeHtmlEntities(str: string): string {
+  return str
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, "&");
+}
+
 function parsearRespostaConsulta(xml: string) {
   try {
-    // GINFES wraps response data in <return><![CDATA[...]]></return> inside SOAP body
-    // Extract the CDATA content first if present
+    // GINFES wraps response data in <return> element
+    // The content may be: CDATA, HTML-escaped entities, or plain XML
     let workXml = xml;
 
-    // Step 1: Extract content from <return> element (may contain CDATA)
-    // Try multiple patterns for the <return> wrapper
+    // Step 1: Extract content from <return> element
     let returnContent: string | null = null;
 
     // Pattern 1: <return><![CDATA[...]]></return>
-  const cdataMatch = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
-  if (cdataMatch) {
-    returnContent = cdataMatch[1];
-  }
-
-  // Pattern 2: <return>...</return> without CDATA
-  if (!returnContent) {
-    const plainMatch = xml.match(/<return[^>]*>([\s\S]*?)<\/return>/i);
-    if (plainMatch) {
-      returnContent = plainMatch[1].trim();
+    const cdataMatch = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
+    if (cdataMatch) {
+      returnContent = cdataMatch[1];
     }
-  }
 
-  // Pattern 3: Look for CDATA anywhere in the response
-  if (!returnContent) {
-    const anyCdata = xml.match(/<!\[CDATA\[([\s\S]*?)\]\]>/i);
-    if (anyCdata && anyCdata[1].includes("ConsultarNfse")) {
-      returnContent = anyCdata[1];
+    // Pattern 2: <return>HTML-escaped content</return> (e.g. &lt;xml&gt;)
+    if (!returnContent) {
+      const escapedMatch = xml.match(/<return[^>]*>([\s\S]*?)<\/return>/i);
+      if (escapedMatch) {
+        let content = escapedMatch[1].trim();
+        // Decode HTML entities (&lt; -> <, &quot; -> ", etc.)
+        content = decodeHtmlEntities(content);
+        if (content.length > 10) {
+          returnContent = content;
+        }
+      }
     }
-  }
 
-  if (returnContent && returnContent.length > 10) {
-    workXml = returnContent;
-  }
+    // Pattern 3: CDATA anywhere in the response
+    if (!returnContent) {
+      const anyCdata = xml.match(/<!\[CDATA\[([\s\S]*?)\]\]>/i);
+      if (anyCdata && anyCdata[1].includes("ConsultarNfse")) {
+        returnContent = anyCdata[1];
+      }
+    }
+
+    if (returnContent && returnContent.length > 10) {
+      workXml = returnContent;
+    }
 
     // Step 2: Strip XML namespaces to simplify regex parsing (e.g. <ns4:Numero> -> <Numero>)
-    // This handles patterns like <ns4:Numero>, </ns4:Numero>, <ns3:CompNfse>, etc.
     const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9_]+:/g, (match) => {
       return match.startsWith("</") ? "</" : "<";
     });
