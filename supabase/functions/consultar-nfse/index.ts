@@ -705,7 +705,7 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
   const consultaId = `CONSULTA${numeroRps}`;
   const signedXml = assinarXml(xmlConsulta, certDigital, consultaId);
   const cabecalho = criarCabecalhoGinfes();
-  const soapEnvelope = criarEnvelopeSOAPGinfes("ConsultarNfseRpsV3", cabecalho, signedXml, "producao");
+  const soapEnvelope = criarEnvelopeSOAPGinfes("ConsultarNfsePorRpsV3", cabecalho, signedXml, "producao");
 
   console.log("=== NFS-e Consulta Producao ===");
   console.log("RPS:", numeroRps, "CNPJ:", cnpj, "IM:", inscricaoMunicipal);

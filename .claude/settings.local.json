@@ -52,7 +52,11 @@
       "Bash(railway status *)",
       "Bash(railway list *)",
       "WebFetch(domain:ninenineteste.onrender.com)",
-      "WebFetch(domain:nfse-mtls-proxy.onrender.com)"
+      "WebFetch(domain:nfse-mtls-proxy.onrender.com)",
+      "WebFetch(domain:producao.ginfes.com.br)",
+      "WebFetch(domain:homologacao.ginfes.com.br)",
+      "WebFetch(domain:www.andrecelestino.com)",
+      "WebFetch(domain:desenvolvimentonfse.forumeiros.com)"
     ]
   }
 }
