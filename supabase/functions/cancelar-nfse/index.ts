@@ -252,8 +252,8 @@ function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dados
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
     <${soapAction} xmlns="${ginfesNs}">
-      <arg0><![CDATA[${cabecalhoXml}]]></arg0>
-      <arg1><![CDATA[${dadosXml}]]></arg1>
+      <arg0 xmlns=""><![CDATA[${cabecalhoXml}]]></arg0>
+      <arg1 xmlns=""><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
