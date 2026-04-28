@@ -12,6 +12,7 @@ export type NFSeStatus =
   | "autorizada"
   | "rejeitada"
   | "cancelada"
+  | "substituida"
   | "erro";
 
 /** Tomador simplificado para formulário */
@@ -149,6 +150,7 @@ export const statusCores: Record<NFSeStatus, { bg: string; text: string; border:
   autorizada: { bg: "bg-green-100", text: "text-green-700", border: "border-green-300", label: "Autorizada" },
   rejeitada: { bg: "bg-red-100", text: "text-red-700", border: "border-red-300", label: "Rejeitada" },
   cancelada: { bg: "bg-orange-100", text: "text-orange-700", border: "border-orange-300", label: "Cancelada" },
+  substituida: { bg: "bg-yellow-100", text: "text-yellow-700", border: "border-yellow-300", label: "Substituida" },
   erro: { bg: "bg-red-100", text: "text-red-800", border: "border-red-400", label: "Erro" },
 };
 

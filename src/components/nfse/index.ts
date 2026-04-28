@@ -10,3 +10,4 @@ export { NotaPreview } from "./NotaPreview";
 export { NumeroNotaDisplay } from "./NumeroNotaDisplay";
 export { CertificadoStatus } from "./CertificadoStatus";
 export { CertificadoConfigModal } from "./CertificadoConfigModal";
+export { NFSeConsultaForm } from "./NFSeConsultaForm";

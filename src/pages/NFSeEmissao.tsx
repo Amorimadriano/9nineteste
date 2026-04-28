@@ -24,6 +24,7 @@ import {
   NumeroNotaDisplay,
   CertificadoStatus,
   CertificadoConfigModal,
+  NFSeConsultaForm,
 } from "@/components/nfse";
 import {
   TomadorFormData,
@@ -48,6 +49,7 @@ import {
   AlertCircle,
   Loader2,
   RotateCcw,
+  Search,
 } from "lucide-react";
 
 // Interface para rascunho salvo
@@ -663,7 +665,7 @@ export default function NFSeEmissao() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full md:w-auto grid-cols-3">
+        <TabsList className="grid w-full md:w-auto grid-cols-4">
           <TabsTrigger value="nova">
             <FileText className="mr-2 h-4 w-4" />
             Nova Nota
@@ -675,6 +677,10 @@ export default function NFSeEmissao() {
           <TabsTrigger value="historico">
             <History className="mr-2 h-4 w-4" />
             Notas Recentes
+          </TabsTrigger>
+          <TabsTrigger value="consulta">
+            <Search className="mr-2 h-4 w-4" />
+            Consulta
           </TabsTrigger>
         </TabsList>
 
@@ -925,6 +931,11 @@ export default function NFSeEmissao() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Tab Consulta */}
+        <TabsContent value="consulta">
+          <NFSeConsultaForm certificado={certificado} />
         </TabsContent>
       </Tabs>
     </div>
