@@ -45,7 +45,8 @@ function canonicalizeXml(xml: string): string {
 
 function extractElementById(xml: string, id: string): string | null {
   const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const openRegex = new RegExp(`<([\\w]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, "i");
+  // Allow namespace prefix in element name (e.g. cnr:ConsultarNfseRpsEnvio)
+  const openRegex = new RegExp(`<([\\w:]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, "i");
   const openMatch = xml.match(openRegex);
   if (!openMatch) return null;
 
@@ -92,7 +93,8 @@ function extractElementById(xml: string, id: string): string | null {
 
 function getElementName(xml: string, id: string): string {
   const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, "i");
+  // Allow namespace prefix in element name (e.g. cnr:ConsultarNfseRpsEnvio)
+  const regex = new RegExp(`<([\\w:]+)[^>]*Id="${escapedId}"`, "i");
   const match = xml.match(regex);
   return match ? match[1] : "Pedido";
 }
@@ -227,20 +229,18 @@ function construirXmlConsultaRps(numeroRps: string, serie: string, tipo: string,
   const consultaId = `CONSULTA${numeroRps}`;
   // ABRASF Tipo codes: 1=RPS, 2=RPS-M, 3=Cupom
   const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "RPS-M" || tipo === "2" ? "2" : tipo === "Cupom" || tipo === "3" ? "3" : "1";
-  // GINFES requires cabecalho INSIDE the ConsultarNfseRpsEnvio XML (E185 correction)
-  const cabecalhoInterno = `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
-  return `<ConsultarNfseRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoConsultar}" Id="${consultaId}">
-  ${cabecalhoInterno}
-  <IdentificacaoRps>
-    <Numero>${numeroRps}</Numero>
-    <Serie>${serie}</Serie>
-    <Tipo>${tipoCodigo}</Tipo>
-  </IdentificacaoRps>
-  <Prestador>
-    <Cnpj>${cnpj}</Cnpj>
-    <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
-  </Prestador>
-</ConsultarNfseRpsEnvio>`;
+  // GINFES requires namespace prefixes cnr: and tip: for ConsultarNfsePorRpsV3 (E185 fix)
+  return `<cnr:ConsultarNfseRpsEnvio xmlns:cnr="${ABRASF_NAMESPACES.servicoConsultar}" xmlns:tip="http://www.ginfes.com.br/tipos_v03.xsd" Id="${consultaId}">
+  <cnr:IdentificacaoRps>
+    <tip:Numero>${numeroRps}</tip:Numero>
+    <tip:Serie>${serie}</tip:Serie>
+    <tip:Tipo>${tipoCodigo}</tip:Tipo>
+  </cnr:IdentificacaoRps>
+  <cnr:Prestador>
+    <tip:Cnpj>${cnpj}</tip:Cnpj>
+    <tip:InscricaoMunicipal>${inscricaoMunicipal}</tip:InscricaoMunicipal>
+  </cnr:Prestador>
+</cnr:ConsultarNfseRpsEnvio>`;
 }
 
 function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
@@ -305,9 +305,40 @@ function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dados
 </soap:Envelope>`;
 }
 
+/**
+ * Create envelope for ConsultarNfsePorRpsV3 WITHOUT CDATA
+ * GINFES ConsultaNfsePorRpsV3 requires direct XML with namespace prefixes (no CDATA)
+ * Based on: https://desenvolvimentonfse.forumeiros.com/t698-soap-consultarnfseporrpsv3
+ */
+function criarEnvelopeConsultaNfsePorRps(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  const ginfesNs = ambiente === "producao"
+    ? "http://producao.ginfes.com.br"
+    : "http://homologacao.ginfes.com.br";
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+                  xmlns:ns1="${ginfesNs}">
+  <soapenv:Body>
+    <ns1:${soapAction}>
+      <arg0>
+${cabecalhoXml}
+      </arg0>
+      <arg1>
+${dadosXml}
+      </arg1>
+    </ns1:${soapAction}>
+  </soapenv:Body>
+</soapenv:Envelope>`;
+}
+
 function criarCabecalhoGinfes(): string {
-  // GINFES requires namespace prefix on cabecalho to avoid E185 error
+  // For ConsultarNfsePorRpsV3: namespace prefix required (E185 fix)
   return `<cab:cabecalho versao="3" xmlns:cab="http://www.ginfes.com.br/cabecalho_v03.xsd"><versaoDados>3</versaoDados></cab:cabecalho>`;
+}
+
+function criarCabecalhoGinfesSemPrefixo(): string {
+  // For RecepcionarLoteRpsV3, CancelarNfseV3 etc (CDATA-based envelope)
+  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 }
 
 function getAmbiente(): "homologacao" | "producao" {
@@ -788,16 +819,18 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
   const cnpj = certDigital.cnpj;
   const inscricaoMunicipal = certDigital.inscricaoMunicipal;
 
-  // Build XML with cabecalho embedded inside (E185 correction requires this)
+  // Build XML with namespace prefixes cnr: and tip: (E185 fix)
   const xmlConsulta = construirXmlConsultaRps(numeroRps, serie, tipo, cnpj, inscricaoMunicipal);
   const consultaId = `CONSULTA${numeroRps}`;
   const signedXml = assinarXml(xmlConsulta, certDigital, consultaId);
   const cabecalho = criarCabecalhoGinfes();
-  const soapEnvelope = criarEnvelopeSOAPGinfes("ConsultarNfsePorRpsV3", cabecalho, signedXml, "producao");
+  // Use Consulta-specific envelope: no CDATA, namespace prefixes, cab: on cabecalho
+  const soapEnvelope = criarEnvelopeConsultaNfsePorRps("ConsultarNfsePorRpsV3", cabecalho, signedXml, "producao");
 
   console.log("=== NFS-e Consulta Producao ===");
   console.log("RPS:", numeroRps, "CNPJ:", cnpj, "IM:", inscricaoMunicipal);
-  console.log("XML Envio (primeiro 2000 chars):", xmlConsulta.substring(0, 2000));
+  console.log("XML Consulta (primeiro 2000 chars):", xmlConsulta.substring(0, 2000));
+  console.log("Envelope SOAP (primeiro 2000 chars):", soapEnvelope.substring(0, 2000));
 
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, {
     certPem: certDigital.certPem,
