@@ -225,11 +225,13 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
  */
 function construirXmlConsultaRps(numeroRps: string, serie: string, tipo: string, cnpj: string, inscricaoMunicipal: string): string {
   const consultaId = `CONSULTA${numeroRps}`;
+  // ABRASF Tipo codes: 1=RPS, 2=RPS-M, 3=Cupom
+  const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "RPS-M" || tipo === "2" ? "2" : tipo === "Cupom" || tipo === "3" ? "3" : "1";
   return `<ConsultarNfseRpsEnvio xmlns="${ABRASF_NAMESPACES.servicoConsultar}" Id="${consultaId}">
   <IdentificacaoRps>
     <Numero>${numeroRps}</Numero>
     <Serie>${serie}</Serie>
-    <Tipo>${tipo}</Tipo>
+    <Tipo>${tipoCodigo}</Tipo>
   </IdentificacaoRps>
   <Prestador>
     <Cnpj>${cnpj}</Cnpj>
@@ -285,21 +287,24 @@ function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dados
     ? "http://producao.ginfes.com.br"
     : "http://homologacao.ginfes.com.br";
 
+  // GINFES requires namespace prefix on SOAP action element and no xmlns="" on arg0/arg1
+  // Using CDATA for content (same pattern as RecepcionarLoteRpsV3 which works)
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="${ginfesNs}">
-      <arg0 xmlns="">${cabecalhoXml}</arg0>
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
+    <ns1:${soapAction} xmlns:ns1="${ginfesNs}">
+      <arg0><![CDATA[${cabecalhoXml}]]></arg0>
+      <arg1><![CDATA[${dadosXml}]]></arg1>
+    </ns1:${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
 }
 
 function criarCabecalhoGinfes(): string {
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+  // GINFES requires namespace prefix on cabecalho to avoid E185 error
+  return `<cab:cabecalho versao="3" xmlns:cab="http://www.ginfes.com.br/cabecalho_v03.xsd"><versaoDados>3</versaoDados></cab:cabecalho>`;
 }
 
 function getAmbiente(): "homologacao" | "producao" {
