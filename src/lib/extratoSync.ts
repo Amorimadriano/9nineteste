@@ -268,6 +268,92 @@ export async function removeContaPagarExtrato(contaId: string) {
 }
 
 /**
+ * Cria um lançamento espelho em extrato_bancario ao criar uma conta a pagar
+ * Status: aguardando_extrato
+ */
+export async function createPendingExtratoPagar(
+  userId: string,
+  contaId: string,
+  values: {
+    descricao: string;
+    valor: number;
+    data_vencimento: string;
+    forma_pagamento?: string | null;
+    banco_cartao_id?: string | null;
+  }
+) {
+  const bancoCartaoId =
+    values.banco_cartao_id ??
+    (await findDestinoFinanceiro(userId, values.forma_pagamento, null));
+
+  const payload = {
+    user_id: userId,
+    descricao: values.descricao,
+    valor: values.valor,
+    data_transacao: values.data_vencimento,
+    tipo: "saida",
+    conta_pagar_id: contaId,
+    conciliado: false,
+    origem: "sistema",
+    status_conciliacao: "aguardando_extrato",
+    banco_cartao_id: bancoCartaoId,
+  };
+
+  const { error } = await (supabase.from("extrato_bancario") as any).insert(
+    payload
+  );
+
+  if (error) {
+    console.error("Erro ao criar espelho de conta a pagar:", error);
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Cria um lançamento espelho em extrato_bancario ao criar uma conta a receber
+ * Status: aguardando_extrato
+ */
+export async function createPendingExtratoReceber(
+  userId: string,
+  contaId: string,
+  values: {
+    descricao: string;
+    valor: number;
+    data_vencimento: string;
+    forma_pagamento?: string | null;
+    banco_cartao_id?: string | null;
+  }
+) {
+  const bancoCartaoId =
+    values.banco_cartao_id ??
+    (await findDestinoFinanceiro(userId, "banco", null));
+
+  const payload = {
+    user_id: userId,
+    descricao: values.descricao,
+    valor: values.valor,
+    data_transacao: values.data_vencimento,
+    tipo: "entrada",
+    conta_receber_id: contaId,
+    conciliado: false,
+    origem: "sistema",
+    status_conciliacao: "aguardando_extrato",
+    banco_cartao_id: bancoCartaoId,
+  };
+
+  const { error } = await (supabase.from("extrato_bancario") as any).insert(
+    payload
+  );
+
+  if (error) {
+    console.error("Erro ao criar espelho de conta a receber:", error);
+    return false;
+  }
+  return true;
+}
+
+/**
  * Remove extrato entries for a conta a receber
  */
 export async function removeContaReceberExtrato(contaId: string) {

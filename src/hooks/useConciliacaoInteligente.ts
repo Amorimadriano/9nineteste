@@ -79,7 +79,7 @@ export function useConciliacaoInteligente(
         motivos.push("valor aproximado");
       }
 
-      // Match de data (peso 30%) - tolera até 3 dias
+      // Match de data (peso 30%) - tolera até 2 dias (requisito BPO)
       const dataExtrato = new Date(extrato.data_transacao);
       const dataCandidato = new Date(candidato.data);
       const diffDias = Math.abs(
@@ -92,7 +92,7 @@ export function useConciliacaoInteligente(
       } else if (diffDias <= 1) {
         score += 20;
         motivos.push("1 dia diferença");
-      } else if (diffDias <= 3) {
+      } else if (diffDias <= 2) {
         score += 10;
         motivos.push(`${diffDias} dias diferença`);
       }
