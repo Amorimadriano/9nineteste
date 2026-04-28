@@ -914,7 +914,7 @@ async function emitirProducao(dadosNota: DadosNota, certDigital: CertificadoDigi
 
   // Envelope SOAP no formato GINFES v03: arg0=cabecalho, arg1=dados
   const cabecalho = criarCabecalhoGinfes();
-  const soapEnvelope = criarEnvelopeSOAPGinfes("RecepcionarLoteRpsV3", cabecalho, signedLote, ambiente);
+  const soapEnvelope = criarEnvelopeSOAPGinfes("RecepcionarLoteRpsV3", cabecalho, signedLote, "producao");
 
   console.log("=== NFS-e Emissão Produção ===");
   console.log("CNPJ:", dadosNota.emitente.cnpj);
