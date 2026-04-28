@@ -41,6 +41,7 @@ interface ConsultaResult {
   discriminacao?: string;
   itemListaServico?: string;
   mensagens?: Array<{ codigo: string; mensagem: string; tipo: string }>;
+  xmlBruto?: string;
 }
 
 interface NotaSimples {
@@ -452,6 +453,19 @@ export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
           Recarregar lista
         </Button>
       </div>
-    </div>
+
+      {/* Debug: XML bruto da resposta */}
+      {resultado?.xmlBruto && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground">Resposta XML (debug)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-96 whitespace-pre-wrap break-all">
+              {resultado.xmlBruto}
+            </pre>
+          </CardContent>
+        </Card>
+      )}
   );
 }

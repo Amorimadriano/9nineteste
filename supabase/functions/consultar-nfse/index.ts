@@ -776,5 +776,6 @@ async function consultarProducao(nota: any, certDigital: CertificadoDigital) {
     console.log("AVISO: Parser nao encontrou dados chave. Resposta completa:", soapResponse.substring(0, 5000));
   }
 
-  return { ...resultado, xmlEnvio: signedXml };
+  // Include raw XML in response for frontend debugging (truncated)
+  return { ...resultado, xmlEnvio: signedXml, xmlBruto: soapResponse.substring(0, 8000) };
 }
