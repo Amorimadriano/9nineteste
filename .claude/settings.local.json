@@ -58,7 +58,8 @@
       "WebFetch(domain:www.andrecelestino.com)",
       "WebFetch(domain:desenvolvimentonfse.forumeiros.com)",
       "WebFetch(domain:abrasf.org.br)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(python3 -m json.tool)"
     ]
   }
 }

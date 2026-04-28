@@ -1,18 +1,27 @@
 import { useTableQuery } from "@/hooks/useSupabaseQuery";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Upload, Brain, Sparkles } from "lucide-react";
+import { Upload, Brain, Sparkles, Building2 } from "lucide-react";
 import ImportOFX from "@/components/conciliacao/ImportOFX";
 import SugestoesConciliacao from "@/components/conciliacao/SugestoesConciliacao";
 import { useConciliacaoInteligente } from "@/hooks/useConciliacaoInteligente";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, ArrowDownCircle, ArrowUpCircle } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
 export default function ConciliacaoBancaria() {
+  const [bancoSelecionadoId, setBancoSelecionadoId] = useState<string>("todos");
+
   const { data: bancos = [] } = useTableQuery("bancos_cartoes");
   const { data: extrato = [] } = useTableQuery("extrato_bancario");
   const { data: lancamentos = [] } = useTableQuery("lancamentos_caixa");
@@ -35,6 +44,12 @@ export default function ConciliacaoBancaria() {
     [extrato, bancosIds]
   );
 
+  // Filtrar por banco selecionado
+  const extratoFiltrado = useMemo(() => {
+    if (bancoSelecionadoId === "todos") return extratoBancos;
+    return extratoBancos.filter(i => i.banco_cartao_id === bancoSelecionadoId);
+  }, [extratoBancos, bancoSelecionadoId]);
+
   // Hook de conciliação inteligente
   const {
     sugestoes,
@@ -45,14 +60,14 @@ export default function ConciliacaoBancaria() {
     isLoading,
     progresso,
   } = useConciliacaoInteligente(
-    extratoBancos,
+    extratoFiltrado,
     lancamentos as any[],
     contasReceber as any[],
     contasPagar as any[]
   );
 
   const stats = useMemo(() => {
-    const items = extratoBancos;
+    const items = extratoFiltrado;
     const conciliados = items.filter(i => i.conciliado);
     const pendentes = items.filter(i => !i.conciliado);
     const entradas = conciliados.filter(i => i.tipo === "entrada").reduce((s, i) => s + Number(i.valor), 0);
@@ -66,13 +81,32 @@ export default function ConciliacaoBancaria() {
       taxaIA: statsIA.taxaMatchAutomatico,
       sugestoesIA: statsIA.sugestoesPendentes,
     };
-  }, [extratoBancos, statsIA]);
+  }, [extratoFiltrado, statsIA]);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold font-display text-foreground">Conciliação Bancária</h1>
-        <p className="text-sm text-muted-foreground">Importe extratos OFX e concilie transações com seus lançamentos</p>
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold font-display text-foreground">Conciliação Bancária</h1>
+          <p className="text-sm text-muted-foreground">Importe extratos OFX e concilie transações com seus lançamentos</p>
+        </div>
+
+        <div className="w-full md:w-72">
+          <Select value={bancoSelecionadoId} onValueChange={setBancoSelecionadoId}>
+            <SelectTrigger>
+              <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="Selecionar banco" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os bancos</SelectItem>
+              {bancosAtivos.map((banco) => (
+                <SelectItem key={banco.id} value={banco.id}>
+                  {banco.nome || banco.banco} — Ag. {banco.agencia} / CC {banco.conta}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* KPIs */}

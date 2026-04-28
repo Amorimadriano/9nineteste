@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { Building2, Save, Upload, Trash2, Loader2, MapPin, Phone, Mail, Globe, Search } from "lucide-react";
 
 const estados = [
@@ -55,38 +56,22 @@ export default function Empresa() {
   const [cepLoading, setCepLoading] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
 
-  const handleCnpjLookup = async () => {
-    const clean = data.cnpj.replace(/\D/g, "");
-    if (clean.length !== 14) return;
-    setCnpjLoading(true);
-    try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`);
-      if (!res.ok) throw new Error("CNPJ não encontrado");
-      const d = await res.json();
-      const telefone = d.ddd_telefone_1
-        ? `(${d.ddd_telefone_1.substring(0, 2)}) ${d.ddd_telefone_1.substring(2)}`
-        : "";
-      setData(prev => ({
-        ...prev,
-        razao_social: d.razao_social || prev.razao_social,
-        nome_fantasia: d.nome_fantasia || prev.nome_fantasia,
-        telefone: telefone || prev.telefone,
-        email: d.email || prev.email,
-        cep: d.cep ? d.cep.replace(/\D/g, "") : prev.cep,
-        endereco: d.logradouro || prev.endereco,
-        numero: d.numero || prev.numero,
-        complemento: d.complemento || prev.complemento,
-        bairro: d.bairro || prev.bairro,
-        cidade: d.municipio || prev.cidade,
-        estado: d.uf || prev.estado,
-      }));
-      toast({ title: "Dados do CNPJ preenchidos automaticamente!" });
-    } catch {
-      toast({ title: "Erro", description: "Não foi possível consultar o CNPJ.", variant: "destructive" });
-    } finally {
-      setCnpjLoading(false);
+  const { lookup: handleCnpjLookup, loading: cnpjLookupLoading } = useCnpjLookup(
+    (updater) => setData(updater),
+    {
+      razaoSocial: "razao_social",
+      nomeFantasia: "nome_fantasia",
+      email: "email",
+      telefone: "telefone",
+      cep: "cep",
+      endereco: "endereco",
+      numero: "numero",
+      complemento: "complemento",
+      bairro: "bairro",
+      cidade: "cidade",
+      estado: "estado",
     }
-  };
+  );
 
   const handleCepLookup = async () => {
     const clean = data.cep.replace(/\D/g, "");
@@ -312,8 +297,8 @@ export default function Empresa() {
                 <Label>CNPJ</Label>
                 <div className="flex gap-2">
                   <Input value={data.cnpj} onChange={e => handleChange("cnpj", e.target.value)} placeholder="00.000.000/0000-00" />
-                  <Button type="button" variant="outline" size="icon" onClick={handleCnpjLookup} disabled={cnpjLoading || data.cnpj.replace(/\D/g, "").length !== 14} title="Buscar CNPJ na Receita Federal">
-                    {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  <Button type="button" variant="outline" size="icon" onClick={() => handleCnpjLookup(data.cnpj)} disabled={cnpjLookupLoading || data.cnpj.replace(/\D/g, "").length !== 14} title="Buscar CNPJ na Receita Federal">
+                    {cnpjLookupLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground">Digite o CNPJ e clique na lupa para preencher automaticamente</p>
