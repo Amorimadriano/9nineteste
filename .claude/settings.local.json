@@ -56,7 +56,8 @@
       "WebFetch(domain:producao.ginfes.com.br)",
       "WebFetch(domain:homologacao.ginfes.com.br)",
       "WebFetch(domain:www.andrecelestino.com)",
-      "WebFetch(domain:desenvolvimentonfse.forumeiros.com)"
+      "WebFetch(domain:desenvolvimentonfse.forumeiros.com)",
+      "WebFetch(domain:abrasf.org.br)"
     ]
   }
 }

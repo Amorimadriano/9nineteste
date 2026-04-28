@@ -467,5 +467,6 @@ export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
           </CardContent>
         </Card>
       )}
+    </div>
   );
 }

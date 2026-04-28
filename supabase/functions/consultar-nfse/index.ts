@@ -398,19 +398,39 @@ function parsearRespostaConsulta(xml: string) {
     // Extract the CDATA content first if present
     let workXml = xml;
 
-    // Try to extract content from <return> element (may contain CDATA)
-    const returnMatch = workXml.match(/<return[^>]*>([\s\S]*?)<\/return>/i);
-    if (returnMatch) {
-      let returnContent = returnMatch[1].trim();
-      // Remove CDATA wrapper if present
-      returnContent = returnContent.replace(/<!\[CDATA\[/g, "").replace(/\]\]>/g, "");
-      if (returnContent.length > 10) {
-        workXml = returnContent;
-      }
-    }
+    // Step 1: Extract content from <return> element (may contain CDATA)
+    // Try multiple patterns for the <return> wrapper
+    let returnContent: string | null = null;
 
-    // Strip XML namespaces to simplify regex parsing (e.g. <tip:Numero> -> <Numero>)
-    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9]+:/g, (match) => {
+    // Pattern 1: <return><![CDATA[...]]></return>
+  const cdataMatch = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
+  if (cdataMatch) {
+    returnContent = cdataMatch[1];
+  }
+
+  // Pattern 2: <return>...</return> without CDATA
+  if (!returnContent) {
+    const plainMatch = xml.match(/<return[^>]*>([\s\S]*?)<\/return>/i);
+    if (plainMatch) {
+      returnContent = plainMatch[1].trim();
+    }
+  }
+
+  // Pattern 3: Look for CDATA anywhere in the response
+  if (!returnContent) {
+    const anyCdata = xml.match(/<!\[CDATA\[([\s\S]*?)\]\]>/i);
+    if (anyCdata && anyCdata[1].includes("ConsultarNfse")) {
+      returnContent = anyCdata[1];
+    }
+  }
+
+  if (returnContent && returnContent.length > 10) {
+    workXml = returnContent;
+  }
+
+    // Step 2: Strip XML namespaces to simplify regex parsing (e.g. <ns4:Numero> -> <Numero>)
+    // This handles patterns like <ns4:Numero>, </ns4:Numero>, <ns3:CompNfse>, etc.
+    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9_]+:/g, (match) => {
       return match.startsWith("</") ? "</" : "<";
     });
 
@@ -732,6 +752,7 @@ function consultarHomologacao(nota: any, certificado: any) {
     discriminacao: nota.servico_descricao || "",
     itemListaServico: nota.servico_item_lista_servico || "",
     xmlRetorno: "<Consulta>true</Consulta>",
+    xmlBruto: "<Consulta>true</Consulta>",
     mensagens: [{
       codigo: "E001",
       mensagem: "Consulta realizada com sucesso - ambiente de homologacao",
