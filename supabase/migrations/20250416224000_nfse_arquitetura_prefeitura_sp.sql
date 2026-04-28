@@ -194,7 +194,7 @@ CREATE INDEX idx_nfse_notas_status_empresa ON nfs_e_notas(empresa_id, status, da
 CREATE TABLE nfs_e_rascunhos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     empresa_id UUID NOT NULL,
-    usuario_id UUID NOT NULL,
+    user_id UUID NOT NULL,
 
     -- Snapshot dos campos do formulário
     dados JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -207,7 +207,7 @@ CREATE TABLE nfs_e_rascunhos (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- Constraint: apenas um rascunho por usuário/empresa
-    CONSTRAINT uq_rascunho_usuario_empresa UNIQUE (empresa_id, usuario_id)
+    CONSTRAINT uq_rascunho_usuario_empresa UNIQUE (empresa_id, user_id)
 );
 
 -- Comentários
@@ -216,7 +216,7 @@ COMMENT ON COLUMN nfs_e_rascunhos.dados IS 'JSON com snapshot de todos os campos
 
 -- Indexes
 CREATE INDEX idx_nfse_rascunhos_empresa ON nfs_e_rascunhos(empresa_id);
-CREATE INDEX idx_nfse_rascunhos_usuario ON nfs_e_rascunhos(usuario_id);
+CREATE INDEX idx_nfse_rascunhos_usuario ON nfs_e_rascunhos(user_id);
 CREATE INDEX idx_nfse_rascunhos_autosave ON nfs_e_rascunhos(ultimo_autosave);
 
 -- =============================================================================
@@ -469,10 +469,10 @@ CREATE POLICY nfse_emitentes_isolamento ON nfs_e_emitentes
     FOR ALL
     TO authenticated
     USING (empresa_id IN (
-        SELECT empresa_id FROM usuario_empresas WHERE usuario_id = auth.uid()
+        SELECT empresa_id FROM usuario_empresas WHERE user_id = auth.uid()
     ))
     WITH CHECK (empresa_id IN (
-        SELECT empresa_id FROM usuario_empresas WHERE usuario_id = auth.uid()
+        SELECT empresa_id FROM usuario_empresas WHERE user_id = auth.uid()
     ));
 
 -- Política: Isolamento por empresa para notas
@@ -480,10 +480,10 @@ CREATE POLICY nfse_notas_isolamento ON nfs_e_notas
     FOR ALL
     TO authenticated
     USING (empresa_id IN (
-        SELECT empresa_id FROM usuario_empresas WHERE usuario_id = auth.uid()
+        SELECT empresa_id FROM usuario_empresas WHERE user_id = auth.uid()
     ))
     WITH CHECK (empresa_id IN (
-        SELECT empresa_id FROM usuario_empresas WHERE usuario_id = auth.uid()
+        SELECT empresa_id FROM usuario_empresas WHERE user_id = auth.uid()
     ));
 
 -- Política: Isolamento por empresa para rascunhos
@@ -491,18 +491,18 @@ CREATE POLICY nfse_rascunhos_isolamento ON nfs_e_rascunhos
     FOR ALL
     TO authenticated
     USING (empresa_id IN (
-        SELECT empresa_id FROM usuario_empresas WHERE usuario_id = auth.uid()
+        SELECT empresa_id FROM usuario_empresas WHERE user_id = auth.uid()
     ))
     WITH CHECK (empresa_id IN (
-        SELECT empresa_id FROM usuario_empresas WHERE usuario_id = auth.uid()
+        SELECT empresa_id FROM usuario_empresas WHERE user_id = auth.uid()
     ));
 
 -- Política: Usuário só pode ver/editar seus próprios rascunhos
 CREATE POLICY nfse_rascunhos_usuario ON nfs_e_rascunhos
     FOR ALL
     TO authenticated
-    USING (usuario_id = auth.uid())
-    WITH CHECK (usuario_id = auth.uid());
+    USING (user_id = auth.uid())
+    WITH CHECK (user_id = auth.uid());
 
 -- Política: Serviço role pode tudo (para edge functions)
 CREATE POLICY nfse_emitentes_service ON nfs_e_emitentes

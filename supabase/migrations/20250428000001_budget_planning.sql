@@ -26,6 +26,7 @@ create table if not exists public.budget_planning_lines (
 -- Política RLS: usuário só vê seus próprios dados
 alter table public.budget_planning_lines enable row level security;
 
+drop policy if exists "Usuário pode gerenciar próprio orçamento" on public.budget_planning_lines;
 create policy "Usuário pode gerenciar próprio orçamento"
   on public.budget_planning_lines
   for all

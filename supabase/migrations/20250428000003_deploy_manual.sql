@@ -28,6 +28,7 @@ create index if not exists idx_budget_lines_plano_conta
 
 alter table public.budget_planning_lines enable row level security;
 
+drop policy if exists "Usuário pode gerenciar próprio orçamento" on public.budget_planning_lines;
 create policy "Usuário pode gerenciar próprio orçamento"
   on public.budget_planning_lines
   for all
