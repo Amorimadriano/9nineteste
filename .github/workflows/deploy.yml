@@ -16,9 +16,9 @@ jobs:
       - name: Deploy via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
-          server: ftp://82.25.67.75
-          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
-          password: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          server: ftp.9nineteste.9ninebusinesscontrol.com.br
+          username: u358595036.amorimadriano83
+          password: Enzo@159753
           protocol: ftps
           port: 21
           security: loose
