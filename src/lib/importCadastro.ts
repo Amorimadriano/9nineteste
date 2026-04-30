@@ -6,6 +6,12 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 function criarClientComToken(accessToken: string) {
+  const customFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    console.log("[supabase-fetch] URL:", input);
+    console.log("[supabase-fetch] headers:", JSON.stringify(init?.headers, null, 2));
+    return fetch(input, init);
+  };
+
   return createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: {
       autoRefreshToken: false,
@@ -17,6 +23,7 @@ function criarClientComToken(accessToken: string) {
         apikey: SUPABASE_KEY,
         Authorization: `Bearer ${accessToken}`,
       },
+      fetch: customFetch as any,
     },
   });
 }
