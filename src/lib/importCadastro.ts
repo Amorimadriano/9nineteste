@@ -1,5 +1,6 @@
 import { isValidCPF, isValidCNPJ } from "./nfse-utils";
 import { supabase } from "@/integrations/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 // ============================================
 // MAPEAMENTO FLEXÍVEL DE COLUNAS
@@ -180,12 +181,13 @@ export interface ImportOptions {
   tabela: "clientes" | "fornecedores";
   userId: string;
   empresaId?: string | null;
+  session?: Session | null;
   rows: any[];
   existingData: any[];
 }
 
 export async function processarImportacao(options: ImportOptions): Promise<ResultadoImportacao> {
-  const { tabela, userId, empresaId, rows, existingData } = options;
+  const { tabela, userId, empresaId, session, rows, existingData } = options;
 
   const resultado: ResultadoImportacao = {
     importados: 0,
@@ -196,14 +198,26 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   if (rows.length === 0) return resultado;
 
-  // Garante que a sessão do Supabase está ativa e com token fresco antes de executar inserts (RLS)
-  const sessao = await garantirSessaoAtiva(userId);
-  if (!sessao.ok) {
+  // ─── GARANTIR AUTENTICAÇÃO ───
+  // Se temos a sessão do contexto, forçamos o client a usá-la explicitamente
+  if (session?.access_token) {
+    await supabase.auth.setSession({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    });
+  }
+
+  // Testa se a sessão está realmente válida fazendo um select mínimo na própria tabela
+  const { error: testError } = await (supabase.from(tabela) as any)
+    .select("id")
+    .eq("user_id", userId)
+    .limit(1);
+  if (testError) {
     resultado.erros.push({
       linha: 0,
       campo: "autenticacao",
       valor: "",
-      motivo: sessao.erro || "Sessão inválida. Faça login novamente.",
+      motivo: traduzirErroSupabase(testError),
     });
     return resultado;
   }

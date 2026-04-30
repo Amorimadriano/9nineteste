@@ -33,7 +33,7 @@ export default function Clientes() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { empresaSelecionada } = useEmpresa();
   const { lookup, loading: cnpjLoading } = useCnpjLookup((updater) => setForm(updater));
 
@@ -112,6 +112,7 @@ export default function Clientes() {
         tabela: "clientes",
         userId: user.id,
         empresaId: empresaSelecionada?.id || null,
+        session,
         rows,
         existingData: clientes as any[],
       });
