@@ -133,14 +133,15 @@ function criarEnvelopeSOAPGinfes(
     ? "http://producao.ginfes.com.br"
     : "http://homologacao.ginfes.com.br";
 
-  // ✅ FIX: envelope simplificado (sem ns1: e sem namespace conflitante)
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+<soapenv:Envelope 
+  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
+  xmlns:ns1="${ginfesNs}">
 <soapenv:Body>
-<${soapAction} xmlns="${ginfesNs}">
-<arg0><![CDATA[${cabecalhoXml}]]></arg0>
+<ns1:${soapAction}>
+<arg0>${cabecalhoXml}</arg0>
 <arg1><![CDATA[${dadosXml}]]></arg1>
-</${soapAction}>
+</ns1:${soapAction}>
 </soapenv:Body>
 </soapenv:Envelope>`;
 }
