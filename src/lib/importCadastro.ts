@@ -218,6 +218,7 @@ export interface ImportOptions {
 
 export async function processarImportacao(options: ImportOptions): Promise<ResultadoImportacao> {
   const { tabela, userId, empresaId, rows, existingData } = options;
+  console.log("[import] START userId:", userId, "empresaId:", empresaId, "rows:", rows.length);
 
   const resultado: ResultadoImportacao = {
     importados: 0,
@@ -339,10 +340,8 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
     }
 
     // ─── PREPARA PAYLOAD ───
-    const payload: any = {
-      ...record,
-      user_id: userId,
-    };
+    const payload: any = Object.assign({}, record);
+    payload.user_id = userId;
     if (empresaId) payload.empresa_id = empresaId;
 
     // ─── UPSERT ───
@@ -353,6 +352,11 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
       toInsert.push(payload);
       existingByDoc.set(docClean, { id: "pending", documento: docClean }); // previne duplicidade no mesmo lote
     }
+  }
+
+  // ─── GARANTIA: user_id em todos os itens ───
+  for (const item of toInsert) {
+    if (!item.user_id) item.user_id = userId;
   }
 
   // ─── EXECUTA INSERÇÕES ───
