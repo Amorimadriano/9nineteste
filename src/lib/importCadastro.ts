@@ -357,6 +357,8 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   // ─── EXECUTA INSERÇÕES ───
   if (toInsert.length > 0) {
+    console.log("[import] first payload keys:", Object.keys(toInsert[0]));
+    console.log("[import] first payload:", JSON.stringify(toInsert[0], null, 2));
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const chunk = toInsert.slice(i, i + chunkSize);
