@@ -19,4 +19,7 @@ jobs:
           server: 82.25.67.75
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          protocol: ftps
+          port: 21
+          security: strict
           server-dir: public_html/
