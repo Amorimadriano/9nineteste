@@ -1,32 +1,5 @@
 import { isValidCPF, isValidCNPJ } from "./nfse-utils";
-import { createClient } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-function criarClientComToken(accessToken: string) {
-  const customFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    console.log("[supabase-fetch] URL:", input);
-    console.log("[supabase-fetch] headers:", JSON.stringify(init?.headers, null, 2));
-    return fetch(input, init);
-  };
-
-  return createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-      detectSessionInUrl: false,
-    },
-    global: {
-      headers: {
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${accessToken}`,
-      },
-      fetch: customFetch as any,
-    },
-  });
-}
 
 // ============================================
 // MAPEAMENTO FLEXÍVEL DE COLUNAS
@@ -176,37 +149,9 @@ function traduzirErroSupabase(error: any): string {
 }
 
 // ============================================
-// OBTER SESSÃO VÁLIDA (com refresh automático)
-// ============================================
-
-async function obterTokenValido(userId: string): Promise<{ ok: boolean; token?: string; erro?: string }> {
-  // 1. Busca sessão mais recente do localStorage (pode ter sido atualizada em background)
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (session && session.user.id === userId) {
-    // Verifica se o token ainda não expirou (margem de 60s de segurança)
-    const agora = Math.floor(Date.now() / 1000);
-    if (session.expires_at && session.expires_at > agora + 60) {
-      return { ok: true, token: session.access_token };
-    }
-  }
-
-  // 2. Token expirado ou inexistente → faz refresh
-  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-  if (refreshError || !refreshData.session) {
-    return { ok: false, erro: "Sessão expirada. Faça login novamente." };
-  }
-
-  if (refreshData.session.user.id !== userId) {
-    return { ok: false, erro: "ID do usuário não confere com a sessão ativa." };
-  }
-
-  return { ok: true, token: refreshData.session.access_token };
-}
-
-// ============================================
 // FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
 // ============================================
+
 
 export interface ImportOptions {
   tabela: "clientes" | "fornecedores";
@@ -228,36 +173,6 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
   };
 
   if (rows.length === 0) return resultado;
-
-  // ─── OBTÉM TOKEN 100% VÁLIDO ───
-  const auth = await obterTokenValido(userId);
-  if (!auth.ok || !auth.token) {
-    resultado.erros.push({
-      linha: 0,
-      campo: "autenticacao",
-      valor: "",
-      motivo: auth.erro || "Token inválido. Faça login novamente.",
-    });
-    return resultado;
-  }
-
-  // ─── CLIENT SUPABASE LOCAL COM TOKEN FRESCO ───
-  const client = criarClientComToken(auth.token);
-
-  // Testa se o token permite SELECT na tabela
-  const { error: testError } = await (client.from(tabela) as any)
-    .select("id")
-    .eq("user_id", userId)
-    .limit(1);
-  if (testError) {
-    resultado.erros.push({
-      linha: 0,
-      campo: "autenticacao",
-      valor: "",
-      motivo: traduzirErroSupabase(testError),
-    });
-    return resultado;
-  }
 
   // Cria mapeamento a partir do primeiro row (usa as chaves do objeto como cabeçalhos)
   const cabecalhos = Object.keys(rows[0]);
@@ -366,11 +281,11 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const chunk = toInsert.slice(i, i + chunkSize);
-      const { error } = await (client.from(tabela) as any).insert(chunk);
+      const { error } = await (supabase.from(tabela) as any).insert(chunk);
       if (error) {
         // Se der erro em lote, tenta um a um para identificar qual falhou
         for (const item of chunk) {
-          const { error: singleError } = await (client.from(tabela) as any).insert(item);
+          const { error: singleError } = await (supabase.from(tabela) as any).insert(item);
           if (singleError) {
             resultado.erros.push({
               linha: 0,
@@ -391,7 +306,7 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   // ─── EXECUTA ATUALIZAÇÕES ───
   for (const item of toUpdate) {
-    const { error } = await (client.from(tabela) as any)
+    const { error } = await (supabase.from(tabela) as any)
       .update(item.data)
       .eq("id", item.id);
     if (error) {
