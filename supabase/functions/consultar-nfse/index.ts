@@ -96,20 +96,30 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   return { pfxBase64, senha, cnpj, inscricaoMunicipal: "", razaoSocial, certPem, keyPem, validoAte };
 }
 
-function construirXmlConsultaRps(numeroRps: string, serie: string, tipo: string, cnpj: string, inscricaoMunicipal: string): string {
-  const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "RPS-M" || tipo === "2" ? "2" : tipo === "Cupom" || tipo === "3" ? "3" : "1";
+function construirXmlConsultaRps(
+  numeroRps: string,
+  serie: string,
+  tipo: string,
+  cnpj: string,
+  inscricaoMunicipal: string
+): string {
+
+  const tipoCodigo =
+    tipo === "RPS" || tipo === "1" ? "1" :
+    tipo === "RPS-M" || tipo === "2" ? "2" :
+    tipo === "3" ? "3" : "1";
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd"
-                       xmlns:tipos="http://www.ginfes.com.br/tipos_v03.xsd">
-  <tipos:IdentificacaoRps>
-    <tipos:Numero>${numeroRps}</tipos:Numero>
-    <tipos:Serie>${serie}</tipos:Serie>
-    <tipos:Tipo>${tipoCodigo}</tipos:Tipo>
-  </tipos:IdentificacaoRps>
-  <tipos:Prestador>
-    <tipos:Cnpj>${cnpj}</tipos:Cnpj>
-    <tipos:InscricaoMunicipal>${inscricaoMunicipal}</tipos:InscricaoMunicipal>
-  </tipos:Prestador>
+<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
+  <IdentificacaoRps>
+    <Numero>${numeroRps}</Numero>
+    <Serie>${serie}</Serie>
+    <Tipo>${tipoCodigo}</Tipo>
+  </IdentificacaoRps>
+  <Prestador>
+    <Cnpj>${cnpj}</Cnpj>
+    <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
+  </Prestador>
 </ConsultarNfseRpsEnvio>`;
 }
 
