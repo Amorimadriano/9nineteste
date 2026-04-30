@@ -3,6 +3,7 @@ const ALLOWED_ORIGINS = [
   "http://localhost:3000",
   "https://9ninebusinesscontrol.com.br",
   "https://www.9ninebusinesscontrol.com.br",
+  "https://9nineteste.9ninebusinesscontrol.com.br",
   "https://ninebpofinanceiro.lovable.app",
   "https://ninebpofinanceiro.vercel.app",
 ];
