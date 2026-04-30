@@ -222,6 +222,7 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   // ─── OBTÉM TOKEN 100% VÁLIDO ───
   const auth = await obterTokenValido(userId);
+  console.log("[import] userId:", userId, "token OK:", auth.ok, "token prefix:", auth.token?.slice(0, 20));
   if (!auth.ok || !auth.token) {
     resultado.erros.push({
       linha: 0,
@@ -236,10 +237,11 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
   const client = criarClientComToken(auth.token);
 
   // Testa se o token permite SELECT na tabela
-  const { error: testError } = await (client.from(tabela) as any)
+  const { data: testData, error: testError } = await (client.from(tabela) as any)
     .select("id")
     .eq("user_id", userId)
     .limit(1);
+  console.log("[import] select test:", { data: testData, error: testError });
   if (testError) {
     resultado.erros.push({
       linha: 0,
@@ -349,14 +351,17 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   // ─── EXECUTA INSERÇÕES ───
   if (toInsert.length > 0) {
+    console.log("[import] items to insert:", toInsert.length, "first payload:", toInsert[0]);
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const chunk = toInsert.slice(i, i + chunkSize);
       const { error } = await (client.from(tabela) as any).insert(chunk);
+      console.log("[import] batch insert error:", error);
       if (error) {
         // Se der erro em lote, tenta um a um para identificar qual falhou
         for (const item of chunk) {
           const { error: singleError } = await (client.from(tabela) as any).insert(item);
+          console.log("[import] single insert error:", singleError, "payload:", item);
           if (singleError) {
             resultado.erros.push({
               linha: 0,
