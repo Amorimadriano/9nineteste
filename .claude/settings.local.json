@@ -69,7 +69,8 @@
       "Bash(grep -v \"^_shared$\")",
       "Bash(continue)",
       "Bash([ -f \"$dir/cors.ts\" ])",
-      "Bash(rm __TRACKED_VAR__/cors.ts)"
+      "Bash(rm __TRACKED_VAR__/cors.ts)",
+      "Bash(docker info *)"
     ]
   }
 }
