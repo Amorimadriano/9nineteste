@@ -103,43 +103,53 @@ function construirXmlConsultaRps(
   cnpj: string,
   inscricaoMunicipal: string
 ): string {
-
   const tipoCodigo =
     tipo === "RPS" || tipo === "1" ? "1" :
-    tipo === "RPS-M" || tipo === "2" ? "2" :
+    tipo === "2" ? "2" :
     tipo === "3" ? "3" : "1";
 
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
-  <IdentificacaoRps>
-    <Numero>${numeroRps}</Numero>
-    <Serie>${serie}</Serie>
-    <Tipo>${tipoCodigo}</Tipo>
-  </IdentificacaoRps>
-  <Prestador>
-    <Cnpj>${cnpj}</Cnpj>
-    <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
-  </Prestador>
+  // ✅ FIX PRINCIPAL: SEM tipos: E SEM XML HEADER
+  return `<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
+<IdentificacaoRps>
+<Numero>${numeroRps}</Numero>
+<Serie>${serie}</Serie>
+<Tipo>${tipoCodigo}</Tipo>
+</IdentificacaoRps>
+<Prestador>
+<Cnpj>${cnpj}</Cnpj>
+<InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
+</Prestador>
 </ConsultarNfseRpsEnvio>`;
 }
 
-function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const ginfesNs = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://homologacao.ginfes.com.br";
+function criarEnvelopeSOAPGinfes(
+  soapAction: string,
+  cabecalhoXml: string,
+  dadosXml: string,
+  ambiente?: string
+): string {
+
+  const ginfesNs = ambiente === "producao"
+    ? "http://producao.ginfes.com.br"
+    : "http://homologacao.ginfes.com.br";
+
+  // ✅ FIX: envelope simplificado (sem ns1: e sem namespace conflitante)
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <ns1:${soapAction} xmlns:ns1="${ginfesNs}">
-      <arg0><![CDATA[${cabecalhoXml}]]></arg0>
-      <arg1><![CDATA[${dadosXml}]]></arg1>
-    </ns1:${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+<soapenv:Body>
+<${soapAction} xmlns="${ginfesNs}">
+<arg0><![CDATA[${cabecalhoXml}]]></arg0>
+<arg1><![CDATA[${dadosXml}]]></arg1>
+</${soapAction}>
+</soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 function criarCabecalhoGinfes(): string {
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+  // ✅ Mantido, apenas padronizado
+  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3">
+<versaoDados>3</versaoDados>
+</cabecalho>`;
 }
 
 function getAmbiente(): "homologacao" | "producao" {
@@ -387,9 +397,24 @@ serve(async (req) => {
       };
     } else {
       const numeroRps = nota.numero_rps || nota.numero_nota || "";
-      const xmlConsulta = construirXmlConsultaRps(numeroRps, nota.serie || "1", nota.tipo_rps || "RPS", certDigital.cnpj, certDigital.inscricaoMunicipal);
+      const serie = nota.serie || "1";
+      const tipo = nota.tipo_rps || "RPS";
+      //const xmlConsulta = construirXmlConsultaRps(numeroRps, nota.serie || "1", nota.tipo_rps || "RPS", certDigital.cnpj, certDigital.inscricaoMunicipal);
+      const xmlConsulta = construirXmlConsultaRps(
+    numeroRps,
+    serie,
+    tipo,
+    certDigital.cnpj,
+    certDigital.inscricaoMunicipal
+  );
       const cabecalho = criarCabecalhoGinfes();
-      const soapEnvelope = criarEnvelopeSOAPGinfes("ConsultarNfsePorRpsV3", cabecalho, xmlConsulta, "producao");
+      //const soapEnvelope = criarEnvelopeSOAPGinfes("ConsultarNfsePorRpsV3", cabecalho, xmlConsulta, "producao");
+      const soapEnvelope = criarEnvelopeSOAPGinfes(
+    "ConsultarNfsePorRpsV3",
+    cabecalho,
+    xmlConsulta,
+    "producao"
+  );
       const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
       resultado = { ...parsearRespostaConsulta(soapResponse), xmlEnvio: xmlConsulta, xmlBruto: soapResponse.substring(0, 8000) };
     }
