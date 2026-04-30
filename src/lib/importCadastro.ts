@@ -135,6 +135,44 @@ export interface ResultadoImportacao {
 }
 
 // ============================================
+// GARANTIR SESSÃO ATIVA
+// ============================================
+
+async function garantirSessaoAtiva(userId: string): Promise<{ ok: boolean; erro?: string }> {
+  // 1. Tenta obter a sessão atual
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+  if (!sessionError && sessionData.session && sessionData.session.user.id === userId) {
+    return { ok: true };
+  }
+
+  // 2. Se não houver sessão ou o token expirou, tenta refresh
+  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+  if (refreshError || !refreshData.session) {
+    return { ok: false, erro: "Sessão expirada. Faça login novamente." };
+  }
+
+  if (refreshData.session.user.id !== userId) {
+    return { ok: false, erro: "ID do usuário não confere com a sessão ativa." };
+  }
+
+  return { ok: true };
+}
+
+function traduzirErroSupabase(error: any): string {
+  const msg = error?.message || "";
+  if (msg.includes("row-level security") || msg.includes("violates row-level security")) {
+    return "Erro de permissão (RLS): verifique se está logado e se o usuário tem acesso a esta empresa.";
+  }
+  if (msg.includes("foreign key constraint")) {
+    return "Erro de integridade: empresa ou vínculo inválido.";
+  }
+  if (msg.includes("unique constraint") || msg.includes("duplicate key")) {
+    return "Registro duplicado detectado no banco de dados.";
+  }
+  return msg;
+}
+
+// ============================================
 // FUNÇÃO PRINCIPAL DE IMPORTAÇÃO
 // ============================================
 
@@ -157,6 +195,18 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
   };
 
   if (rows.length === 0) return resultado;
+
+  // Garante que a sessão do Supabase está ativa e com token fresco antes de executar inserts (RLS)
+  const sessao = await garantirSessaoAtiva(userId);
+  if (!sessao.ok) {
+    resultado.erros.push({
+      linha: 0,
+      campo: "autenticacao",
+      valor: "",
+      motivo: sessao.erro || "Sessão inválida. Faça login novamente.",
+    });
+    return resultado;
+  }
 
   // Cria mapeamento a partir do primeiro row (usa as chaves do objeto como cabeçalhos)
   const cabecalhos = Object.keys(rows[0]);
@@ -270,7 +320,7 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
               linha: 0,
               campo: "insercao",
               valor: item.documento || "",
-              motivo: singleError.message,
+              motivo: traduzirErroSupabase(singleError),
             });
             resultado.ignorados++;
           } else {
@@ -293,7 +343,7 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
         linha: 0,
         campo: "atualizacao",
         valor: item.data.documento || "",
-        motivo: error.message,
+        motivo: traduzirErroSupabase(error),
       });
       resultado.ignorados++;
     } else {
