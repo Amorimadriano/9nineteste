@@ -90,7 +90,7 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
         keyPem = forge.pki.privateKeyToPem(keyBagsPlain[forge.pki.oids.keyBag]![0].key!);
       }
     }
-  }
+  } 
 
   if (!certPem || !keyPem) throw new Error("Nao foi possivel extrair certificado ou chave privada do PFX");
   return { pfxBase64, senha, cnpj, inscricaoMunicipal: "", razaoSocial, certPem, keyPem, validoAte };
