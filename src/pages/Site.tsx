@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { AgenteVendas } from "@/components/site/AgenteVendas";
+import { supabase } from "@/integrations/supabase/client";
 import {
   DollarSign, BarChart3, Monitor, Phone, Mail, Instagram,
   ChevronRight, CheckCircle2, ArrowRight, Menu, X, Shield,
-  TrendingUp, Users, FileText, Zap, Star, MapPin
+  TrendingUp, Users, FileText, Zap, Star, MapPin, Gift, Clock, Target
 } from "lucide-react";
 
 const navLinks = [
@@ -498,105 +499,8 @@ export default function Site() {
         </div>
       </section>
 
-      {/* ── SIGNUP / CONTACT FORM ── */}
-      <section id="cadastro" className="py-24 bg-blue-50/50">
-        <div className="max-w-3xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-600 text-xs font-bold uppercase tracking-widest rounded-full mb-4">
-              Cadastre-se
-            </span>
-            <h2 className="text-3xl lg:text-4xl font-extrabold text-blue-900 mb-4">
-              Solicite uma <span className="text-blue-500">demonstração</span>
-            </h2>
-            <p className="text-gray-500 text-lg max-w-xl mx-auto">
-              Preencha o formulário abaixo e nossa equipe entrará em contato em até 24 horas com uma proposta personalizada.
-            </p>
-          </div>
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.target as HTMLFormElement;
-              const nome = (form.elements.namedItem("nome") as HTMLInputElement).value;
-              const email = (form.elements.namedItem("email") as HTMLInputElement).value;
-              const telefone = (form.elements.namedItem("telefone") as HTMLInputElement).value;
-              const empresa = (form.elements.namedItem("empresa") as HTMLInputElement).value;
-              const mensagem = (form.elements.namedItem("mensagem") as HTMLTextAreaElement).value;
-              const whatsappMsg = encodeURIComponent(
-                `Olá! Meu nome é ${nome}, da empresa ${empresa}.\nE-mail: ${email}\nTelefone: ${telefone}\n\n${mensagem || "Gostaria de receber uma proposta."}`
-              );
-              window.open(`https://wa.me/5511960012210?text=${whatsappMsg}`, "_blank", "noopener,noreferrer");
-              form.reset();
-            }}
-            className="bg-white border border-blue-100 rounded-3xl p-8 md:p-10 shadow-lg space-y-6"
-          >
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-blue-900 mb-2">Nome completo *</label>
-                <input
-                  name="nome"
-                  required
-                  maxLength={100}
-                  placeholder="Seu nome"
-                  className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-blue-900 mb-2">E-mail *</label>
-                <input
-                  name="email"
-                  type="email"
-                  required
-                  maxLength={255}
-                  placeholder="seu@email.com"
-                  className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                />
-              </div>
-            </div>
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-semibold text-blue-900 mb-2">Telefone *</label>
-                <input
-                  name="telefone"
-                  required
-                  maxLength={20}
-                  placeholder="(11) 99999-9999"
-                  className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-blue-900 mb-2">Empresa *</label>
-                <input
-                  name="empresa"
-                  required
-                  maxLength={100}
-                  placeholder="Nome da empresa"
-                  className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-blue-900 mb-2">Mensagem (opcional)</label>
-              <textarea
-                name="mensagem"
-                rows={4}
-                maxLength={1000}
-                placeholder="Conte-nos sobre sua necessidade..."
-                className="w-full px-4 py-3 rounded-xl border border-blue-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-sm resize-none"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full py-4 rounded-xl bg-blue-600 text-white font-bold text-lg hover:bg-blue-500 transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2"
-            >
-              Enviar Proposta <ArrowRight size={20} />
-            </button>
-            <p className="text-center text-xs text-gray-400">
-              Ao enviar, você será redirecionado para nosso WhatsApp com as informações preenchidas.
-            </p>
-          </form>
-        </div>
-      </section>
+      {/* ── DIAGNÓSTICO FINANCEIRO GRATUITO ── */}
+      <SecaoDiagnostico />
 
       {/* ── ENDEREÇO & MAPA ── */}
       <section id="contato" className="bg-gray-50 py-16 scroll-mt-20">
@@ -716,5 +620,250 @@ export default function Site() {
         </div>
       </footer>
     </div>
+  );
+}
+
+// ============= DIAGNÓSTICO FINANCEIRO GRATUITO =============
+function SecaoDiagnostico() {
+  const [enviando, setEnviando] = useState(false);
+  const [enviado, setEnviado] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setErro(null);
+    setEnviando(true);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    const payload = {
+      nome: String(fd.get("nome") || "").trim(),
+      email: String(fd.get("email") || "").trim(),
+      telefone: String(fd.get("telefone") || "").trim(),
+      empresa: String(fd.get("empresa") || "").trim(),
+      cnpj: String(fd.get("cnpj") || "").trim() || null,
+      faturamento_mensal: String(fd.get("faturamento_mensal") || "") || null,
+      num_funcionarios: String(fd.get("num_funcionarios") || "") || null,
+      principal_dor: String(fd.get("principal_dor") || "").trim() || null,
+      origem: "site_diagnostico",
+      status: "novo",
+    };
+
+    try {
+      const { error } = await (supabase.from("leads_diagnostico") as any).insert(payload);
+      if (error) throw error;
+      setEnviado(true);
+      form.reset();
+      // Redireciona para WhatsApp com mensagem qualificada
+      const msg = encodeURIComponent(
+        `Olá! Acabei de solicitar um *Diagnóstico Financeiro Gratuito* no site da 9Nine.\n\n` +
+        `📋 *Dados:*\n` +
+        `Nome: ${payload.nome}\n` +
+        `Empresa: ${payload.empresa}\n` +
+        `Faturamento: ${payload.faturamento_mensal || "Não informado"}\n` +
+        `Funcionários: ${payload.num_funcionarios || "Não informado"}\n\n` +
+        `🎯 *Principal necessidade:*\n${payload.principal_dor || "Quero conhecer o serviço de BPO Financeiro"}`
+      );
+      setTimeout(() => {
+        window.open(`https://wa.me/5511960012210?text=${msg}`, "_blank", "noopener,noreferrer");
+      }, 800);
+    } catch (err: any) {
+      setErro(err?.message || "Erro ao enviar. Tente novamente.");
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <section id="cadastro" className="py-24 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-950 relative overflow-hidden">
+      {/* Decoração */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-400/10 rounded-full blur-3xl" />
+
+      <div className="max-w-6xl mx-auto px-6 relative">
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
+          {/* Coluna esquerda — Persuasão */}
+          <div className="text-white">
+            <span className="inline-flex items-center gap-2 px-4 py-1.5 bg-yellow-400/20 border border-yellow-400/30 text-yellow-300 text-xs font-bold uppercase tracking-widest rounded-full mb-6">
+              <Gift size={14} /> 100% Gratuito • Sem Compromisso
+            </span>
+            <h2 className="text-4xl lg:text-5xl font-extrabold leading-tight mb-6">
+              Descubra <span className="text-yellow-300">onde sua empresa está perdendo dinheiro</span> em 30 minutos
+            </h2>
+            <p className="text-blue-100/80 text-lg leading-relaxed mb-8">
+              Receba um <strong className="text-white">Diagnóstico Financeiro Gratuito</strong> realizado por nossos especialistas em BPO Financeiro. Identificamos gargalos, oportunidades de economia e organizamos um plano de ação personalizado.
+            </p>
+
+            <div className="space-y-4 mb-8">
+              {[
+                { icon: Target, titulo: "Análise de fluxo de caixa", desc: "Identificamos vazamentos e padrões de gastos" },
+                { icon: TrendingUp, titulo: "Oportunidades de economia", desc: "Em média, encontramos 8-15% de redução de custos" },
+                { icon: Clock, titulo: "Plano de ação em 7 dias", desc: "Você recebe um relatório executivo personalizado" },
+                { icon: Shield, titulo: "Sigilo total garantido", desc: "Conformidade com LGPD e NDA quando solicitado" },
+              ].map((item, i) => (
+                <div key={i} className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-yellow-400/20 border border-yellow-400/30 flex items-center justify-center flex-shrink-0">
+                    <item.icon size={20} className="text-yellow-300" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">{item.titulo}</p>
+                    <p className="text-blue-200/70 text-sm">{item.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="flex -space-x-2">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 border-2 border-blue-900 flex items-center justify-center text-xs font-bold text-white">
+                      {String.fromCharCode(64 + i)}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex text-yellow-300">
+                  {[1,2,3,4,5].map(i => <Star key={i} size={14} fill="currentColor" />)}
+                </div>
+              </div>
+              <p className="text-blue-100/80 text-sm italic">
+                "Em 60 dias identificamos R$ 47.000 em gastos desnecessários. O ROI do BPO foi imediato."
+              </p>
+              <p className="text-blue-300/60 text-xs mt-2">— Carlos M., CEO de e-commerce</p>
+            </div>
+          </div>
+
+          {/* Coluna direita — Formulário */}
+          <div className="bg-white rounded-3xl p-8 shadow-2xl">
+            {enviado ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
+                  <CheckCircle2 size={48} className="text-green-600" />
+                </div>
+                <h3 className="text-2xl font-bold text-blue-900 mb-3">Solicitação recebida! 🎉</h3>
+                <p className="text-gray-600 mb-6">
+                  Em até <strong>2 horas úteis</strong>, nossa equipe entrará em contato para agendar seu diagnóstico gratuito.
+                </p>
+                <p className="text-sm text-gray-500">
+                  Você está sendo redirecionado para o WhatsApp...
+                </p>
+                <button
+                  onClick={() => setEnviado(false)}
+                  className="mt-6 text-sm text-blue-600 hover:underline"
+                >
+                  Enviar nova solicitação
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <h3 className="text-2xl font-bold text-blue-900 mb-2">
+                    Quero meu diagnóstico gratuito
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Preencha em 60 segundos. Resposta em até 2h úteis.
+                  </p>
+                </div>
+
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      name="nome"
+                      required
+                      maxLength={100}
+                      placeholder="Seu nome *"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                    <input
+                      name="empresa"
+                      required
+                      maxLength={100}
+                      placeholder="Empresa *"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <input
+                      name="email"
+                      type="email"
+                      required
+                      maxLength={255}
+                      placeholder="E-mail *"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                    <input
+                      name="telefone"
+                      required
+                      maxLength={20}
+                      placeholder="WhatsApp *"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                    />
+                  </div>
+
+                  <input
+                    name="cnpj"
+                    maxLength={20}
+                    placeholder="CNPJ (opcional)"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm"
+                  />
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <select
+                      name="faturamento_mensal"
+                      required
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white"
+                    >
+                      <option value="">Faturamento mensal *</option>
+                      <option value="Até R$ 50 mil">Até R$ 50 mil</option>
+                      <option value="R$ 50 mil a R$ 200 mil">R$ 50 mil a R$ 200 mil</option>
+                      <option value="R$ 200 mil a R$ 500 mil">R$ 200 mil a R$ 500 mil</option>
+                      <option value="R$ 500 mil a R$ 1 mi">R$ 500 mil a R$ 1 mi</option>
+                      <option value="Acima de R$ 1 mi">Acima de R$ 1 mi</option>
+                    </select>
+                    <select
+                      name="num_funcionarios"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm bg-white"
+                    >
+                      <option value="">Nº funcionários</option>
+                      <option value="1-5">1 a 5</option>
+                      <option value="6-20">6 a 20</option>
+                      <option value="21-50">21 a 50</option>
+                      <option value="51-100">51 a 100</option>
+                      <option value="100+">Mais de 100</option>
+                    </select>
+                  </div>
+
+                  <textarea
+                    name="principal_dor"
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Qual é o principal desafio financeiro da sua empresa hoje? (opcional)"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm resize-none"
+                  />
+
+                  {erro && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                      {erro}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={enviando}
+                    className="w-full py-4 rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 text-blue-950 font-bold text-base hover:from-yellow-300 hover:to-yellow-400 transition-all shadow-lg shadow-yellow-500/30 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {enviando ? "Enviando..." : <>Quero meu diagnóstico gratuito <ArrowRight size={20} /></>}
+                  </button>
+
+                  <p className="text-center text-xs text-gray-400 flex items-center justify-center gap-1">
+                    <Shield size={12} /> Seus dados estão seguros • LGPD
+                  </p>
+                </form>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }

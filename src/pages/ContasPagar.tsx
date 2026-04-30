@@ -60,6 +60,8 @@ const emptyForm = {
   recorrente: false, frequencia: "", data_fim_recorrencia: "", forma_pagamento: "", banco_cartao_id: "",
 };
 
+const FREQUENCIAS_VALIDAS = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
+
 function addInterval(date: Date, freq: string): Date {
   const d = new Date(date);
   switch (freq) {
@@ -70,6 +72,7 @@ function addInterval(date: Date, freq: string): Date {
     case "trimestral": d.setMonth(d.getMonth() + 3); break;
     case "semestral": d.setMonth(d.getMonth() + 6); break;
     case "anual": d.setFullYear(d.getFullYear() + 1); break;
+    default: d.setMonth(d.getMonth() + 1); break;
   }
   return d;
 }
@@ -120,46 +123,87 @@ export default function ContasPagar() {
   const categoriasDespesa = (categorias as any[]).filter((c) => c.tipo === "despesa");
   const bancosAtivos = (bancos as any[]).filter((b) => b.ativo);
 
-  const fileToBase64 = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        resolve(result.split(",")[1]);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
   const handleBoletoImport = async (mode: "barcode" | "pdf", file?: File) => {
     setBoletoLoading(true);
+    const controller = new AbortController();
+    // Timeout generoso: extração de PDF pode levar até 30s em PDFs complexos
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
     try {
-      let payload: any = {};
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      let res: Response;
       if (mode === "barcode") {
         if (!barcodeInput.trim()) {
           toast({ title: "Digite o código de barras ou linha digitável", variant: "destructive" });
-          setBoletoLoading(false);
           return;
         }
         const cleanBarcode = barcodeInput.trim().replace(/[\s.\-]/g, "");
-        payload = { barcode: cleanBarcode };
+        res = await fetch(`${SUPABASE_URL}/functions/v1/parse-boleto-pdf`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_KEY,
+          },
+          body: JSON.stringify({ barcode: cleanBarcode }),
+          signal: controller.signal,
+        });
       } else if (file) {
-        const base64 = await fileToBase64(file);
-        payload = { pdfBase64: base64 };
+        if (file.size > 2 * 1024 * 1024) {
+          toast({ title: "Arquivo muito grande", description: "O PDF deve ter no máximo 2 MB.", variant: "destructive" });
+          return;
+        }
+        if (file.type !== "application/pdf") {
+          toast({ title: "Formato inválido", description: "Envie apenas arquivos PDF.", variant: "destructive" });
+          return;
+        }
+        toast({ title: "Processando PDF...", description: "Extraindo linha digitável do boleto. Aguarde." });
+        const arrayBuffer = await file.arrayBuffer();
+        res = await fetch(`${SUPABASE_URL}/functions/v1/parse-boleto-pdf`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "apikey": SUPABASE_KEY,
+          },
+          body: arrayBuffer,
+          signal: controller.signal,
+        });
+      } else {
+        throw new Error("Nenhum arquivo selecionado");
       }
-
-      const { data, error } = await supabase.functions.invoke("parse-boleto-pdf", { body: payload });
-      if (error) throw error;
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let errorMsg = `Erro HTTP ${res.status}`;
+        try {
+          const errorData = JSON.parse(text);
+          errorMsg = errorData.error || errorData.message || errorMsg;
+          if (errorData.dica) errorMsg += `\n\nDica: ${errorData.dica}`;
+        } catch {
+          if (text) errorMsg += `: ${text.substring(0, 200)}`;
+        }
+        throw new Error(errorMsg);
+      }
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
 
       const boleto = data?.boleto;
       if (!boleto) throw new Error("Resposta inválida da IA");
+
+      // Para boletos de concessionária (arrecadação), a data de vencimento pode não estar no código de barras
+      // Preenche com data atual + 5 dias se não houver data de vencimento
+      let dataVencimento = boleto.data_vencimento;
+      if (!dataVencimento) {
+        const hoje = new Date();
+        hoje.setDate(hoje.getDate() + 5);
+        dataVencimento = hoje.toISOString().split("T")[0];
+      }
 
       setForm({
         ...emptyForm,
         descricao: boleto.descricao || boleto.beneficiario || "",
         valor: boleto.valor ? String(boleto.valor) : "",
-        data_vencimento: boleto.data_vencimento || "",
+        data_vencimento: dataVencimento,
         documento: boleto.documento || boleto.codigo_barras || "",
         observacoes: [
           boleto.beneficiario ? `Beneficiário: ${boleto.beneficiario}` : "",
@@ -175,8 +219,13 @@ export default function ContasPagar() {
       setOpen(true);
       toast({ title: "Boleto reconhecido! Confira os dados e salve." });
     } catch (err: any) {
-      toast({ title: "Erro ao processar boleto", description: err.message, variant: "destructive" });
+      if (err.name === "AbortError") {
+        toast({ title: "Tempo esgotado", description: "O processamento do PDF demorou mais que o esperado. Tente usar a opção de código de barras.", variant: "destructive" });
+      } else {
+        toast({ title: "Erro ao processar boleto", description: err.message, variant: "destructive" });
+      }
     } finally {
+      clearTimeout(timeoutId);
       setBoletoLoading(false);
     }
   };
@@ -298,11 +347,16 @@ export default function ContasPagar() {
 
       // Generate recurring entries
       if (form.recorrente && form.frequencia && form.data_fim_recorrencia) {
+        if (!FREQUENCIAS_VALIDAS.includes(form.frequencia)) {
+          toast({ title: "Frequência inválida", description: "Selecione uma frequência válida.", variant: "destructive" });
+          return;
+        }
         const dataFim = new Date(form.data_fim_recorrencia + "T00:00:00");
         let nextDate = addInterval(new Date(form.data_vencimento + "T00:00:00"), form.frequencia);
         const parcelas: any[] = [];
+        const maxParcelas = 1000;
 
-        while (nextDate <= dataFim) {
+        while (nextDate <= dataFim && parcelas.length < maxParcelas) {
           parcelas.push({
             ...payload,
             user_id: user!.id,
@@ -312,6 +366,9 @@ export default function ContasPagar() {
             data_pagamento: null,
           });
           nextDate = addInterval(nextDate, form.frequencia);
+        }
+        if (parcelas.length >= maxParcelas) {
+          console.warn("Limite de parcelas recorrentes atingido (", maxParcelas, ")");
         }
 
         if (parcelas.length > 0) {
@@ -416,42 +473,56 @@ export default function ContasPagar() {
   };
 
   const handleDelete = async (contaId: string) => {
-    // Busca a conta antes de excluir para verificar se precisa reverter o saldo
     const conta = (contas as any[]).find((c) => c.id === contaId);
-
-    const { error } = await (supabase.from("lancamentos_caixa") as any)
-      .delete()
-      .eq("conta_pagar_id", contaId);
-
-    if (error) {
-      toast({ title: "Erro ao excluir lançamento do caixa", description: error.message, variant: "destructive" });
+    if (!conta) {
+      toast({ title: "Conta não encontrada", variant: "destructive" });
       return;
     }
 
-    // Se a conta estava paga, reverte o saldo do banco
-    if (conta && conta.status === "pago" && conta.banco_cartao_id) {
-      const banco = bancosAtivos.find((b: any) => b.id === conta.banco_cartao_id);
-      if (banco) {
-        const saldoAtual = Number(banco.saldo_inicial || 0);
-        const novoSaldo = saldoAtual + Number(conta.valor);
-        await (supabase.from("bancos_cartoes") as any)
+    const banco = conta.status === "pago" && conta.banco_cartao_id
+      ? bancosAtivos.find((b: any) => b.id === conta.banco_cartao_id)
+      : null;
+    const saldoOriginal = banco ? Number(banco.saldo_inicial || 0) : null;
+    const novoSaldo = saldoOriginal !== null ? saldoOriginal + Number(conta.valor) : null;
+
+    try {
+      const { error: caixaError } = await (supabase.from("lancamentos_caixa") as any)
+        .delete()
+        .eq("conta_pagar_id", contaId);
+      if (caixaError) throw new Error("Erro ao excluir lançamento do caixa: " + caixaError.message);
+
+      if (novoSaldo !== null && banco) {
+        const { error: saldoError } = await (supabase.from("bancos_cartoes") as any)
           .update({ saldo_inicial: novoSaldo })
           .eq("id", conta.banco_cartao_id);
+        if (saldoError) throw new Error("Erro ao reverter saldo: " + saldoError.message);
       }
-    }
 
-    await removeContaPagarExtrato(contaId);
-    await remove.mutateAsync(contaId);
-    queryClient.invalidateQueries({ queryKey: ["extrato_bancario"] });
-    queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
+      await removeContaPagarExtrato(contaId);
+      await remove.mutateAsync(contaId);
+      queryClient.invalidateQueries({ queryKey: ["extrato_bancario"] });
+      queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
+      toast({ title: "Conta excluída com sucesso" });
+    } catch (err: any) {
+      // Rollback manual do saldo se necessário
+      if (novoSaldo !== null && saldoOriginal !== null) {
+        await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: saldoOriginal })
+          .eq("id", conta.banco_cartao_id)
+          .catch(() => {});
+      }
+      toast({ title: "Erro ao excluir conta", description: err.message, variant: "destructive" });
+    }
   };
 
   const [empresa, setEmpresa] = useState<any>(null);
   useEffect(() => {
+    let mounted = true;
     if (!user) return;
     supabase.from("empresa").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setEmpresa(data);
+      if (mounted && data) setEmpresa(data);
     });
+    return () => { mounted = false; };
   }, [user]);
 
   const handleExportPDF = () => {
@@ -512,7 +583,7 @@ export default function ContasPagar() {
                     <div>
                       <Label>Linha digitável ou código de barras</Label>
                       <Textarea
-                        placeholder="Cole aqui a linha digitável do boleto (ex: 23793.38128 60000.000003 00000.000400 1 84340000012345)"
+                        placeholder="Cole aqui a linha digitável (47 dígitos cobrança, 48 dígitos concessionária/tributo) ou código de barras (44 dígitos)"
                         value={barcodeInput}
                         onChange={(e) => setBarcodeInput(e.target.value)}
                         rows={3}
@@ -521,10 +592,11 @@ export default function ContasPagar() {
                     <Button
                       className="w-full"
                       onClick={() => handleBoletoImport("barcode")}
-                      disabled={boletoLoading || !barcodeInput.trim()}
+                      disabled={boletoLoading || barcodeInput.replace(/\D/g, "").length < 36}
                     >
                       {boletoLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : "Reconhecer Boleto"}
                     </Button>
+                    <p className="text-xs text-muted-foreground mt-1">Mínimo 36 dígitos. Aceita cobrança (44/47 dígitos), arrecadação (48 dígitos) e tributos.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">

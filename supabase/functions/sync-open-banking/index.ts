@@ -1,3 +1,22 @@
+const ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "https://9ninebusinesscontrol.com.br",
+  "https://www.9ninebusinesscontrol.com.br",
+  "https://ninebpofinanceiro.lovable.app",
+  "https://ninebpofinanceiro.vercel.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("origin") || "";
+  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowed,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
+}
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -129,10 +148,6 @@ function validateTransactionData(
 }
 // --- End inline Open Banking helpers ---
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
 
 interface SyncRequest {
   integracaoId: string;
@@ -151,6 +166,7 @@ interface SyncStats {
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -207,9 +223,10 @@ serve(async (req) => {
       throw new Error("Token expirado. Renove o consentimento.");
     }
 
+    const kv = await Deno.openKv();
     const rateLimitResult = await checkRateLimit(
       integracao.banco_codigo,
-      supabaseAdmin
+      kv
     );
 
     if (!rateLimitResult.allowed) {

@@ -125,40 +125,59 @@ export default function TransferenciasContas() {
   };
 
   const handleDelete = async (id: string) => {
-    // Busca a transferência antes de excluir para poder reverter os saldos
     const transferencia = transferList.find((t: any) => t.id === id);
-
-    const { error } = await (supabase.from("transferencias_contas") as any).delete().eq("id", id);
-    if (error) {
-      toast({ title: "Erro ao excluir", variant: "destructive" });
+    if (!transferencia) {
+      toast({ title: "Transferência não encontrada", variant: "destructive" });
       return;
     }
 
-    // Reverte os saldos das contas (adiciona de volta na origem, subtrai do destino)
-    if (transferencia) {
-      const contaOrigem = contasAtivas.find((c: any) => c.id === transferencia.conta_origem_id);
-      const contaDestino = contasAtivas.find((c: any) => c.id === transferencia.conta_destino_id);
-      const valor = Number(transferencia.valor);
+    const contaOrigem = contasAtivas.find((c: any) => c.id === transferencia.conta_origem_id);
+    const contaDestino = contasAtivas.find((c: any) => c.id === transferencia.conta_destino_id);
+    const valor = Number(transferencia.valor);
 
-      if (contaOrigem) {
-        const saldoOrigem = Number(contaOrigem.saldo_inicial || 0);
-        await (supabase.from("bancos_cartoes") as any)
-          .update({ saldo_inicial: saldoOrigem + valor })
+    const saldoOrigemOriginal = contaOrigem ? Number(contaOrigem.saldo_inicial || 0) : null;
+    const saldoDestinoOriginal = contaDestino ? Number(contaDestino.saldo_inicial || 0) : null;
+    const novoSaldoOrigem = saldoOrigemOriginal !== null ? saldoOrigemOriginal + valor : null;
+    const novoSaldoDestino = saldoDestinoOriginal !== null ? saldoDestinoOriginal - valor : null;
+
+    try {
+      if (novoSaldoOrigem !== null && contaOrigem) {
+        const { error } = await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: novoSaldoOrigem })
           .eq("id", transferencia.conta_origem_id);
+        if (error) throw new Error("Erro ao reverter saldo origem: " + error.message);
       }
 
-      if (contaDestino) {
-        const saldoDestino = Number(contaDestino.saldo_inicial || 0);
-        await (supabase.from("bancos_cartoes") as any)
-          .update({ saldo_inicial: saldoDestino - valor })
+      if (novoSaldoDestino !== null && contaDestino) {
+        const { error } = await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: novoSaldoDestino })
           .eq("id", transferencia.conta_destino_id);
+        if (error) throw new Error("Erro ao reverter saldo destino: " + error.message);
       }
-    }
 
-    toast({ title: "Transferência excluída" });
-    queryClient.invalidateQueries({ queryKey: ["transferencias_contas"] });
-    queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
-    queryClient.invalidateQueries({ queryKey: ["extrato_bancario"] });
+      const { error } = await (supabase.from("transferencias_contas") as any).delete().eq("id", id);
+      if (error) throw new Error("Erro ao excluir transferência: " + error.message);
+
+      toast({ title: "Transferência excluída" });
+      queryClient.invalidateQueries({ queryKey: ["transferencias_contas"] });
+      queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
+      queryClient.invalidateQueries({ queryKey: ["extrato_bancario"] });
+    } catch (err: any) {
+      // Rollback manual dos saldos
+      if (saldoOrigemOriginal !== null) {
+        await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: saldoOrigemOriginal })
+          .eq("id", transferencia.conta_origem_id)
+          .catch(() => {});
+      }
+      if (saldoDestinoOriginal !== null) {
+        await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: saldoDestinoOriginal })
+          .eq("id", transferencia.conta_destino_id)
+          .catch(() => {});
+      }
+      toast({ title: "Erro ao excluir transferência", description: err.message, variant: "destructive" });
+    }
   };
 
   return (

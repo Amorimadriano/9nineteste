@@ -1,6 +1,8 @@
 import { useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTableQuery, useTableMutation } from "@/hooks/useSupabaseQuery";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +12,7 @@ import { Plus, Pencil, Trash2, Truck, Search, Loader2, Download, Upload } from "
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
-const emptyForm = { nome: "", documento: "", email: "", telefone: "", endereco: "", cidade: "", estado: "", observacoes: "" };
+const emptyForm = { nome: "", documento: "", email: "", telefone: "", endereco: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "", cep: "", cnae: "", natureza_juridica: "", observacoes: "" };
 const COLUMNS = ["Nome", "CPF/CNPJ", "E-mail", "Telefone", "Endereço", "Cidade", "Estado", "Observações"];
 const FIELD_MAP: Record<string, string> = { "Nome": "nome", "CPF/CNPJ": "documento", "E-mail": "email", "Telefone": "telefone", "Endereço": "endereco", "Cidade": "cidade", "Estado": "estado", "Observações": "observacoes" };
 
@@ -24,6 +26,7 @@ export default function Fornecedores() {
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { lookup, loading: cnpjLoading } = useCnpjLookup((updater) => setForm(updater));
 
   const filtered = (fornecedores as any[]).filter((f) =>
@@ -32,11 +35,22 @@ export default function Fornecedores() {
     f.email?.toLowerCase().includes(search.toLowerCase())
   );
 
+  const ALLOWED_FIELDS = ["nome", "documento", "email", "telefone", "endereco", "numero", "complemento", "bairro", "cidade", "estado", "cep", "cnae", "natureza_juridica", "observacoes"];
+
+  const sanitizeForm = (raw: any) => {
+    const clean: any = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (raw[key] !== undefined) clean[key] = raw[key];
+    }
+    return clean;
+  };
+
   const handleSubmit = async () => {
+    const payload = sanitizeForm(form);
     if (editing) {
-      await update.mutateAsync({ id: editing.id, ...form });
+      await update.mutateAsync({ id: editing.id, ...payload });
     } else {
-      await insert.mutateAsync(form);
+      await insert.mutateAsync(payload);
     }
     setOpen(false);
     setEditing(null);
@@ -47,8 +61,10 @@ export default function Fornecedores() {
     setEditing(item);
     setForm({
       nome: item.nome, documento: item.documento || "", email: item.email || "",
-      telefone: item.telefone || "", endereco: item.endereco || "",
-      cidade: item.cidade || "", estado: item.estado || "", observacoes: item.observacoes || "",
+      telefone: item.telefone || "", endereco: item.endereco || "", numero: item.numero || "",
+      complemento: item.complemento || "", bairro: item.bairro || "", cidade: item.cidade || "",
+      estado: item.estado || "", cep: item.cep || "", cnae: item.cnae || "", natureza_juridica: item.natureza_juridica || "",
+      observacoes: item.observacoes || "",
     });
     setOpen(true);
   };
@@ -81,7 +97,8 @@ export default function Fornecedores() {
       if (rows.length === 0) { toast({ title: "Planilha vazia", variant: "destructive" }); return; }
 
       const existingDocs = new Set((fornecedores as any[]).map((f) => f.documento?.replace(/\D/g, "")).filter(Boolean));
-      let imported = 0, skipped = 0;
+      const batch: any[] = [];
+      let skipped = 0;
 
       for (const row of rows) {
         const record: any = {};
@@ -92,11 +109,17 @@ export default function Fornecedores() {
         if (!record.nome) { skipped++; continue; }
         const docClean = record.documento?.replace(/\D/g, "");
         if (docClean && existingDocs.has(docClean)) { skipped++; continue; }
-        await insert.mutateAsync(record);
         if (docClean) existingDocs.add(docClean);
-        imported++;
+        batch.push(record);
       }
-      toast({ title: `Importação concluída!`, description: `${imported} fornecedores importados${skipped > 0 ? `, ${skipped} ignorados` : ""}.` });
+
+      if (batch.length > 0) {
+        const { error } = await (supabase.from("fornecedores") as any).insert(batch);
+        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ["fornecedores"] });
+      }
+
+      toast({ title: `Importação concluída!`, description: `${batch.length} fornecedores importados${skipped > 0 ? `, ${skipped} ignorados` : ""}.` });
     } catch (err: any) {
       toast({ title: "Erro na importação", description: err.message, variant: "destructive" });
     } finally {
@@ -122,30 +145,50 @@ export default function Fornecedores() {
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Novo Fornecedor</Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
-              <DialogHeader><DialogTitle>{editing ? "Editar" : "Novo"} Fornecedor</DialogTitle></DialogHeader>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
-                  <Label>CPF/CNPJ</Label>
-                  <div className="flex gap-2">
-                    <Input value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} placeholder="Digite o CNPJ para busca automática" />
-                    <Button type="button" variant="outline" size="icon" onClick={() => lookup(form.documento)} disabled={cnpjLoading || form.documento.replace(/\D/g, "").length !== 14} title="Buscar CNPJ na Receita Federal">
-                      {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-                    </Button>
+            <DialogContent className="max-w-lg max-h-[85vh] p-0 overflow-hidden">
+              <DialogHeader className="px-6 pt-6 pb-2"><DialogTitle>{editing ? "Editar" : "Novo"} Fornecedor</DialogTitle></DialogHeader>
+              <div className="px-6 pb-6 overflow-y-auto" style={{ maxHeight: "calc(85vh - 80px)" }}>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <Label>CPF/CNPJ</Label>
+                    <div className="flex gap-2">
+                      <Input value={form.documento} onChange={(e) => setForm({ ...form, documento: e.target.value })} placeholder="Digite o CNPJ para busca automática" />
+                      <Button type="button" variant="outline" size="icon" onClick={() => lookup(form.documento)} disabled={cnpjLoading || form.documento.replace(/\D/g, "").length !== 14} title="Buscar CNPJ na Receita Federal">
+                        {cnpjLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Digite 14 dígitos do CNPJ e clique na lupa para preencher automaticamente</p>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Digite 14 dígitos do CNPJ e clique na lupa para preencher automaticamente</p>
+                  <div className="col-span-2"><Label>Nome *</Label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+                  <div><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
+                  <div><Label>Telefone</Label><Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
+
+                  <div className="col-span-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-1 mb-1">Endereço</p>
+                  </div>
+                  <div><Label>CEP</Label><Input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} /></div>
+                  <div><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
+                  <div><Label>Estado</Label><Input value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} /></div>
+                  <div className="col-span-2"><Label>Endereço</Label><Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
+                  <div><Label>Número</Label><Input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} /></div>
+                  <div><Label>Complemento</Label><Input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} /></div>
+                  <div className="col-span-2"><Label>Bairro</Label><Input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} /></div>
+
+                  <div className="col-span-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-1 mb-1">Dados da Receita Federal</p>
+                  </div>
+                  <div className="col-span-2"><Label>CNAE Principal</Label><Input value={form.cnae} onChange={(e) => setForm({ ...form, cnae: e.target.value })} /></div>
+                  <div className="col-span-2"><Label>Natureza Jurídica</Label><Input value={form.natureza_juridica} onChange={(e) => setForm({ ...form, natureza_juridica: e.target.value })} /></div>
+
+                  <div className="col-span-2">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mt-1 mb-1">Outros</p>
+                  </div>
+                  <div className="col-span-2"><Label>Observações</Label><Input value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
                 </div>
-                <div className="col-span-2"><Label>Nome *</Label><Input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
-                <div><Label>E-mail</Label><Input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></div>
-                <div><Label>Telefone</Label><Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
-                <div><Label>Cidade</Label><Input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} /></div>
-                <div><Label>Estado</Label><Input value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} /></div>
-                <div className="col-span-2"><Label>Endereço</Label><Input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} /></div>
-                <div className="col-span-2"><Label>Observações</Label><Input value={form.observacoes} onChange={(e) => setForm({ ...form, observacoes: e.target.value })} /></div>
+                <Button onClick={handleSubmit} className="w-full mt-4" disabled={!form.nome}>
+                  {editing ? "Atualizar" : "Criar"}
+                </Button>
               </div>
-              <Button onClick={handleSubmit} className="w-full" disabled={!form.nome}>
-                {editing ? "Atualizar" : "Criar"}
-              </Button>
             </DialogContent>
           </Dialog>
         </div>

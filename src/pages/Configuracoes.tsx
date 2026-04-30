@@ -26,8 +26,8 @@ export default function Configuracoes() {
       toast({ title: "As senhas não coincidem", variant: "destructive" });
       return;
     }
-    if (newPassword.length < 6) {
-      toast({ title: "A senha deve ter pelo menos 6 caracteres", variant: "destructive" });
+    if (newPassword.length < 8) {
+      toast({ title: "A senha deve ter pelo menos 8 caracteres", variant: "destructive" });
       return;
     }
     setSaving(true);

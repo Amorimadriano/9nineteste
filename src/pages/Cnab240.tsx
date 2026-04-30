@@ -116,10 +116,12 @@ export default function Cnab240() {
 
   const [emp, setEmp] = useState<any>(null);
   useEffect(() => {
+    let mounted = true;
     if (!user) return;
     supabase.from("empresa").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setEmp(data);
+      if (mounted && data) setEmp(data);
     });
+    return () => { mounted = false; };
   }, [user]);
 
   const [selectedReceber, setSelectedReceber] = useState<Set<string>>(new Set());

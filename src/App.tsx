@@ -27,8 +27,6 @@ import SimuladorIbsCbs from "./pages/SimuladorIbsCbs";
 
 // Lazy loading de páginas pesadas - Code Splitting por rotas
 const Dashboard = lazy(() => import("./pages/Dashboard"));
-const DashboardMaster = lazy(() => import("./pages/DashboardMaster"));
-const NovaEmpresa = lazy(() => import("./pages/NovaEmpresa"));
 const ContasReceber = lazy(() => import("./pages/ContasReceber"));
 const ContasPagar = lazy(() => import("./pages/ContasPagar"));
 const FluxoCaixa = lazy(() => import("./pages/FluxoCaixa"));
@@ -48,6 +46,7 @@ const ConciliacaoCartao = lazy(() => import("./pages/ConciliacaoCartao"));
 const TransferenciasContas = lazy(() => import("./pages/TransferenciasContas"));
 const Auditoria = lazy(() => import("./pages/Auditoria"));
 const AuditoriaRecebiveis = lazy(() => import("./pages/AuditoriaRecebiveis"));
+const Leads = lazy(() => import("./pages/Leads"));
 const LicencasSoftware = lazy(() => import("./pages/LicencasSoftware"));
 const Planos = lazy(() => import("./pages/Planos"));
 const ReguaCobranca = lazy(() => import("./pages/ReguaCobranca"));
@@ -191,16 +190,6 @@ const App = () => (
                   <Dashboard />
                 </Suspense>
               } />
-              <Route path="/painel-master" element={
-                <Suspense fallback={<PageLoader />}>
-                  <DashboardMaster />
-                </Suspense>
-              } />
-              <Route path="/nova-empresa" element={
-                <Suspense fallback={<PageLoader />}>
-                  <NovaEmpresa />
-                </Suspense>
-              } />
               <Route path="/contas-receber" element={
                 <Suspense fallback={<PageLoader />}>
                   <ContasReceber />
@@ -306,6 +295,11 @@ const App = () => (
                   <AuditoriaRecebiveis />
                 </Suspense>
               } />
+              <Route path="/leads" element={
+                <Suspense fallback={<PageLoader />}>
+                  <Leads />
+                </Suspense>
+              } />
               <Route path="/roi" element={
                 <Suspense fallback={<PageLoader />}>
                   <ROI />
@@ -343,16 +337,7 @@ const App = () => (
                   <OpenBankingConfig />
                 </Suspense>
               } />
-              <Route path="/nfse" element={
-                <Suspense fallback={<PageLoader />}>
-                  <NFSeEmissao />
-                </Suspense>
-              } />
-              <Route path="/nfse/historico" element={
-                <Suspense fallback={<PageLoader />}>
-                  <NFSeHistorico />
-                </Suspense>
-              } />
+              {/* NFS-e removido conforme solicitação do cliente */}
               <Route path="/integracao-contabil" element={
                 <Suspense fallback={<PageLoader />}>
                   <ContabilidadeIntegracao />
@@ -378,11 +363,7 @@ const App = () => (
                   <EmailMarketing />
                 </Suspense>
               } />
-              <Route path="/card-audit" element={
-                <Suspense fallback={<PageLoader />}>
-                  <CardAudit />
-                </Suspense>
-              } />
+              {/* 9nine Card removido conforme solicitação do cliente */}
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

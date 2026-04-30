@@ -121,9 +121,11 @@ export default function SimuladorIBSCBS() {
         body: { dados },
       });
 
-      if (error) throw error;
+      if (error) throw new Error(error.message || "Erro na função de IA");
+      if (!data) throw new Error("Resposta vazia da IA");
+      if (data.error) throw new Error(data.error);
 
-      setParecer({ texto: data.parecer || "", carregando: false });
+      setParecer({ texto: data.parecer || "Parecer indisponível.", carregando: false });
     } catch (err: any) {
       setParecer({
         texto: "",
@@ -143,6 +145,7 @@ export default function SimuladorIBSCBS() {
   // Buscar dados da empresa para o cabeçalho do PDF
   const [empresaData, setEmpresaData] = useState<any>(null);
   useEffect(() => {
+    let mounted = true;
     const fetchEmpresa = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -151,9 +154,10 @@ export default function SimuladorIBSCBS() {
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
-      if (data) setEmpresaData(data);
+      if (mounted && data) setEmpresaData(data);
     };
     fetchEmpresa();
+    return () => { mounted = false; };
   }, []);
 
   const exportarPDF = () => {

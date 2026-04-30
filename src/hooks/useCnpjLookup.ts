@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Dados retornados pela BrasilAPI para consulta de CNPJ
@@ -116,30 +117,23 @@ export function useCnpjLookup(
       }
 
       setLoading(true);
-      console.log(`[useCnpjLookup] Consultando CNPJ: ${clean}`);
+      console.log(`[useCnpjLookup] Consultando CNPJ via edge function: ${clean}`);
 
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${clean}`, {
-          signal: controller.signal,
+        // Use edge function (avoids CORS / network blocks) with BrasilAPI + ReceitaWS fallback
+        const { data: resp, error: fnError } = await supabase.functions.invoke("consultar-cnpj", {
+          body: { cnpj: clean },
         });
-        clearTimeout(timeoutId);
 
-        console.log(`[useCnpjLookup] Status da resposta: ${res.status}`);
-
-        if (!res.ok) {
-          if (res.status === 404) {
-            throw new Error("CNPJ não encontrado na base da Receita Federal.");
-          }
-          if (res.status === 429) {
-            throw new Error("Muitas consultas em pouco tempo. Aguarde um momento.");
-          }
-          throw new Error(`Erro ${res.status} ao consultar CNPJ.`);
+        if (fnError) {
+          console.error("[useCnpjLookup] Erro edge function:", fnError);
+          throw new Error(fnError.message || "Erro ao consultar CNPJ");
+        }
+        if (resp?.error) {
+          throw new Error(resp.error);
         }
 
-        const data: BrasilApiCnpjResponse = await res.json();
+        const data: BrasilApiCnpjResponse = resp?.data || {};
         console.log("[useCnpjLookup] Dados recebidos:", data);
 
         const telefone = formatTelefone(data.ddd_telefone_1);

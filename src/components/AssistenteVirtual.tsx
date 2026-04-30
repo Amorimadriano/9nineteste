@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { FormattedText } from "@/components/FormattedText";
 
 interface Mensagem {
   id: string;
@@ -901,14 +902,9 @@ export function AssistenteVirtual() {
                       : "bg-white border border-gray-200 text-gray-700 rounded-bl-md shadow-sm"
                   )}
                 >
-                  <div
-                    className="prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html: msg.texto
-                        .replace(/\*\*(.*?)\*\*/g, "<strong class='text-emerald-700'>$1</strong>")
-                        .replace(/\n/g, "<br />"),
-                    }}
-                  />
+                  <div className="prose prose-sm max-w-none">
+                    <FormattedText text={msg.texto} strongClassName="text-emerald-700" />
+                  </div>
 
                   {/* Opções */}
                   {msg.opcoes && msg.opcoes.length > 0 && (

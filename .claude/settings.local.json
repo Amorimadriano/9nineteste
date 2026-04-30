@@ -61,7 +61,15 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(python3 -m json.tool)",
       "Bash(git mv *)",
-      "Bash(awk '/^   2026/ && $2 == \"|\" {print $1}')"
+      "Bash(awk '/^   2026/ && $2 == \"|\" {print $1}')",
+      "Bash(gh auth *)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); r=d['workflow_runs'][0]; print\\(f\\\\\"Status: {r['status']}\\\\nConclusão: {r.get\\('conclusion','N/A'\\)}\\\\nWorkflow: {r['name']}\\\\nURL: {r['html_url']}\\\\nCriado: {r['created_at']}\\\\\"\\)\")",
+      "Bash(python3 _check_actions.py)",
+      "Bash([ -f \"$dir/index.ts\" ])",
+      "Bash(grep -v \"^_shared$\")",
+      "Bash(continue)",
+      "Bash([ -f \"$dir/cors.ts\" ])",
+      "Bash(rm __TRACKED_VAR__/cors.ts)"
     ]
   }
 }

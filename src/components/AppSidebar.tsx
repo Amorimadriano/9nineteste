@@ -93,6 +93,7 @@ const cadastroItems = [
   { title: "Configurações", url: "/configuracoes", icon: Settings, tour: "configuracoes" },
   { title: "Usuários", url: "/usuarios", icon: UsersRound },
   { title: "Email Marketing", url: "/email-marketing", icon: Receipt, adminOnly: true },
+  { title: "Leads Capturados", url: "/leads", icon: Target, adminOnly: true },
   { title: "Auditoria do Sistema", url: "/auditoria", icon: ShieldCheck, adminOnly: true },
 ];
 

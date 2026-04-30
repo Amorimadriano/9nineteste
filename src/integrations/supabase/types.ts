@@ -272,6 +272,307 @@ export type Database = {
         }
         Relationships: []
       }
+      card_dashboard_cache: {
+        Row: {
+          atualizado_em: string | null
+          cashflow_previsto: Json | null
+          chargebacks: number | null
+          conferidas: number | null
+          divergentes: number | null
+          empresa_id: string | null
+          id: string
+          pendentes: number | null
+          por_adquirente: Json | null
+          por_bandeira: Json | null
+          split_cbs: number | null
+          split_ibs: number | null
+          split_liquido_projetado: number | null
+          total_bruto: number | null
+          total_liquido: number | null
+          total_taxas: number | null
+          total_transacoes: number | null
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string | null
+          cashflow_previsto?: Json | null
+          chargebacks?: number | null
+          conferidas?: number | null
+          divergentes?: number | null
+          empresa_id?: string | null
+          id?: string
+          pendentes?: number | null
+          por_adquirente?: Json | null
+          por_bandeira?: Json | null
+          split_cbs?: number | null
+          split_ibs?: number | null
+          split_liquido_projetado?: number | null
+          total_bruto?: number | null
+          total_liquido?: number | null
+          total_taxas?: number | null
+          total_transacoes?: number | null
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string | null
+          cashflow_previsto?: Json | null
+          chargebacks?: number | null
+          conferidas?: number | null
+          divergentes?: number | null
+          empresa_id?: string | null
+          id?: string
+          pendentes?: number | null
+          por_adquirente?: Json | null
+          por_bandeira?: Json | null
+          split_cbs?: number | null
+          split_ibs?: number | null
+          split_liquido_projetado?: number | null
+          total_bruto?: number | null
+          total_liquido?: number | null
+          total_taxas?: number | null
+          total_transacoes?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_dashboard_cache_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_importacoes: {
+        Row: {
+          adquirente: string
+          criado_em: string | null
+          empresa_id: string | null
+          erros: Json | null
+          id: string
+          nome_arquivo: string
+          processado_em: string | null
+          status: string | null
+          tamanho_arquivo: number | null
+          tipo_arquivo: string
+          total_erros: number | null
+          total_importadas: number | null
+          total_linhas: number | null
+          user_id: string
+        }
+        Insert: {
+          adquirente: string
+          criado_em?: string | null
+          empresa_id?: string | null
+          erros?: Json | null
+          id?: string
+          nome_arquivo: string
+          processado_em?: string | null
+          status?: string | null
+          tamanho_arquivo?: number | null
+          tipo_arquivo?: string
+          total_erros?: number | null
+          total_importadas?: number | null
+          total_linhas?: number | null
+          user_id: string
+        }
+        Update: {
+          adquirente?: string
+          criado_em?: string | null
+          empresa_id?: string | null
+          erros?: Json | null
+          id?: string
+          nome_arquivo?: string
+          processado_em?: string | null
+          status?: string | null
+          tamanho_arquivo?: number | null
+          tipo_arquivo?: string
+          total_erros?: number | null
+          total_importadas?: number | null
+          total_linhas?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_importacoes_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_relatorios_gerados: {
+        Row: {
+          criado_em: string | null
+          empresa_id: string | null
+          filtros: Json | null
+          id: string
+          nome_arquivo: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          tamanho_bytes: number | null
+          tipo_relatorio: string
+          total_bruto: number | null
+          total_divergencias: number | null
+          total_liquido: number | null
+          total_transacoes: number | null
+          user_id: string
+        }
+        Insert: {
+          criado_em?: string | null
+          empresa_id?: string | null
+          filtros?: Json | null
+          id?: string
+          nome_arquivo?: string | null
+          periodo_fim: string
+          periodo_inicio: string
+          tamanho_bytes?: number | null
+          tipo_relatorio: string
+          total_bruto?: number | null
+          total_divergencias?: number | null
+          total_liquido?: number | null
+          total_transacoes?: number | null
+          user_id: string
+        }
+        Update: {
+          criado_em?: string | null
+          empresa_id?: string | null
+          filtros?: Json | null
+          id?: string
+          nome_arquivo?: string | null
+          periodo_fim?: string
+          periodo_inicio?: string
+          tamanho_bytes?: number | null
+          tipo_relatorio?: string
+          total_bruto?: number | null
+          total_divergencias?: number | null
+          total_liquido?: number | null
+          total_transacoes?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_relatorios_gerados_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_report_config: {
+        Row: {
+          atualizado_em: string | null
+          criado_em: string | null
+          empresa_id: string | null
+          id: string
+          incluir_detalhamento_parcelas: boolean | null
+          incluir_graficos: boolean | null
+          logo_empresa: boolean | null
+          nome_relatorio: string
+          periodo_padrao_dias: number | null
+          tipo_relatorio: string
+          user_id: string
+        }
+        Insert: {
+          atualizado_em?: string | null
+          criado_em?: string | null
+          empresa_id?: string | null
+          id?: string
+          incluir_detalhamento_parcelas?: boolean | null
+          incluir_graficos?: boolean | null
+          logo_empresa?: boolean | null
+          nome_relatorio: string
+          periodo_padrao_dias?: number | null
+          tipo_relatorio?: string
+          user_id: string
+        }
+        Update: {
+          atualizado_em?: string | null
+          criado_em?: string | null
+          empresa_id?: string | null
+          id?: string
+          incluir_detalhamento_parcelas?: boolean | null
+          incluir_graficos?: boolean | null
+          logo_empresa?: boolean | null
+          nome_relatorio?: string
+          periodo_padrao_dias?: number | null
+          tipo_relatorio?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_report_config_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_simulacoes_salvas: {
+        Row: {
+          aliquota_cbs: number
+          aliquota_ibs: number
+          ano_referencia: number
+          criado_em: string | null
+          empresa_id: string | null
+          id: string
+          nome: string
+          observacoes: string | null
+          taxa_mdr: number
+          user_id: string
+          valor_bruto: number
+          valor_cbs: number | null
+          valor_ibs: number | null
+          valor_liquido: number | null
+          valor_mdr: number | null
+        }
+        Insert: {
+          aliquota_cbs: number
+          aliquota_ibs: number
+          ano_referencia: number
+          criado_em?: string | null
+          empresa_id?: string | null
+          id?: string
+          nome: string
+          observacoes?: string | null
+          taxa_mdr: number
+          user_id: string
+          valor_bruto: number
+          valor_cbs?: number | null
+          valor_ibs?: number | null
+          valor_liquido?: number | null
+          valor_mdr?: number | null
+        }
+        Update: {
+          aliquota_cbs?: number
+          aliquota_ibs?: number
+          ano_referencia?: number
+          criado_em?: string | null
+          empresa_id?: string | null
+          id?: string
+          nome?: string
+          observacoes?: string | null
+          taxa_mdr?: number
+          user_id?: string
+          valor_bruto?: number
+          valor_cbs?: number | null
+          valor_ibs?: number | null
+          valor_liquido?: number | null
+          valor_mdr?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_simulacoes_salvas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_split_simulacoes: {
         Row: {
           aliquota_cbs: number
@@ -340,20 +641,25 @@ export type Database = {
           bandeira: string | null
           conciliado: boolean
           created_at: string
+          data_conciliacao: string | null
           data_prevista_recebimento: string | null
           data_recebimento: string | null
           data_venda: string
+          empresa_id: string | null
           id: string
           nsu: string | null
           observacoes: string | null
           parcela_atual: number
           parcelas: number
+          score_conciliacao: number | null
           status_auditoria: string
           taxa_mdr: number
+          tipo_arquivo: string | null
           tipo_transacao: string
           updated_at: string
           user_id: string
           valor_bruto: number
+          valor_extrato_bancario: number | null
           valor_liquido: number
           valor_taxa: number
         }
@@ -365,20 +671,25 @@ export type Database = {
           bandeira?: string | null
           conciliado?: boolean
           created_at?: string
+          data_conciliacao?: string | null
           data_prevista_recebimento?: string | null
           data_recebimento?: string | null
           data_venda: string
+          empresa_id?: string | null
           id?: string
           nsu?: string | null
           observacoes?: string | null
           parcela_atual?: number
           parcelas?: number
+          score_conciliacao?: number | null
           status_auditoria?: string
           taxa_mdr?: number
+          tipo_arquivo?: string | null
           tipo_transacao?: string
           updated_at?: string
           user_id: string
           valor_bruto?: number
+          valor_extrato_bancario?: number | null
           valor_liquido?: number
           valor_taxa?: number
         }
@@ -390,20 +701,25 @@ export type Database = {
           bandeira?: string | null
           conciliado?: boolean
           created_at?: string
+          data_conciliacao?: string | null
           data_prevista_recebimento?: string | null
           data_recebimento?: string | null
           data_venda?: string
+          empresa_id?: string | null
           id?: string
           nsu?: string | null
           observacoes?: string | null
           parcela_atual?: number
           parcelas?: number
+          score_conciliacao?: number | null
           status_auditoria?: string
           taxa_mdr?: number
+          tipo_arquivo?: string | null
           tipo_transacao?: string
           updated_at?: string
           user_id?: string
           valor_bruto?: number
+          valor_extrato_bancario?: number | null
           valor_liquido?: number
           valor_taxa?: number
         }
@@ -413,6 +729,13 @@ export type Database = {
             columns: ["banco_cartao_id"]
             isOneToOne: false
             referencedRelation: "bancos_cartoes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transacoes_brutas_empresa_id_fkey"
+            columns: ["empresa_id"]
+            isOneToOne: false
+            referencedRelation: "empresa"
             referencedColumns: ["id"]
           },
         ]
@@ -503,14 +826,21 @@ export type Database = {
       clientes: {
         Row: {
           ativo: boolean
+          bairro: string | null
+          cep: string | null
           cidade: string | null
+          cnae: string | null
+          complemento: string | null
           created_at: string
           documento: string | null
           email: string | null
+          empresa_id: string | null
           endereco: string | null
           estado: string | null
           id: string
+          natureza_juridica: string | null
           nome: string
+          numero: string | null
           observacoes: string | null
           telefone: string | null
           updated_at: string
@@ -518,14 +848,21 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
+          cnae?: string | null
+          complemento?: string | null
           created_at?: string
           documento?: string | null
           email?: string | null
+          empresa_id?: string | null
           endereco?: string | null
           estado?: string | null
           id?: string
+          natureza_juridica?: string | null
           nome: string
+          numero?: string | null
           observacoes?: string | null
           telefone?: string | null
           updated_at?: string
@@ -533,14 +870,21 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
+          cnae?: string | null
+          complemento?: string | null
           created_at?: string
           documento?: string | null
           email?: string | null
+          empresa_id?: string | null
           endereco?: string | null
           estado?: string | null
           id?: string
+          natureza_juridica?: string | null
           nome?: string
+          numero?: string | null
           observacoes?: string | null
           telefone?: string | null
           updated_at?: string
@@ -1082,14 +1426,21 @@ export type Database = {
       fornecedores: {
         Row: {
           ativo: boolean
+          bairro: string | null
+          cep: string | null
           cidade: string | null
+          cnae: string | null
+          complemento: string | null
           created_at: string
           documento: string | null
           email: string | null
+          empresa_id: string | null
           endereco: string | null
           estado: string | null
           id: string
+          natureza_juridica: string | null
           nome: string
+          numero: string | null
           observacoes: string | null
           telefone: string | null
           updated_at: string
@@ -1097,14 +1448,21 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
+          cnae?: string | null
+          complemento?: string | null
           created_at?: string
           documento?: string | null
           email?: string | null
+          empresa_id?: string | null
           endereco?: string | null
           estado?: string | null
           id?: string
+          natureza_juridica?: string | null
           nome: string
+          numero?: string | null
           observacoes?: string | null
           telefone?: string | null
           updated_at?: string
@@ -1112,14 +1470,21 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          bairro?: string | null
+          cep?: string | null
           cidade?: string | null
+          cnae?: string | null
+          complemento?: string | null
           created_at?: string
           documento?: string | null
           email?: string | null
+          empresa_id?: string | null
           endereco?: string | null
           estado?: string | null
           id?: string
+          natureza_juridica?: string | null
           nome?: string
+          numero?: string | null
           observacoes?: string | null
           telefone?: string | null
           updated_at?: string
@@ -1194,10 +1559,62 @@ export type Database = {
           },
         ]
       }
+      leads_diagnostico: {
+        Row: {
+          cnpj: string | null
+          created_at: string
+          email: string
+          empresa: string
+          faturamento_mensal: string | null
+          id: string
+          nome: string
+          num_funcionarios: string | null
+          observacoes_internas: string | null
+          origem: string
+          principal_dor: string | null
+          status: string
+          telefone: string
+          updated_at: string
+        }
+        Insert: {
+          cnpj?: string | null
+          created_at?: string
+          email: string
+          empresa: string
+          faturamento_mensal?: string | null
+          id?: string
+          nome: string
+          num_funcionarios?: string | null
+          observacoes_internas?: string | null
+          origem?: string
+          principal_dor?: string | null
+          status?: string
+          telefone: string
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string | null
+          created_at?: string
+          email?: string
+          empresa?: string
+          faturamento_mensal?: string | null
+          id?: string
+          nome?: string
+          num_funcionarios?: string | null
+          observacoes_internas?: string | null
+          origem?: string
+          principal_dor?: string | null
+          status?: string
+          telefone?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       licencas_software: {
         Row: {
           chave_licenca: string
           cnpj: string | null
+          configuracao_extra: Json
           contato_nome: string | null
           created_at: string
           data_fim: string | null
@@ -1220,6 +1637,7 @@ export type Database = {
         Insert: {
           chave_licenca?: string
           cnpj?: string | null
+          configuracao_extra?: Json
           contato_nome?: string | null
           created_at?: string
           data_fim?: string | null
@@ -1242,6 +1660,7 @@ export type Database = {
         Update: {
           chave_licenca?: string
           cnpj?: string | null
+          configuracao_extra?: Json
           contato_nome?: string | null
           created_at?: string
           data_fim?: string | null
@@ -1793,6 +2212,10 @@ export type Database = {
       inserir_plano_contas_padrao: {
         Args: { p_user_id: string }
         Returns: number
+      }
+      refresh_card_dashboard: {
+        Args: { p_user_id: string }
+        Returns: undefined
       }
       seed_default_categories: {
         Args: { p_user_id: string }

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTableQuery, useTableMutation } from "@/hooks/useSupabaseQuery";
 import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, ArrowDownCircle, CheckCircle, RefreshCw, ChevronsUpDown, Check, FileDown, Landmark } from "lucide-react";
+import { Plus, Pencil, Trash2, ArrowDownCircle, CheckCircle, RefreshCw, ChevronsUpDown, Check, FileDown, Landmark, ScanBarcode, FileUp, Loader2 } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
@@ -58,6 +58,8 @@ const emptyForm = {
   recorrente: false, frequencia: "", data_fim_recorrencia: "", forma_pagamento: "", banco_cartao_id: "",
 };
 
+const FREQUENCIAS_VALIDAS = ["semanal", "quinzenal", "mensal", "bimestral", "trimestral", "semestral", "anual"];
+
 function addInterval(date: Date, freq: string): Date {
   const d = new Date(date);
   switch (freq) {
@@ -68,6 +70,7 @@ function addInterval(date: Date, freq: string): Date {
     case "trimestral": d.setMonth(d.getMonth() + 3); break;
     case "semestral": d.setMonth(d.getMonth() + 6); break;
     case "anual": d.setFullYear(d.getFullYear() + 1); break;
+    default: d.setMonth(d.getMonth() + 1); break;
   }
   return d;
 }
@@ -85,7 +88,117 @@ export default function ContasReceber() {
   const [editing, setEditing] = useState<any>(null);
   const [form, setForm] = useState(emptyForm);
   const [filtroRecorrencia, setFiltroRecorrencia] = useState<string>("todas");
+  const [boletoOpen, setBoletoOpen] = useState(false);
+  const [boletoMode, setBoletoMode] = useState<"barcode" | "pdf">("barcode");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [boletoLoading, setBoletoLoading] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const { filters, setFilters, applyFilters } = useContasFilter();
+
+  const handleBoletoImport = async (mode: "barcode" | "pdf", file?: File) => {
+    setBoletoLoading(true);
+    const controller = new AbortController();
+    // Timeout generoso: extração de PDF pode levar até 30s em PDFs complexos
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+    try {
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      let res: Response;
+      if (mode === "barcode") {
+        if (!barcodeInput.trim()) {
+          toast({ title: "Digite o código de barras ou linha digitável", variant: "destructive" });
+          return;
+        }
+        res = await fetch(`${SUPABASE_URL}/functions/v1/parse-boleto-pdf`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_KEY,
+          },
+          body: JSON.stringify({ barcode: barcodeInput.trim().replace(/[\s.\-]/g, "") }),
+          signal: controller.signal,
+        });
+      } else if (file) {
+        if (file.size > 2 * 1024 * 1024) {
+          toast({ title: "Arquivo muito grande", description: "O PDF deve ter no máximo 2 MB.", variant: "destructive" });
+          return;
+        }
+        if (file.type !== "application/pdf") {
+          toast({ title: "Formato inválido", description: "Envie apenas arquivos PDF.", variant: "destructive" });
+          return;
+        }
+        toast({ title: "Processando PDF...", description: "Extraindo linha digitável do boleto. Aguarde." });
+        const arrayBuffer = await file.arrayBuffer();
+        res = await fetch(`${SUPABASE_URL}/functions/v1/parse-boleto-pdf`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/octet-stream",
+            "apikey": SUPABASE_KEY,
+          },
+          body: arrayBuffer,
+          signal: controller.signal,
+        });
+      } else {
+        throw new Error("Nenhum arquivo selecionado");
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        let errorMsg = `Erro HTTP ${res.status}`;
+        try {
+          const errorData = JSON.parse(text);
+          errorMsg = errorData.error || errorData.message || errorMsg;
+          if (errorData.dica) errorMsg += `\n\nDica: ${errorData.dica}`;
+        } catch {
+          if (text) errorMsg += `: ${text.substring(0, 200)}`;
+        }
+        throw new Error(errorMsg);
+      }
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      const boleto = data?.boleto;
+      if (!boleto) throw new Error("Resposta inválida da IA");
+
+      // Para boletos de concessionária (arrecadação), a data de vencimento pode não estar no código de barras
+      // Preenche com data atual + 5 dias se não houver data de vencimento
+      let dataVencimento = boleto.data_vencimento;
+      if (!dataVencimento) {
+        const hoje = new Date();
+        hoje.setDate(hoje.getDate() + 5);
+        dataVencimento = hoje.toISOString().split("T")[0];
+      }
+
+      setForm({
+        ...emptyForm,
+        descricao: boleto.descricao || boleto.beneficiario || "",
+        valor: boleto.valor ? String(boleto.valor) : "",
+        data_vencimento: dataVencimento,
+        documento: boleto.documento || boleto.codigo_barras || "",
+        observacoes: [
+          boleto.beneficiario ? `Pagador: ${boleto.beneficiario}` : "",
+          boleto.banco ? `Banco: ${boleto.banco}` : "",
+          boleto.codigo_barras ? `Cód. Barras: ${boleto.codigo_barras}` : "",
+        ].filter(Boolean).join(" | "),
+        forma_pagamento: "boleto",
+      });
+      setBoletoOpen(false);
+      setBarcodeInput("");
+      setEditing(null);
+      setOpen(true);
+      toast({ title: "Boleto reconhecido! Confira os dados e salve." });
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        toast({ title: "Tempo esgotado", description: "O processamento do PDF demorou mais que o esperado. Tente usar a opção de código de barras.", variant: "destructive" });
+      } else {
+        toast({ title: "Erro ao processar boleto", description: err.message, variant: "destructive" });
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      setBoletoLoading(false);
+    }
+  };
 
   // Quick-receive dialog state
   const [quickReceiveOpen, setQuickReceiveOpen] = useState(false);
@@ -229,11 +342,16 @@ export default function ContasReceber() {
       queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
 
       if (form.recorrente && form.frequencia && form.data_fim_recorrencia) {
+        if (!FREQUENCIAS_VALIDAS.includes(form.frequencia)) {
+          toast({ title: "Frequência inválida", description: "Selecione uma frequência válida.", variant: "destructive" });
+          return;
+        }
         const dataFim = new Date(form.data_fim_recorrencia + "T00:00:00");
         let nextDate = addInterval(new Date(form.data_vencimento + "T00:00:00"), form.frequencia);
         const parcelas: any[] = [];
+        const maxParcelas = 1000;
 
-        while (nextDate <= dataFim) {
+        while (nextDate <= dataFim && parcelas.length < maxParcelas) {
           parcelas.push({
             ...payload,
             user_id: user!.id,
@@ -243,6 +361,9 @@ export default function ContasReceber() {
             data_recebimento: null,
           });
           nextDate = addInterval(nextDate, form.frequencia);
+        }
+        if (parcelas.length >= maxParcelas) {
+          console.warn("Limite de parcelas recorrentes atingido (", maxParcelas, ")");
         }
 
         if (parcelas.length > 0) {
@@ -347,37 +468,56 @@ export default function ContasReceber() {
   };
 
   const handleDelete = async (contaId: string) => {
-    // Busca a conta antes de excluir para verificar se precisa reverter o saldo
     const conta = (contas as any[]).find((c) => c.id === contaId);
-
-    await (supabase.from("lancamentos_caixa") as any)
-      .delete()
-      .eq("conta_receber_id", contaId);
-
-    // Se a conta estava recebida, reverte o saldo do banco
-    if (conta && conta.status === "recebido" && conta.banco_cartao_id) {
-      const banco = bancosAtivos.find((b: any) => b.id === conta.banco_cartao_id);
-      if (banco) {
-        const saldoAtual = Number(banco.saldo_inicial || 0);
-        const novoSaldo = saldoAtual - Number(conta.valor);
-        await (supabase.from("bancos_cartoes") as any)
-          .update({ saldo_inicial: novoSaldo })
-          .eq("id", conta.banco_cartao_id);
-      }
+    if (!conta) {
+      toast({ title: "Conta não encontrada", variant: "destructive" });
+      return;
     }
 
-    await removeContaReceberExtrato(contaId);
-    await remove.mutateAsync(contaId);
-    queryClient.invalidateQueries({ queryKey: ["extrato_bancario"] });
-    queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
+    const banco = conta.status === "recebido" && conta.banco_cartao_id
+      ? bancosAtivos.find((b: any) => b.id === conta.banco_cartao_id)
+      : null;
+    const saldoOriginal = banco ? Number(banco.saldo_inicial || 0) : null;
+    const novoSaldo = saldoOriginal !== null ? saldoOriginal - Number(conta.valor) : null;
+
+    try {
+      const { error: caixaError } = await (supabase.from("lancamentos_caixa") as any)
+        .delete()
+        .eq("conta_receber_id", contaId);
+      if (caixaError) throw new Error("Erro ao excluir lançamento do caixa: " + caixaError.message);
+
+      if (novoSaldo !== null && banco) {
+        const { error: saldoError } = await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: novoSaldo })
+          .eq("id", conta.banco_cartao_id);
+        if (saldoError) throw new Error("Erro ao reverter saldo: " + saldoError.message);
+      }
+
+      await removeContaReceberExtrato(contaId);
+      await remove.mutateAsync(contaId);
+      queryClient.invalidateQueries({ queryKey: ["extrato_bancario"] });
+      queryClient.invalidateQueries({ queryKey: ["bancos_cartoes"] });
+      toast({ title: "Conta excluída com sucesso" });
+    } catch (err: any) {
+      // Rollback manual do saldo se necessário
+      if (novoSaldo !== null && saldoOriginal !== null) {
+        await (supabase.from("bancos_cartoes") as any)
+          .update({ saldo_inicial: saldoOriginal })
+          .eq("id", conta.banco_cartao_id)
+          .catch(() => {});
+      }
+      toast({ title: "Erro ao excluir conta", description: err.message, variant: "destructive" });
+    }
   };
 
   const [empresa, setEmpresa] = useState<any>(null);
   useEffect(() => {
+    let mounted = true;
     if (!user) return;
     supabase.from("empresa").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setEmpresa(data);
+      if (mounted && data) setEmpresa(data);
     });
+    return () => { mounted = false; };
   }, [user]);
 
   const handleExportPDF = () => {
@@ -404,6 +544,44 @@ export default function ContasReceber() {
           <h1 className="text-2xl font-bold font-display text-foreground">Contas a Receber</h1>
           <p className="text-sm text-muted-foreground">Gerencie suas receitas e recebimentos</p>
         </div>
+        <div className="flex gap-2 flex-wrap">
+        <Dialog open={boletoOpen} onOpenChange={(v) => { setBoletoOpen(v); if (!v) setBarcodeInput(""); }}>
+          <DialogTrigger asChild>
+            <Button variant="outline"><ScanBarcode className="mr-2 h-4 w-4" /> Importar Boleto</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle>Importar Boleto / Código de Barras</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button type="button" variant={boletoMode === "barcode" ? "default" : "outline"} className="flex-1" onClick={() => setBoletoMode("barcode")}>
+                  <ScanBarcode className="mr-2 h-4 w-4" /> Código de Barras
+                </Button>
+                <Button type="button" variant={boletoMode === "pdf" ? "default" : "outline"} className="flex-1" onClick={() => setBoletoMode("pdf")}>
+                  <FileUp className="mr-2 h-4 w-4" /> PDF do Boleto
+                </Button>
+              </div>
+              {boletoMode === "barcode" ? (
+                <div className="space-y-2">
+                  <Label>Linha digitável ou código de barras</Label>
+                  <Input placeholder="Cole aqui (44/47/48 dígitos, mínimo 36)" value={barcodeInput} onChange={(e) => setBarcodeInput(e.target.value)} />
+                  <Button onClick={() => handleBoletoImport("barcode")} disabled={boletoLoading || barcodeInput.replace(/\D/g, "").length < 36} className="w-full">
+                    {boletoLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando...</> : "Reconhecer Boleto"}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">Aceita cobrança (44/47 dígitos), arrecadação (48 dígitos) e tributos.</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Selecione o PDF do boleto</Label>
+                  <input ref={pdfInputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleBoletoImport("pdf", f); }} />
+                  <Button onClick={() => pdfInputRef.current?.click()} disabled={boletoLoading} className="w-full" variant="outline">
+                    {boletoLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processando PDF...</> : <><FileUp className="mr-2 h-4 w-4" /> Escolher PDF</>}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">A IA extrairá os dados automaticamente.</p>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
         <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setEditing(null); setForm(emptyForm); } }}>
           <DialogTrigger asChild>
             <Button><Plus className="mr-2 h-4 w-4" /> Nova Conta</Button>
@@ -529,6 +707,7 @@ export default function ContasReceber() {
             </Button>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Quick Receive Dialog */}

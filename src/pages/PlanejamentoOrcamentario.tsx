@@ -58,6 +58,7 @@ export default function PlanejamentoOrcamentario() {
   const [formValor, setFormValor] = useState("");
   const [formObs, setFormObs] = useState("");
   const [catComboOpen, setCatComboOpen] = useState(false);
+  const [replicarMeses, setReplicarMeses] = useState(true);
 
   const isLoading = loadingCat || loadingMetas;
 
@@ -214,13 +215,43 @@ export default function PlanejamentoOrcamentario() {
       if (editMeta) {
         await updateMeta.mutateAsync({ id: editMeta.id, valor_orcado: Number(formValor), observacoes: formObs || null });
       } else {
+        const mesInicial = Number(selectedMonth);
+        const valor = Number(formValor);
+        const obs = formObs || null;
+
+        // Sempre salva o mês selecionado
         await insertMeta.mutateAsync({
           categoria_id: formCat,
-          mes: Number(selectedMonth),
+          mes: mesInicial,
           ano: selectedYear,
-          valor_orcado: Number(formValor),
-          observacoes: formObs || null,
+          valor_orcado: valor,
+          observacoes: obs,
         });
+
+        // Replica para os próximos meses (até dezembro), pulando meses que já têm meta
+        if (replicarMeses && mesInicial < 12) {
+          let replicados = 0;
+          for (let m = mesInicial + 1; m <= 12; m++) {
+            const jaExiste = metasArr.some(
+              (mt: any) => mt.categoria_id === formCat && mt.mes === m && mt.ano === selectedYear
+            );
+            if (jaExiste) continue;
+            await insertMeta.mutateAsync({
+              categoria_id: formCat,
+              mes: m,
+              ano: selectedYear,
+              valor_orcado: valor,
+              observacoes: obs,
+            });
+            replicados++;
+          }
+          if (replicados > 0) {
+            toast({
+              title: "Meta replicada",
+              description: `Valor replicado automaticamente para ${replicados} mês(es) seguintes.`,
+            });
+          }
+        }
       }
       setDialogOpen(false);
       resetForm();
@@ -360,6 +391,24 @@ export default function PlanejamentoOrcamentario() {
                     onChange={(e) => setFormObs(e.target.value)}
                   />
                 </div>
+                {!editMeta && Number(selectedMonth) < 12 && (
+                  <label className="flex items-start gap-2 p-3 rounded-md border border-border bg-muted/40 cursor-pointer hover:bg-muted/60 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={replicarMeses}
+                      onChange={(e) => setReplicarMeses(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-input accent-primary cursor-pointer"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        Replicar para os próximos meses
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Cria automaticamente a mesma meta de {mesesFull[Number(selectedMonth) - 1]} até Dezembro/{selectedYear}. Meses já cadastrados serão preservados.
+                      </p>
+                    </div>
+                  </label>
+                )}
                 <div className="flex gap-2 justify-end">
                   <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancelar</Button>
                   <Button onClick={handleSaveMeta} disabled={insertMeta.isPending || updateMeta.isPending}>

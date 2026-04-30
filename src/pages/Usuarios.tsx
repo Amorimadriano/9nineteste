@@ -144,8 +144,12 @@ export default function Usuarios() {
       toast({ title: "Preencha e-mail e senha", variant: "destructive" });
       return;
     }
-    if (password.length < 6) {
-      toast({ title: "A senha deve ter pelo menos 6 caracteres", variant: "destructive" });
+    if (password.length < 8) {
+      toast({ title: "A senha deve ter pelo menos 8 caracteres", variant: "destructive" });
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      toast({ title: "E-mail inválido", variant: "destructive" });
       return;
     }
     setCreating(true);
@@ -250,7 +254,7 @@ export default function Usuarios() {
             </div>
             <div className="space-y-2 flex-1">
               <Label htmlFor="inv-pass">Senha inicial</Label>
-              <Input id="inv-pass" type="password" placeholder="Mínimo 6 caracteres" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
+              <Input id="inv-pass" type="password" placeholder="Mínimo 8 caracteres" value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" />
             </div>
             <Button onClick={handleCreate} disabled={creating} className="gap-2 shrink-0">
               {creating ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}

@@ -39,8 +39,8 @@ export default function ResetPassword() {
       toast({ title: "As senhas não coincidem", variant: "destructive" });
       return;
     }
-    if (password.length < 6) {
-      toast({ title: "A senha deve ter no mínimo 6 caracteres", variant: "destructive" });
+    if (password.length < 8) {
+      toast({ title: "A senha deve ter no mínimo 8 caracteres", variant: "destructive" });
       return;
     }
     setLoading(true);

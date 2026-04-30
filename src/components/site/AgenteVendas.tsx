@@ -7,6 +7,7 @@ import { MessageCircle, X, Send, Bot, User, Sparkles, ChevronRight, Phone, Mail,
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { FormattedText } from "@/components/FormattedText";
 
 interface Mensagem {
   id: string;
@@ -468,14 +469,9 @@ export function AgenteVendas() {
                       : "bg-white border border-gray-200 text-gray-700 rounded-bl-md shadow-sm"
                   )}
                 >
-                  <div
-                    className="prose prose-sm max-w-none"
-                    dangerouslySetInnerHTML={{
-                      __html: msg.texto
-                        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-                        .replace(/\n/g, "<br />"),
-                    }}
-                  />
+                  <div className="prose prose-sm max-w-none">
+                    <FormattedText text={msg.texto} />
+                  </div>
 
                   {/* Opções */}
                   {msg.opcoes && msg.opcoes.length > 0 && (

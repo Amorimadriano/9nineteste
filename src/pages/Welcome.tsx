@@ -82,20 +82,21 @@ export default function Welcome() {
   const [hasStartedTour, setHasStartedTour] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
     const fetchUserData = async () => {
       if (!user) return;
 
-      // Fetch user metadata
       const { data: userData } = await supabase.auth.getUser();
       const name = userData.user?.user_metadata?.nome || user.email?.split("@")[0] || "Usuário";
+      if (!mounted) return;
       setUserName(name);
 
-      // Fetch empresa
       const { data: empresa } = await (supabase.from("empresa") as any)
         .select("nome_fantasia")
         .eq("user_id", user.id)
         .maybeSingle();
 
+      if (!mounted) return;
       if (empresa?.nome_fantasia) {
         setEmpresaNome(empresa.nome_fantasia);
         setSetupSteps((prev) => prev.map((step) =>
@@ -109,6 +110,7 @@ export default function Welcome() {
         .eq("empresa_id", user.id)
         .limit(1);
 
+      if (!mounted) return;
       if (categorias && categorias.length > 0) {
         setSetupSteps((prev) => prev.map((step) =>
           step.id === 2 ? { ...step, completed: true } : step
@@ -120,6 +122,7 @@ export default function Welcome() {
         .eq("empresa_id", user.id)
         .limit(1);
 
+      if (!mounted) return;
       if (bancos && bancos.length > 0) {
         setSetupSteps((prev) => prev.map((step) =>
           step.id === 3 ? { ...step, completed: true } : step
@@ -131,6 +134,7 @@ export default function Welcome() {
         .eq("empresa_id", user.id)
         .limit(1);
 
+      if (!mounted) return;
       if (clientes && clientes.length > 0) {
         setSetupSteps((prev) => prev.map((step) =>
           step.id === 4 ? { ...step, completed: true } : step
@@ -139,6 +143,7 @@ export default function Welcome() {
     };
 
     fetchUserData();
+    return () => { mounted = false; };
   }, [user]);
 
   const completedStepsCount = setupSteps.filter((s) => s.completed).length;

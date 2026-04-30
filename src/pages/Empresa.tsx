@@ -17,7 +17,6 @@ const estados = [
 ];
 
 interface EmpresaData {
-  id?: string;
   razao_social: string;
   nome_fantasia: string;
   cnpj: string;
@@ -44,6 +43,52 @@ const emptyEmpresa: EmpresaData = {
   cidade: "", estado: "", logo_url: "", observacoes: "",
 };
 
+// Mapeia do banco (empresas) para o form
+function fromDb(row: any): EmpresaData {
+  return {
+    razao_social: row.razao_social || "",
+    nome_fantasia: row.nome_fantasia || "",
+    cnpj: row.cnpj || "",
+    inscricao_estadual: row.inscricao_estadual || "",
+    inscricao_municipal: row.inscricao_municipal || "",
+    telefone: row.telefone || "",
+    email: row.email || "",
+    website: row.website || "",
+    cep: row.endereco_cep || "",
+    endereco: row.endereco_logradouro || "",
+    numero: row.endereco_numero || "",
+    complemento: row.endereco_complemento || "",
+    bairro: row.endereco_bairro || "",
+    cidade: row.endereco_cidade || "",
+    estado: row.endereco_uf || "",
+    logo_url: row.logo_url || "",
+    observacoes: row.observacoes || "",
+  };
+}
+
+// Mapeia do form para o banco (empresas)
+function toDb(data: EmpresaData): any {
+  return {
+    razao_social: data.razao_social || null,
+    nome_fantasia: data.nome_fantasia || null,
+    cnpj: data.cnpj.replace(/\D/g, ""),
+    inscricao_estadual: data.inscricao_estadual || null,
+    inscricao_municipal: data.inscricao_municipal || null,
+    telefone: data.telefone || null,
+    email: data.email || null,
+    website: data.website || null,
+    endereco_cep: data.cep || null,
+    endereco_logradouro: data.endereco || null,
+    endereco_numero: data.numero || null,
+    endereco_complemento: data.complemento || null,
+    endereco_bairro: data.bairro || null,
+    endereco_cidade: data.cidade || null,
+    endereco_uf: data.estado || null,
+    logo_url: data.logo_url || null,
+    observacoes: data.observacoes || null,
+  };
+}
+
 export default function Empresa() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -52,9 +97,9 @@ export default function Empresa() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [cnpjLoading, setCnpjLoading] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
+  const pendingIdRef = useRef<string>(crypto.randomUUID());
 
   const { lookup: handleCnpjLookup, loading: cnpjLookupLoading } = useCnpjLookup(
     (updater) => setData(updater),
@@ -96,43 +141,46 @@ export default function Empresa() {
     }
   };
 
-  useEffect(() => {
-    if (!user) return;
-    const load = async () => {
-      const { data: rows, error } = await (supabase.from("empresa") as any)
-        .select("*")
-        .eq("user_id", user.id)
-        .maybeSingle();
+  const loadEmpresa = async () => {
+    if (!user) {
       setLoading(false);
-      if (error) {
-        toast({ title: "Erro ao carregar dados", description: error.message, variant: "destructive" });
-        return;
-      }
-      if (rows) {
-        setExistingId(rows.id);
-        setData({
-          razao_social: rows.razao_social || "",
-          nome_fantasia: rows.nome_fantasia || "",
-          cnpj: rows.cnpj || "",
-          inscricao_estadual: rows.inscricao_estadual || "",
-          inscricao_municipal: rows.inscricao_municipal || "",
-          telefone: rows.telefone || "",
-          email: rows.email || "",
-          website: rows.website || "",
-          cep: rows.cep || "",
-          endereco: rows.endereco || "",
-          numero: rows.numero || "",
-          complemento: rows.complemento || "",
-          bairro: rows.bairro || "",
-          cidade: rows.cidade || "",
-          estado: rows.estado || "",
-          logo_url: rows.logo_url || "",
-          observacoes: rows.observacoes || "",
-        });
-      }
-    };
-    load();
-  }, [user, toast]);
+      return;
+    }
+    setLoading(true);
+
+    // Busca a empresa vinculada ao usuário via usuario_empresas
+    const { data: vinculos, error: vinculoError } = await supabase
+      .from("usuario_empresas")
+      .select("empresa_id, empresas(*)")
+      .eq("user_id", user.id)
+      .limit(1);
+
+    setLoading(false);
+
+    if (vinculoError) {
+      toast({ title: "Erro ao carregar dados", description: vinculoError.message, variant: "destructive" });
+      return;
+    }
+
+    const row = (vinculos && vinculos.length > 0) ? (vinculos[0] as any).empresas : null;
+
+    if (row) {
+      setExistingId(row.id);
+      setData(fromDb(row));
+    } else {
+      setExistingId(null);
+      setData(emptyEmpresa);
+    }
+  };
+
+  useEffect(() => {
+    let mounted = true;
+    loadEmpresa().then(() => {
+      if (!mounted) return;
+    });
+    return () => { mounted = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
 
   const handleChange = (field: keyof EmpresaData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -140,7 +188,10 @@ export default function Empresa() {
 
   const handleUploadLogo = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
+
+    const empresaId = existingId || pendingIdRef.current;
+    if (!empresaId) return;
 
     const allowedTypes = ["image/png", "image/jpeg", "image/webp", "image/svg+xml"];
     if (!allowedTypes.includes(file.type)) {
@@ -155,7 +206,7 @@ export default function Empresa() {
     setUploading(true);
     try {
       const ext = file.name.split(".").pop();
-      const path = `${user.id}/logo_${Date.now()}.${ext}`;
+      const path = `${empresaId}/logo_${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage.from("logos").upload(path, file, { upsert: true });
       if (uploadError) {
@@ -170,7 +221,6 @@ export default function Empresa() {
       toast({ title: "Erro ao enviar logo", description: err.message, variant: "destructive" });
     } finally {
       setUploading(false);
-      // Reset file input so user can upload same file again
       if (fileRef.current) fileRef.current.value = "";
     }
   };
@@ -180,13 +230,16 @@ export default function Empresa() {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user) {
+      toast({ title: "Usuário não autenticado", description: "Faça login para continuar.", variant: "destructive" });
+      return;
+    }
     setSaving(true);
 
-    const payload = { ...data, user_id: user.id };
+    const payload = toDb(data);
 
     if (existingId) {
-      const { error } = await (supabase.from("empresa") as any)
+      const { error } = await (supabase.from("empresas") as any)
         .update(payload)
         .eq("id", existingId);
       if (error) {
@@ -195,18 +248,35 @@ export default function Empresa() {
         return;
       }
     } else {
-      const { data: inserted, error } = await (supabase.from("empresa") as any)
-        .insert(payload)
-        .select()
-        .single();
+      // Usa o ID temporário (já usado para upload de logo) ou gera um novo
+      const novoId = existingId || pendingIdRef.current;
+      const payloadComId = { ...payload, id: novoId };
+
+      // Cria a empresa (sem .select() pois o RLS de SELECT bloquearia até o vínculo existir)
+      const { error } = await (supabase.from("empresas") as any)
+        .insert(payloadComId);
       if (error) {
         toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
         setSaving(false);
         return;
       }
-      setExistingId(inserted.id);
+
+      // Cria vínculo usuario_empresas com role admin
+      const { error: vinculoError } = await supabase
+        .from("usuario_empresas")
+        .insert({ user_id: user.id, empresa_id: novoId, role: "admin" });
+
+      if (vinculoError) {
+        toast({ title: "Erro ao vincular empresa", description: vinculoError.message, variant: "destructive" });
+        setSaving(false);
+        return;
+      }
+
+      setExistingId(novoId);
     }
 
+    // Recarrega do banco para confirmar persistência
+    await loadEmpresa();
     setSaving(false);
     toast({ title: "Dados da empresa salvos com sucesso!" });
   };

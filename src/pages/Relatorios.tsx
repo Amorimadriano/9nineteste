@@ -74,10 +74,12 @@ export default function Relatorios() {
   const { toast } = useToast();
 
   useEffect(() => {
+    let mounted = true;
     if (!user) return;
     supabase.from("empresa").select("*").eq("user_id", user.id).maybeSingle().then(({ data }) => {
-      if (data) setEmpresa(data);
+      if (mounted && data) setEmpresa(data);
     });
+    return () => { mounted = false; };
   }, [user]);
 
   const clientesMap = useMemo(() => Object.fromEntries((clientes as any[]).map(c => [c.id, c.nome])), [clientes]);

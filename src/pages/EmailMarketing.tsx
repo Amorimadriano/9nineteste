@@ -76,7 +76,10 @@ export default function EmailMarketing() {
       }
       const { error } = await supabase
         .from("settings" as any)
-        .upsert({ user_id: user.id, key: "resend_config", value: JSON.stringify({ apiKey: resendApiKey, active: true }) } as any);
+        .upsert(
+          { user_id: user.id, key: "resend_config", value: JSON.stringify({ apiKey: resendApiKey, active: true }) } as any,
+          { onConflict: "user_id,key" }
+        );
       if (error) {
         toast.error("Erro ao salvar configuração: " + error.message);
         return;
@@ -87,24 +90,15 @@ export default function EmailMarketing() {
         toast.error("Preencha todos os campos obrigatórios (host, e-mail e senha).");
         return;
       }
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("settings" as any)
-        .update({ value: JSON.stringify(smtpConfig) } as any)
-        .eq("user_id", user.id)
-        .eq("key", "smtp_config")
-        .select();
+        .upsert(
+          { user_id: user.id, key: "smtp_config", value: JSON.stringify(smtpConfig) } as any,
+          { onConflict: "user_id,key" }
+        );
       if (error) {
         toast.error("Erro ao salvar configuração: " + error.message);
         return;
-      }
-      if (!data || data.length === 0) {
-        const { error: insertError } = await supabase
-          .from("settings" as any)
-          .upsert({ user_id: user.id, key: "smtp_config", value: JSON.stringify(smtpConfig) } as any);
-        if (insertError) {
-          toast.error("Erro ao salvar configuração: " + insertError.message);
-          return;
-        }
       }
       toast.success("Configuração SMTP salva com sucesso!");
     }

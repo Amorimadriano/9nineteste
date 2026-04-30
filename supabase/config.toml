@@ -27,6 +27,9 @@ verify_jwt = false
 [functions.parecer-ibs-cbs]
 verify_jwt = false
 
+[functions.parse-boleto-pdf]
+verify_jwt = false
+
 [functions.sync-open-banking]
 verify_jwt = false
 

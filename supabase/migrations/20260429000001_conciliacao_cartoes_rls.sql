@@ -222,7 +222,6 @@ SELECT
     conciliado_tipo,
     conciliado_em,
     score_conciliacao,
-    status,
     created_at,
     updated_at
 FROM transacoes_cartao;
