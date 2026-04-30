@@ -337,7 +337,16 @@ const App = () => (
                   <OpenBankingConfig />
                 </Suspense>
               } />
-              {/* NFS-e removido conforme solicitação do cliente */}
+              <Route path="/nfse" element={
+                <Suspense fallback={<PageLoader />}>
+                  <NFSeEmissao />
+                </Suspense>
+              } />
+              <Route path="/nfse-historico" element={
+                <Suspense fallback={<PageLoader />}>
+                  <NFSeHistorico />
+                </Suspense>
+              } />
               <Route path="/integracao-contabil" element={
                 <Suspense fallback={<PageLoader />}>
                   <ContabilidadeIntegracao />
@@ -363,7 +372,11 @@ const App = () => (
                   <EmailMarketing />
                 </Suspense>
               } />
-              {/* 9nine Card removido conforme solicitação do cliente */}
+              <Route path="/card-audit" element={
+                <Suspense fallback={<PageLoader />}>
+                  <CardAudit />
+                </Suspense>
+              } />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
