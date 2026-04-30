@@ -21,5 +21,5 @@ jobs:
           password: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           protocol: ftps
           port: 21
-          security: strict
+          security: loose
           server-dir: public_html/
