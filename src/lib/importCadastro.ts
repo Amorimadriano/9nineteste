@@ -1,6 +1,24 @@
 import { isValidCPF, isValidCNPJ } from "./nfse-utils";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import type { Session } from "@supabase/supabase-js";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+function criarClientComToken(accessToken: string) {
+  return createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+}
 
 // ============================================
 // MAPEAMENTO FLEXÍVEL DE COLUNAS
@@ -135,30 +153,6 @@ export interface ResultadoImportacao {
   erros: ErroImportacao[];
 }
 
-// ============================================
-// GARANTIR SESSÃO ATIVA
-// ============================================
-
-async function garantirSessaoAtiva(userId: string): Promise<{ ok: boolean; erro?: string }> {
-  // 1. Tenta obter a sessão atual
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (!sessionError && sessionData.session && sessionData.session.user.id === userId) {
-    return { ok: true };
-  }
-
-  // 2. Se não houver sessão ou o token expirou, tenta refresh
-  const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-  if (refreshError || !refreshData.session) {
-    return { ok: false, erro: "Sessão expirada. Faça login novamente." };
-  }
-
-  if (refreshData.session.user.id !== userId) {
-    return { ok: false, erro: "ID do usuário não confere com a sessão ativa." };
-  }
-
-  return { ok: true };
-}
-
 function traduzirErroSupabase(error: any): string {
   const msg = error?.message || "";
   if (msg.includes("row-level security") || msg.includes("violates row-level security")) {
@@ -181,13 +175,13 @@ export interface ImportOptions {
   tabela: "clientes" | "fornecedores";
   userId: string;
   empresaId?: string | null;
-  session?: Session | null;
+  accessToken?: string;
   rows: any[];
   existingData: any[];
 }
 
 export async function processarImportacao(options: ImportOptions): Promise<ResultadoImportacao> {
-  const { tabela, userId, empresaId, session, rows, existingData } = options;
+  const { tabela, userId, empresaId, accessToken, rows, existingData } = options;
 
   const resultado: ResultadoImportacao = {
     importados: 0,
@@ -198,17 +192,24 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   if (rows.length === 0) return resultado;
 
-  // ─── GARANTIR AUTENTICAÇÃO ───
-  // Se temos a sessão do contexto, forçamos o client a usá-la explicitamente
-  if (session?.access_token) {
-    await supabase.auth.setSession({
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
+  // ─── VALIDAÇÃO DO TOKEN ───
+  if (!accessToken) {
+    resultado.erros.push({
+      linha: 0,
+      campo: "autenticacao",
+      valor: "",
+      motivo: "Token de acesso não disponível. Faça login novamente.",
     });
+    return resultado;
   }
 
-  // Testa se a sessão está realmente válida fazendo um select mínimo na própria tabela
-  const { error: testError } = await (supabase.from(tabela) as any)
+  // ─── CLIENT SUPABASE LOCAL COM TOKEN EXPLÍCITO ───
+  // Isso garante 100% que o header Authorization está presente em TODAS as requisições,
+  // eliminando race conditions do singleton global.
+  const client = criarClientComToken(accessToken);
+
+  // Testa se o token permite SELECT na tabela antes de tentar inserts
+  const { error: testError } = await (client.from(tabela) as any)
     .select("id")
     .eq("user_id", userId)
     .limit(1);
@@ -324,11 +325,11 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
     const chunkSize = 50;
     for (let i = 0; i < toInsert.length; i += chunkSize) {
       const chunk = toInsert.slice(i, i + chunkSize);
-      const { error } = await (supabase.from(tabela) as any).insert(chunk);
+      const { error } = await (client.from(tabela) as any).insert(chunk);
       if (error) {
         // Se der erro em lote, tenta um a um para identificar qual falhou
         for (const item of chunk) {
-          const { error: singleError } = await (supabase.from(tabela) as any).insert(item);
+          const { error: singleError } = await (client.from(tabela) as any).insert(item);
           if (singleError) {
             resultado.erros.push({
               linha: 0,
@@ -349,7 +350,7 @@ export async function processarImportacao(options: ImportOptions): Promise<Resul
 
   // ─── EXECUTA ATUALIZAÇÕES ───
   for (const item of toUpdate) {
-    const { error } = await (supabase.from(tabela) as any)
+    const { error } = await (client.from(tabela) as any)
       .update(item.data)
       .eq("id", item.id);
     if (error) {

@@ -112,7 +112,7 @@ export default function Fornecedores() {
         tabela: "fornecedores",
         userId: user.id,
         empresaId: empresaSelecionada?.id || null,
-        session,
+        accessToken: session?.access_token,
         rows,
         existingData: fornecedores as any[],
       });

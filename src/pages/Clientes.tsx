@@ -112,7 +112,7 @@ export default function Clientes() {
         tabela: "clientes",
         userId: user.id,
         empresaId: empresaSelecionada?.id || null,
-        session,
+        accessToken: session?.access_token,
         rows,
         existingData: clientes as any[],
       });
