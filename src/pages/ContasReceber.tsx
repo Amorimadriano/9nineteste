@@ -170,17 +170,42 @@ export default function ContasReceber() {
         dataVencimento = hoje.toISOString().split("T")[0];
       }
 
+      // Tenta encontrar cliente pelo CNPJ/CPF extraído do boleto
+      let clienteId = "";
+      const cnpjBusca = boleto.cnpj_pagador || boleto.cpf_pagador || boleto.cnpj_beneficiario || boleto.cpf_beneficiario;
+      if (cnpjBusca && clientes) {
+        const cleanBusca = cnpjBusca.replace(/\D/g, "");
+        const match = (clientes as any[]).find(c => (c.cnpj_cpf || "").replace(/\D/g, "") === cleanBusca);
+        if (match) clienteId = match.id;
+      }
+
+      // Monta observações com metadados do boleto
+      const observacoesParts = [
+        boleto.beneficiario ? `Pagador: ${boleto.beneficiario}` : "",
+        boleto.banco ? `Banco: ${boleto.banco}` : "",
+        boleto.codigo_barras ? `Cód. Barras: ${boleto.codigo_barras}` : "",
+        boleto.desconto ? `Desconto: R$ ${Number(boleto.desconto).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "",
+        boleto.multa ? `Multa: R$ ${Number(boleto.multa).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "",
+        boleto.juros ? `Juros: R$ ${Number(boleto.juros).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "",
+      ];
+
+      // Se houver erros de validação, adiciona às observações
+      if (boleto.erros_validacao && boleto.erros_validacao.length > 0) {
+        const errosMsg = (boleto.erros_validacao as any[])
+          .filter((e: any) => e.severidade === "erro")
+          .map((e: any) => `[${e.campo}] ${e.mensagem}`)
+          .join(" | ");
+        if (errosMsg) observacoesParts.push(`⚠️ Erros: ${errosMsg}`);
+      }
+
       setForm({
         ...emptyForm,
         descricao: boleto.descricao || boleto.beneficiario || "",
         valor: boleto.valor ? String(boleto.valor) : "",
         data_vencimento: dataVencimento,
+        cliente_id: clienteId,
         documento: boleto.documento || boleto.codigo_barras || "",
-        observacoes: [
-          boleto.beneficiario ? `Pagador: ${boleto.beneficiario}` : "",
-          boleto.banco ? `Banco: ${boleto.banco}` : "",
-          boleto.codigo_barras ? `Cód. Barras: ${boleto.codigo_barras}` : "",
-        ].filter(Boolean).join(" | "),
+        observacoes: observacoesParts.filter(Boolean).join(" | "),
         forma_pagamento: "boleto",
       });
       setBoletoOpen(false);

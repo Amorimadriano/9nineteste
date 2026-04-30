@@ -23,6 +23,7 @@ interface EmpresaContextType {
   empresas: Empresa[];
   empresaSelecionada: Empresa | null;
   selecionarEmpresa: (empresaId: string) => Promise<void>;
+  recarregarEmpresa: () => Promise<void>;
   loading: boolean;
 }
 
@@ -30,6 +31,7 @@ const EmpresaContext = createContext<EmpresaContextType>({
   empresas: [],
   empresaSelecionada: null,
   selecionarEmpresa: async () => {},
+  recarregarEmpresa: async () => {},
   loading: true,
 });
 
@@ -99,9 +101,39 @@ export function EmpresaProvider({ children }: { children: ReactNode }) {
     [empresas]
   );
 
+  const recarregarEmpresa = useCallback(async () => {
+    if (!empresaSelecionada) return;
+    const { data, error } = await supabase
+      .from("empresas")
+      .select("id, razao_social, nome_fantasia, cnpj, segmento, logo_url, ativo")
+      .eq("id", empresaSelecionada.id)
+      .single();
+
+    if (error) {
+      console.error("Erro ao recarregar empresa:", error);
+      return;
+    }
+
+    if (data) {
+      const atualizada: Empresa = {
+        id: data.id,
+        razao_social: data.razao_social,
+        nome_fantasia: data.nome_fantasia,
+        cnpj: data.cnpj,
+        segmento: data.segmento,
+        logo_url: data.logo_url,
+        ativo: data.ativo,
+      };
+      setEmpresaSelecionada(atualizada);
+      setEmpresas((prev) =>
+        prev.map((e) => (e.id === atualizada.id ? atualizada : e))
+      );
+    }
+  }, [empresaSelecionada]);
+
   return (
     <EmpresaContext.Provider
-      value={{ empresas, empresaSelecionada, selecionarEmpresa, loading }}
+      value={{ empresas, empresaSelecionada, selecionarEmpresa, recarregarEmpresa, loading }}
     >
       {children}
     </EmpresaContext.Provider>

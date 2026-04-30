@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { exportarPdfSimuladorIbsCbs } from "@/lib/pdfSimuladorIbsCbsExport";
+import { gerarParecerExecutivo, SimulacaoDados } from "@/lib/gerarParecerIbsCbs";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,21 +23,6 @@ import {
   Download,
   Loader2,
 } from "lucide-react";
-
-interface SimulacaoDados {
-  empresa: string;
-  setor: string;
-  regimeAtual: "simples" | "presumido" | "real";
-  faturamentoMensal: number;
-  faturamentoAnual: number;
-  cargaAtual: number;
-  aliquotaAtual: number;
-  cargaNova: number;
-  variacao: number;
-  impactoSplit: number;
-  capitalGiroAnual: number;
-  prazoRecebimento: number;
-}
 
 interface ParecerExecutivo {
   texto: string;
@@ -117,15 +103,9 @@ export default function SimuladorIBSCBS() {
     setParecer({ texto: "", carregando: true });
 
     try {
-      const { data, error } = await supabase.functions.invoke("parecer-ibs-cbs", {
-        body: { dados },
-      });
-
-      if (error) throw new Error(error.message || "Erro na função de IA");
-      if (!data) throw new Error("Resposta vazia da IA");
-      if (data.error) throw new Error(data.error);
-
-      setParecer({ texto: data.parecer || "Parecer indisponível.", carregando: false });
+      // Geração local 100% algorítmica — sem dependência de IA externa
+      const texto = gerarParecerExecutivo(dados);
+      setParecer({ texto, carregando: false });
     } catch (err: any) {
       setParecer({
         texto: "",

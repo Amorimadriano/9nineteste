@@ -40,7 +40,7 @@ const STEPS = [
 
 export default function NovaEmpresa() {
   const { user } = useAuth();
-  const { selecionarEmpresa } = useEmpresa();
+  const { selecionarEmpresa, recarregarEmpresa } = useEmpresa();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -137,6 +137,7 @@ export default function NovaEmpresa() {
     });
 
     await selecionarEmpresa(empresa.id);
+    await recarregarEmpresa(); // Atualiza o contexto global com dados mais recentes
 
     toast({ title: "Empresa criada com sucesso!" });
     setSaving(false);

@@ -38,7 +38,7 @@ import {
 import { NavLink } from "@/components/NavLink";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import {
   Sidebar,
   SidebarContent,
@@ -52,8 +52,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-
-const ADMIN_EMAILS = ["9ninebpo9@gmail.com", "adriano.amorim83@gmail.com", "amorim.adriano83@gmail.com", "marketing@9ninebusinesscontrol.com.br"];
 
 const menuItems = [
   { title: "Empresa", url: "/empresa", icon: Briefcase },
@@ -101,24 +99,29 @@ const relatorioItems = [
   { title: "Relatórios", url: "/relatorios", icon: FileSpreadsheet },
 ];
 
+function obterIniciais(nome?: string | null): string {
+  if (!nome) return "ME";
+  const palavras = nome.trim().split(/\s+/).filter(Boolean);
+  if (palavras.length === 1) return palavras[0].slice(0, 2).toUpperCase();
+  return (palavras[0][0] + palavras[palavras.length - 1][0]).toUpperCase();
+}
+
+function LogoComCacheBusting(url?: string | null): string | null {
+  if (!url) return null;
+  const sep = url.includes("?") ? "&" : "?";
+  return `${url}${sep}t=${Date.now()}`;
+}
+
 export function AppSidebar() {
   const { state } = useSidebar();
   const collapsed = state === "collapsed";
   const location = useLocation();
   const { signOut, user } = useAuth();
-  const [empresa, setEmpresa] = useState<{ nome_fantasia?: string; logo_url?: string } | null>(null);
+  const { empresaSelecionada } = useEmpresa();
 
-  useEffect(() => {
-    if (!user) return;
-    const fetchEmpresa = async () => {
-      const { data } = await (supabase.from("empresa") as any)
-        .select("nome_fantasia, logo_url")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      if (data) setEmpresa(data);
-    };
-    fetchEmpresa();
-  }, [user, location.pathname]);
+  const nomeFantasia = empresaSelecionada?.nome_fantasia || empresaSelecionada?.razao_social || "Minha Empresa";
+  const logoUrl = LogoComCacheBusting(empresaSelecionada?.logo_url);
+  const iniciais = obterIniciais(nomeFantasia);
 
   return (
     <Sidebar collapsible="icon" data-tour="sidebar">
@@ -126,20 +129,28 @@ export function AppSidebar() {
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
           <div
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden"
-            style={{ background: empresa?.logo_url ? "transparent" : "var(--gradient-primary)" }}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg overflow-hidden bg-primary"
           >
-            {empresa?.logo_url ? (
-              <img src={empresa.logo_url} alt="Logo" className="w-full h-full object-contain" />
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt="Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                  const parent = (e.target as HTMLImageElement).parentElement;
+                  if (parent) parent.innerHTML = `<span class="text-xs font-bold text-primary-foreground">${iniciais}</span>`;
+                }}
+              />
             ) : (
-              <DollarSign className="h-5 w-5 text-primary-foreground" />
+              <span className="text-xs font-bold text-primary-foreground">{iniciais}</span>
             )}
           </div>
           {!collapsed && (
             <div>
               <p className="text-sm font-bold font-display text-sidebar-foreground">9Nine Business Control</p>
               <p className="text-xs text-muted-foreground truncate max-w-[140px]">
-                {empresa?.nome_fantasia || "Minha Empresa"}
+                {nomeFantasia}
               </p>
             </div>
           )}

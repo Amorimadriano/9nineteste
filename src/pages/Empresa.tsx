@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEmpresa } from "@/contexts/EmpresaContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useCnpjLookup } from "@/hooks/useCnpjLookup";
 import { Building2, Save, Upload, Trash2, Loader2, MapPin, Phone, Mail, Globe, Search } from "lucide-react";
@@ -91,6 +92,7 @@ function toDb(data: EmpresaData): any {
 
 export default function Empresa() {
   const { user } = useAuth();
+  const { recarregarEmpresa } = useEmpresa();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const [data, setData] = useState<EmpresaData>(emptyEmpresa);
@@ -277,6 +279,7 @@ export default function Empresa() {
 
     // Recarrega do banco para confirmar persistência
     await loadEmpresa();
+    await recarregarEmpresa(); // Atualiza o contexto global (logo + nome no sidebar)
     setSaving(false);
     toast({ title: "Dados da empresa salvos com sucesso!" });
   };
