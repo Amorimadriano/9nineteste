@@ -71,7 +71,10 @@
       "Bash([ -f \"$dir/cors.ts\" ])",
       "Bash(rm __TRACKED_VAR__/cors.ts)",
       "Bash(docker info *)",
-      "Bash(bunx tsc *)"
+      "Bash(bunx tsc *)",
+      "Bash(bunx supabase *)",
+      "Bash(npm supabase *)",
+      "Bash(git check-ignore *)"
     ]
   }
 }
