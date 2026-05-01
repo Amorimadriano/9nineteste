@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { exportarPdfSimuladorIbsCbs } from "@/lib/pdfSimuladorIbsCbsExport";
-import { gerarParecerExecutivo, SimulacaoDados } from "@/lib/gerarParecerIbsCbs";
+import { SimulacaoDados } from "@/lib/gerarParecerIbsCbs";
+import { gerarParecerComFallback } from "@/lib/parecerIbsCbsService";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -103,9 +104,17 @@ export default function SimuladorIBSCBS() {
     setParecer({ texto: "", carregando: true });
 
     try {
-      // Geração local 100% algorítmica — sem dependência de IA externa
-      const texto = gerarParecerExecutivo(dados);
+      // Serviço inteligente: tenta edge function, fallback local se falhar
+      const { texto, fonte, erro } = await gerarParecerComFallback(dados);
       setParecer({ texto, carregando: false });
+
+      if (erro && fonte === "local") {
+        toast({
+          title: "Aviso",
+          description: erro,
+          variant: "default",
+        });
+      }
     } catch (err: any) {
       setParecer({
         texto: "",
