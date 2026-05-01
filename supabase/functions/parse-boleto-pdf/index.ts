@@ -21,7 +21,56 @@ function getCorsHeaders(req: Request) {
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 // ============================================
-// UTILITÁRIOS DE BOLETO
+// TIPOS
+// ============================================
+
+interface BoletoParseado {
+  tipo: string;
+  descricao: string;
+  valor: string | null;
+  data_vencimento: string | null;
+  documento: string;
+  beneficiario: string | null;
+  codigo_barras: string;
+  banco: string | null;
+  codigo_banco: string | null;
+  fator_vencimento: number | null;
+  codigo_barras_44?: string;
+  validado: boolean;
+  [key: string]: any;
+}
+
+interface ValidacaoResultado {
+  valido: boolean;
+  erros: ErroValidacao[];
+  boletoSanitizado: any;
+}
+
+interface ErroValidacao {
+  campo: string;
+  mensagem: string;
+  severidade: "erro" | "aviso";
+}
+
+interface ExtracaoResultado {
+  boleto: BoletoParseado | null;
+  textoBruto: string;
+  metadados: MetadadosExtraidos;
+}
+
+interface MetadadosExtraidos {
+  cnpj_beneficiario?: string;
+  cpf_beneficiario?: string;
+  cnpj_pagador?: string;
+  cpf_pagador?: string;
+  desconto?: string;
+  multa?: string;
+  juros?: string;
+  cpfsCnpjs?: any[];
+}
+
+// ============================================
+// CONSTANTES E CACHE DE REGEX
 // ============================================
 
 const BANCOS: Record<string, string> = {
@@ -54,6 +103,25 @@ const SEGMENTOS_ARRECADACAO: Record<string, string> = {
   "7": "Multas",
   "9": "Uso Exclusivo da Empresa",
 };
+
+// Regex compiladas uma única vez (cache)
+const RE_PARENTHESES = /\(([^()]{2,})\)/g;
+const RE_ESCAPED = /\\\(([^\\]*)\\\)/g;
+const RE_HEX = /<([0-9A-Fa-f\s]{10,})>/g;
+const RE_LINHA47 = /\d{47}/g;
+const RE_LINHA48 = /\d{48}/g;
+const RE_CODIGO44 = /\d{44}/g;
+const RE_SEQ36_50 = /\d{36,50}/g;
+const RE_CNPJ_FMT = /\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/g;
+const RE_CPF_FMT = /\b(\d{3}\.\d{3}\.\d{3}-\d{2})\b/g;
+const RE_CNPJ_RAW = /\b(\d{14})\b/g;
+const RE_CPF_RAW = /\b(\d{11})\b/g;
+const RE_VALOR = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})/g;
+const RE_STREAM = /stream\r?\n([\s\S]{0,524288}?)\r?\nendstream/g;
+
+// ============================================
+// UTILITÁRIOS DE BOLETO (PUROS, SEM SIDE EFFECTS)
+// ============================================
 
 function calcularDataVencimento(fatorVencimento: number): string {
   const dataBase = new Date(1997, 9, 7);
@@ -106,7 +174,7 @@ function calcularDvModulo11Arrecadacao(numeros: string): number {
 }
 
 // ============================================
-// PARSE DE BOLETO DE COBRANÇA
+// PARSER DE BOLETO (FUNÇÕES PURAS)
 // ============================================
 
 function validarLinhaDigitavelCobranca(linha: string): boolean {
@@ -139,7 +207,7 @@ function linhaDigitavelParaCodigoBarrasCobranca(linha: string): string {
   return produto + segmento + dvCodigoBarras + fatorVencimento + valor + identCedente + livre1 + livre2 + livre3;
 }
 
-function parsearLinhaDigitavelCobranca(linha: string, forcar = false) {
+function parsearLinhaDigitavelCobranca(linha: string, forcar = false): BoletoParseado {
   const clean = linha.replace(/\D/g, "");
   if (clean.length !== 47) {
     throw new Error(`Linha digitável de cobrança deve ter 47 dígitos. Fornecido: ${clean.length}`);
@@ -170,7 +238,7 @@ function parsearLinhaDigitavelCobranca(linha: string, forcar = false) {
   };
 }
 
-function parsearCodigoBarrasCobranca(codigo: string) {
+function parsearCodigoBarrasCobranca(codigo: string): BoletoParseado {
   const codigoBanco = codigo.substring(0, 3);
   const fatorVencimento = parseInt(codigo.substring(5, 9), 10);
   const valorRaw = codigo.substring(9, 19);
@@ -190,10 +258,6 @@ function parsearCodigoBarrasCobranca(codigo: string) {
     validado: true,
   };
 }
-
-// ============================================
-// PARSE DE BOLETO DE ARRECADAÇÃO
-// ============================================
 
 function validarLinhaDigitavelArrecadacao(linha: string): boolean {
   if (linha.length !== 48) return false;
@@ -218,18 +282,12 @@ function linhaDigitavelParaCodigoBarrasArrecadacao(linha: string): string {
 }
 
 function extrairValorArrecadacao(codigo: string): number | null {
-  const identValor = codigo.substring(2, 3);
-  if (["6", "7", "8", "9"].includes(identValor)) {
-    const valorRaw = codigo.substring(4, 15);
-    const valor = parseFloat(valorRaw) / 100;
-    return valor > 0 ? valor : null;
-  }
   const valorRaw = codigo.substring(4, 15);
   const valor = parseFloat(valorRaw) / 100;
   return valor > 0 ? valor : null;
 }
 
-function parsearLinhaDigitavelArrecadacao(linha: string, forcar = false) {
+function parsearLinhaDigitavelArrecadacao(linha: string, forcar = false): BoletoParseado {
   const clean = linha.replace(/\D/g, "");
   if (clean.length !== 48) {
     throw new Error(`Linha digitável de arrecadação deve ter 48 dígitos. Fornecido: ${clean.length}`);
@@ -257,11 +315,11 @@ function parsearLinhaDigitavelArrecadacao(linha: string, forcar = false) {
   };
 }
 
-function parsearCodigoBarrasArrecadacao(codigo: string) {
+function parsearCodigoBarrasArrecadacao(codigo: string): BoletoParseado {
   const segmento = codigo.substring(1, 2);
   const valor = extrairValorArrecadacao(codigo);
   return {
-    tipo: "arrecadaacao",
+    tipo: "arrecadacao",
     descricao: `Boleto ${SEGMENTOS_ARRECADACAO[segmento] || "Arrecadação"}`,
     valor: valor ? valor.toFixed(2) : null,
     data_vencimento: null,
@@ -275,29 +333,15 @@ function parsearCodigoBarrasArrecadacao(codigo: string) {
   };
 }
 
-// ============================================
-// PARSE GENÉRICO / FALLBACK
-// ============================================
-
-/**
- * Tenta parsear QUALQUER sequência de dígitos como boleto.
- * Usado como fallback quando os padrões 44/47/48 falham.
- */
-function parsearGenerico(codigoLimpo: string) {
+function parsearGenerico(codigoLimpo: string): BoletoParseado {
   const len = codigoLimpo.length;
-
-  // Tenta detectar tipo pela estrutura
   const primeiroDigito = codigoLimpo[0];
 
-  // Se começa com 8, provavelmente é arrecadação
   if (primeiroDigito === "8" && len >= 36) {
-    // Tenta reconstruir como código de barras de arrecadação
-    // Preenche com zeros à direita se necessário para chegar a 44
     const codigo44 = codigoLimpo.padEnd(44, "0").substring(0, 44);
     try {
       return parsearCodigoBarrasArrecadacao(codigo44);
     } catch {
-      // Fallback genérico
       const segmento = codigo44.substring(1, 2);
       const valor = extrairValorArrecadacao(codigo44);
       return {
@@ -316,15 +360,12 @@ function parsearGenerico(codigoLimpo: string) {
     }
   }
 
-  // Se começa com código de banco conhecido, provavelmente é cobrança
   const codigoBanco = codigoLimpo.substring(0, 3);
   if (BANCOS[codigoBanco] && len >= 36) {
-    // Tenta reconstruir como código de barras de cobrança
     const codigo44 = codigoLimpo.padEnd(44, "0").substring(0, 44);
     try {
       return parsearCodigoBarrasCobranca(codigo44);
     } catch {
-      // Fallback: tenta extrair valor e vencimento manualmente
       const valorRaw = codigo44.substring(9, 19);
       const valor = parseFloat(`${valorRaw.substring(0, 8)}.${valorRaw.substring(8)}`);
       const fatorVencimento = parseInt(codigo44.substring(5, 9), 10);
@@ -352,7 +393,6 @@ function parsearGenerico(codigoLimpo: string) {
     }
   }
 
-  // Último fallback: trata como boleto desconhecido
   return {
     tipo: "desconhecido",
     descricao: "Boleto",
@@ -368,11 +408,7 @@ function parsearGenerico(codigoLimpo: string) {
   };
 }
 
-// ============================================
-// DETECÇÃO AUTOMÁTICA
-// ============================================
-
-function detectarETentarParse(codigoLimpo: string, forcar = false) {
+function detectarETentarParse(codigoLimpo: string, forcar = false): BoletoParseado {
   if (codigoLimpo.length === 47) {
     return parsearLinhaDigitavelCobranca(codigoLimpo, forcar);
   }
@@ -385,7 +421,6 @@ function detectarETentarParse(codigoLimpo: string, forcar = false) {
     }
     return parsearCodigoBarrasCobranca(codigoLimpo);
   }
-  // Fallback para códigos incompletos (36-43 ou 45-46 dígitos)
   if (codigoLimpo.length >= 36 && codigoLimpo.length <= 50) {
     return parsearGenerico(codigoLimpo);
   }
@@ -393,213 +428,85 @@ function detectarETentarParse(codigoLimpo: string, forcar = false) {
 }
 
 // ============================================
-// EXTRAÇÃO DE METADADOS DO TEXTO DO BOLETO
+// DETECÇÃO DE BOLETO EM TEXTO (COM EARLY RETURN)
 // ============================================
 
-const REGEX_CNPJ = /\b(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})\b/g;
-const REGEX_CPF = /\b(\d{3}\.\d{3}\.\d{3}-\d{2})\b/g;
-const REGEX_CNPJ_SEM_FORMATO = /\b(\d{14})\b/g;
-const REGEX_CPF_SEM_FORMATO = /\b(\d{11})\b/g;
+function tentarExtrairDeTexto(texto: string): BoletoParseado | null {
+  let boleto: BoletoParseado | null = null;
 
-const PALAVRAS_BENEFICIARIO = [
-  "beneficiario", "cedente", "beneficiário", "cedente", "recebedor",
-  "emissor", "favorecido", "origem", "sacador",
-];
-const PALAVRAS_PAGADOR = [
-  "pagador", "sacado", "pagador", "debitado", "cliente",
-  "devedor", "tomador", "destino",
-];
-const PALAVRAS_DESCONTO = [
-  "desconto", "abatimento", "desc.", "abat.", "descontos",
-];
-const PALAVRAS_MULTA = [
-  "multa", "mora", "punitive", "penalidade",
-];
-const PALAVRAS_JUROS = [
-  "juros", "mora", "juro", "mora diaria", "mora diária",
-];
-
-function limparCpfCnpj(valor: string): string {
-  return valor.replace(/\D/g, "");
-}
-
-function validarCnpj(cnpj: string): boolean {
-  const clean = cnpj.replace(/\D/g, "");
-  if (clean.length !== 14) return false;
-  if (/^(\d)\1{13}$/.test(clean)) return false;
-  let tamanho = clean.length - 2;
-  let numeros = clean.substring(0, tamanho);
-  const digitos = clean.substring(tamanho);
-  let soma = 0;
-  let pos = tamanho - 7;
-  for (let i = tamanho; i >= 1; i--) {
-    soma += parseInt(numeros.charAt(tamanho - i), 10) * pos--;
-    if (pos < 2) pos = 9;
-  }
-  let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-  if (resultado !== parseInt(digitos.charAt(0), 10)) return false;
-  tamanho++;
-  numeros = clean.substring(0, tamanho);
-  soma = 0;
-  pos = tamanho - 7;
-  for (let i = tamanho; i >= 1; i--) {
-    soma += parseInt(numeros.charAt(tamanho - i), 10) * pos--;
-    if (pos < 2) pos = 9;
-  }
-  resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
-  return resultado === parseInt(digitos.charAt(1), 10);
-}
-
-function validarCpf(cpf: string): boolean {
-  const clean = cpf.replace(/\D/g, "");
-  if (clean.length !== 11) return false;
-  if (/^(\d)\1{10}$/.test(clean)) return false;
-  let soma = 0;
-  for (let i = 0; i < 9; i++) soma += parseInt(clean.charAt(i), 10) * (10 - i);
-  let rev = 11 - (soma % 11);
-  if (rev === 10 || rev === 11) rev = 0;
-  if (rev !== parseInt(clean.charAt(9), 10)) return false;
-  soma = 0;
-  for (let i = 0; i < 10; i++) soma += parseInt(clean.charAt(i), 10) * (11 - i);
-  rev = 11 - (soma % 11);
-  if (rev === 10 || rev === 11) rev = 0;
-  return rev === parseInt(clean.charAt(10), 10);
-}
-
-function extrairCpfCnpjDoTexto(texto: string): Array<{ numero: string; tipo: "CPF" | "CNPJ"; valido: boolean; contexto: string }> {
-  const encontrados: Array<{ numero: string; tipo: "CPF" | "CNPJ"; valido: boolean; contexto: string }> = [];
-  const vistos = new Set<string>();
-
-  function adicionar(match: RegExpExecArray, tipo: "CPF" | "CNPJ") {
-    const clean = limparCpfCnpj(match[1]);
-    if (vistos.has(clean)) return;
-    vistos.add(clean);
-    const valido = tipo === "CNPJ" ? validarCnpj(clean) : validarCpf(clean);
-
-    // Pega contexto: 80 chars antes e depois
-    const start = Math.max(0, match.index - 80);
-    const end = Math.min(texto.length, (match.index || 0) + match[0].length + 80);
-    const contexto = texto.substring(start, end).replace(/\s+/g, " ").trim();
-
-    encontrados.push({ numero: clean, tipo, valido, contexto });
-  }
-
-  let m: RegExpExecArray | null;
-  REGEX_CNPJ.lastIndex = 0;
-  while ((m = REGEX_CNPJ.exec(texto)) !== null) adicionar(m, "CNPJ");
-
-  REGEX_CPF.lastIndex = 0;
-  while ((m = REGEX_CPF.exec(texto)) !== null) adicionar(m, "CPF");
-
-  // Também tenta sem formato, mas só se não foi encontrado formatado
-  REGEX_CNPJ_SEM_FORMATO.lastIndex = 0;
-  while ((m = REGEX_CNPJ_SEM_FORMATO.exec(texto)) !== null) {
-    const clean = m[1];
-    if (vistos.has(clean)) continue;
-    if (validarCnpj(clean)) {
-      const start = Math.max(0, m.index - 80);
-      const end = Math.min(texto.length, (m.index || 0) + m[0].length + 80);
-      const contexto = texto.substring(start, end).replace(/\s+/g, " ").trim();
-      vistos.add(clean);
-      encontrados.push({ numero: clean, tipo: "CNPJ", valido: true, contexto });
-    }
-  }
-
-  REGEX_CPF_SEM_FORMATO.lastIndex = 0;
-  while ((m = REGEX_CPF_SEM_FORMATO.exec(texto)) !== null) {
-    const clean = m[1];
-    if (vistos.has(clean)) continue;
-    if (validarCpf(clean)) {
-      const start = Math.max(0, m.index - 80);
-      const end = Math.min(texto.length, (m.index || 0) + m[0].length + 80);
-      const contexto = texto.substring(start, end).replace(/\s+/g, " ").trim();
-      vistos.add(clean);
-      encontrados.push({ numero: clean, tipo: "CPF", valido: true, contexto });
-    }
-  }
-
-  return encontrados;
-}
-
-function classificarCpfCnpjPorContexto(
-  lista: Array<{ numero: string; tipo: "CPF" | "CNPJ"; valido: boolean; contexto: string }>
-): { beneficiario: string | null; pagador: string | null } {
-  let beneficiario: string | null = null;
-  let pagador: string | null = null;
-
-  const ctxLower = (ctx: string) => ctx.toLowerCase();
-
-  for (const item of lista) {
-    const ctx = ctxLower(item.contexto);
-
-    // Score de proximidade com palavras-chave
-    const scoreBeneficiario = PALAVRAS_BENEFICIARIO.reduce((acc, p) => acc + (ctx.includes(p) ? 1 : 0), 0);
-    const scorePagador = PALAVRAS_PAGADOR.reduce((acc, p) => acc + (ctx.includes(p) ? 1 : 0), 0);
-
-    if (scoreBeneficiario > scorePagador && !beneficiario) {
-      beneficiario = item.numero;
-    } else if (scorePagador > scoreBeneficiario && !pagador) {
-      pagador = item.numero;
-    } else if (!beneficiario && scoreBeneficiario > 0) {
-      beneficiario = item.numero;
-    } else if (!pagador && scorePagador > 0) {
-      pagador = item.numero;
-    } else if (!beneficiario) {
-      beneficiario = item.numero;
-    } else if (!pagador && item.numero !== beneficiario) {
-      pagador = item.numero;
-    }
-  }
-
-  return { beneficiario, pagador };
-}
-
-const REGEX_VALOR_MONETARIO = /(?:R\$\s*)?(\d{1,3}(?:\.\d{3})*,\d{2})/g;
-
-function extrairValoresMonetariosProximos(texto: string, palavrasChave: string[], maxDistancia = 120): number[] {
-  const valores: number[] = [];
-  const vistos = new Set<number>();
-  const textoLower = texto.toLowerCase();
-
-  for (const palavra of palavrasChave) {
-    let idx = textoLower.indexOf(palavra);
-    while (idx !== -1) {
-      const inicio = Math.max(0, idx - maxDistancia);
-      const fim = Math.min(texto.length, idx + palavra.length + maxDistancia);
-      const trecho = texto.substring(inicio, fim);
-
-      REGEX_VALOR_MONETARIO.lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = REGEX_VALOR_MONETARIO.exec(trecho)) !== null) {
-        const valorStr = m[1].replace(/\./g, "").replace(",", ".");
-        const valor = parseFloat(valorStr);
-        if (!isNaN(valor) && valor > 0 && !vistos.has(valor)) {
-          vistos.add(valor);
-          valores.push(valor);
+  // Tenta 47 dígitos (cobrança)
+  const linhas47 = texto.match(RE_LINHA47);
+  if (linhas47) {
+    for (const linha of linhas47) {
+      try {
+        boleto = parsearLinhaDigitavelCobranca(linha);
+        break;
+      } catch {
+        try {
+          boleto = parsearLinhaDigitavelCobranca(linha, true);
+          break;
+        } catch {
+          continue;
         }
       }
-
-      idx = textoLower.indexOf(palavra, idx + 1);
     }
   }
 
-  return valores;
-}
+  // Tenta 48 dígitos (arrecadação)
+  if (!boleto) {
+    const linhas48 = texto.match(RE_LINHA48);
+    if (linhas48) {
+      for (const linha of linhas48) {
+        try {
+          boleto = parsearLinhaDigitavelArrecadacao(linha);
+          break;
+        } catch {
+          try {
+            boleto = parsearLinhaDigitavelArrecadacao(linha, true);
+            break;
+          } catch {
+            continue;
+          }
+        }
+      }
+    }
+  }
 
-function extrairDescontoMultaJuros(texto: string): { desconto: number | null; multa: number | null; juros: number | null } {
-  const descontos = extrairValoresMonetariosProximos(texto, PALAVRAS_DESCONTO, 100);
-  const multas = extrairValoresMonetariosProximos(texto, PALAVRAS_MULTA, 100);
-  const jurosLista = extrairValoresMonetariosProximos(texto, PALAVRAS_JUROS, 100);
+  // Tenta 44 dígitos (código de barras)
+  if (!boleto) {
+    const codigos44 = texto.match(RE_CODIGO44);
+    if (codigos44) {
+      for (const codigo of codigos44) {
+        try {
+          boleto = detectarETentarParse(codigo);
+          break;
+        } catch {
+          continue;
+        }
+      }
+    }
+  }
 
-  return {
-    desconto: descontos.length > 0 ? Math.min(...descontos) : null,
-    multa: multas.length > 0 ? Math.min(...multas) : null,
-    juros: jurosLista.length > 0 ? Math.min(...jurosLista) : null,
-  };
+  // Tenta qualquer sequência de 36-50 dígitos (fallback)
+  if (!boleto) {
+    const sequencias = texto.match(RE_SEQ36_50);
+    if (sequencias) {
+      for (const seq of sequencias) {
+        try {
+          boleto = detectarETentarParse(seq, true);
+          break;
+        } catch {
+          continue;
+        }
+      }
+    }
+  }
+
+  return boleto;
 }
 
 // ============================================
-// EXTRAÇÃO DE TEXTO DE PDF
+// EXTRAÇÃO DE TEXTO DE PDF (PIPELINE OTIMIZADA)
 // ============================================
 
 function base64ToUint8Array(base64: string): Uint8Array {
@@ -612,7 +519,6 @@ function base64ToUint8Array(base64: string): Uint8Array {
 }
 
 function bytesToLatin1(bytes: Uint8Array): string {
-  // Otimização: usar array de chars + join em vez de concatenação de string
   const len = bytes.length;
   const chars = new Array(len);
   for (let i = 0; i < len; i++) {
@@ -621,10 +527,6 @@ function bytesToLatin1(bytes: Uint8Array): string {
   return chars.join("");
 }
 
-/**
- * Descomprime um stream zlib/deflate (raw, sem header).
- * Retorna null se falhar.
- */
 async function decompressZlibRaw(bytes: Uint8Array): Promise<Uint8Array | null> {
   try {
     const stream = new DecompressionStream("deflate-raw");
@@ -652,62 +554,80 @@ async function decompressZlibRaw(bytes: Uint8Array): Promise<Uint8Array | null> 
 }
 
 /**
- * Scanner de bytes direto: procura sequências de 44–48 dígitos no Uint8Array
- * SEM converter o PDF inteiro para string.
- * Ignora espaços (32) e pontos (46) entre dígitos.
- * Buffer limitado a 100 dígitos (trunca últimos 50 se estourar).
- * Retorna a primeira string de dígitos que conseguir parsear como boleto,
- * ou null se nada for encontrado.
+ * Scanner de bytes otimizado:
+ * - Usa um buffer circular Uint8Array em vez de string concatenada
+ * - Evita O(n²) de concatenação de strings
+ * - Early return no primeiro match válido
  */
 function buscarDigitosDireto(bytes: Uint8Array): string | null {
-  let buf = "";
   const MAX_BUF = 100;
   const MIN_LEN = 44;
+  const buf = new Uint8Array(MAX_BUF);
+  let bufLen = 0;
+  let bufStart = 0;
 
   for (let i = 0; i < bytes.length; i++) {
     const b = bytes[i];
-    const isDigit = b >= 48 && b <= 57;        // 0-9
-    const isSep   = b === 32 || b === 46;       // space or dot
+    const isDigit = b >= 48 && b <= 57;
+    const isSep = b === 32 || b === 46;
 
     if (isDigit) {
-      buf += String.fromCharCode(b);
-      if (buf.length >= MIN_LEN) {
-        if (tentarExtrairDeTexto(buf)) {
-          return buf;
+      buf[(bufStart + bufLen) % MAX_BUF] = b;
+      bufLen++;
+      if (bufLen >= MIN_LEN) {
+        // Extrai string do buffer circular
+        let str = "";
+        for (let j = 0; j < bufLen; j++) {
+          str += String.fromCharCode(buf[(bufStart + j) % MAX_BUF]);
+        }
+        if (tentarExtrairDeTexto(str)) {
+          return str;
         }
       }
-      if (buf.length > MAX_BUF) {
-        buf = buf.slice(-50);
+      if (bufLen > MAX_BUF) {
+        bufStart = (bufStart + 1) % MAX_BUF;
+        bufLen = MAX_BUF;
       }
     } else if (!isSep) {
-      // Caractere quebrador: reseta, mas antes tenta o que tem no buffer
-      if (buf.length >= MIN_LEN && tentarExtrairDeTexto(buf)) {
-        return buf;
+      // Caractere quebrador: tenta o que tem no buffer
+      if (bufLen >= MIN_LEN) {
+        let str = "";
+        for (let j = 0; j < bufLen; j++) {
+          str += String.fromCharCode(buf[(bufStart + j) % MAX_BUF]);
+        }
+        if (tentarExtrairDeTexto(str)) {
+          return str;
+        }
       }
-      buf = "";
+      bufLen = 0;
+      bufStart = 0;
     }
-    // Se isSep, simplesmente ignora (mantém buffer de dígitos acumulados)
   }
 
-  // Tenta no final também
-  if (buf.length >= MIN_LEN && tentarExtrairDeTexto(buf)) {
-    return buf;
+  // Tenta no final
+  if (bufLen >= MIN_LEN) {
+    let str = "";
+    for (let j = 0; j < bufLen; j++) {
+      str += String.fromCharCode(buf[(bufStart + j) % MAX_BUF]);
+    }
+    if (tentarExtrairDeTexto(str)) {
+      return str;
+    }
   }
   return null;
 }
 
 /**
- * Tenta extrair texto de streams do PDF (limitado a maxStreams e tamanho).
- * Só é chamada como ÚLTIMO recurso para PDFs pequenos.
+ * Extrai texto de streams PDF (limitado).
+ * Só processa maxStreams streams, cada um com no máximo 512KB.
  */
 async function extrairStreamsPdf(raw: string, maxStreams = 3): Promise<string[]> {
   const textos: string[] = [];
-
-  const streamRegex = /stream\r?\n([\s\S]{0,524288}?)\r?\nendstream/g;
   let match: RegExpExecArray | null;
   let count = 0;
 
-  while ((match = streamRegex.exec(raw)) !== null && count < maxStreams) {
+  RE_STREAM.lastIndex = 0;
+  while ((match = RE_STREAM.exec(raw)) !== null && count < maxStreams) {
     count++;
     const streamContent = match[1];
     const streamBytes = new Uint8Array(streamContent.length);
@@ -717,8 +637,7 @@ async function extrairStreamsPdf(raw: string, maxStreams = 3): Promise<string[]>
 
     const decompressed = await decompressZlibRaw(streamBytes);
     if (decompressed) {
-      const texto = bytesToLatin1(decompressed);
-      textos.push(texto);
+      textos.push(bytesToLatin1(decompressed));
     } else {
       textos.push(streamContent);
     }
@@ -727,241 +646,336 @@ async function extrairStreamsPdf(raw: string, maxStreams = 3): Promise<string[]>
   return textos;
 }
 
+interface TextoExtraido {
+  texto: string;
+  boleto: BoletoParseado | null;
+}
+
 /**
- * Extrai texto de um PDF usando múltiplas estratégias.
- * Otimizado: scanner de bytes direto como PRIMEIRA fase (early return).
- * Só converte o PDF para string e processa streams como ÚLTIMO recurso.
+ * Extrai texto de PDF usando pipeline otimizada.
+ * Retorna APENAS o texto necessário + boleto se encontrado.
+ * Early return: se encontrar boleto no scanner de bytes, retorna imediatamente.
+ * Senão, faz extração completa para metadados.
  */
-async function extrairTextoPdf(bytes: Uint8Array): Promise<string | null> {
+async function extrairTextoPdf(bytes: Uint8Array): Promise<TextoExtraido> {
   const startTime = Date.now();
-  try {
-    // ═══════════════════════════════════════════════════
-    // FASE 0: Scanner de bytes direto (mais rápido possível)
-    // ═══════════════════════════════════════════════════
-    const digitosDireto = buscarDigitosDireto(bytes);
-    if (digitosDireto) {
+
+  // FASE 0: Scanner de bytes direto (mais rápido)
+  const digitosDireto = buscarDigitosDireto(bytes);
+  if (digitosDireto) {
+    const boleto = tentarExtrairDeTexto(digitosDireto);
+    if (boleto) {
       console.log("[parse-boleto-pdf] boleto encontrado em", Date.now() - startTime, "ms via scanner de bytes");
-      return digitosDireto;
+      return { texto: digitosDireto, boleto };
     }
-
-    // ═══════════════════════════════════════════════════
-    // FASE 1: Conversão para string + busca simples no raw
-    // ═══════════════════════════════════════════════════
-    const raw = bytesToLatin1(bytes);
-
-    // 1a. Strings entre parênteses (operador Tj / TJ)
-    const textos: string[] = [];
-    const regexParenteses = /\(([^()]{2,})\)/g;
-    let match: RegExpExecArray | null;
-    while ((match = regexParenteses.exec(raw)) !== null) {
-      const text = match[1];
-      if (/[a-zA-Z0-9]/.test(text)) textos.push(text);
-    }
-
-    // 1b. Texto entre parênteses escapados
-    const regexEscapados = /\\\(([^\\]*)\\\)/g;
-    while ((match = regexEscapados.exec(raw)) !== null) {
-      textos.push(match[1]);
-    }
-
-    // 1c. Strings hex no formato PDF
-    const regexHexStrings = /<([0-9A-Fa-f\s]{10,})>/g;
-    let hexMatch: RegExpExecArray | null;
-    while ((hexMatch = regexHexStrings.exec(raw)) !== null) {
-      const hexStr = hexMatch[1].replace(/\s/g, "");
-      if (hexStr.length % 2 === 0) {
-        let decoded = "";
-        for (let i = 0; i < hexStr.length; i += 2) {
-          const byte = parseInt(hexStr.substring(i, i + 2), 16);
-          if (byte >= 32 && byte < 127) decoded += String.fromCharCode(byte);
-          else if (byte >= 160 && byte < 256) decoded += String.fromCharCode(byte);
-        }
-        if (decoded.length > 2) textos.push(decoded);
-      }
-    }
-
-    const textoParcial = textos.join("\n");
-    if (tentarExtrairDeTexto(textoParcial)) {
-      console.log("[parse-boleto-pdf] boleto encontrado em", Date.now() - startTime, "ms via texto bruto do PDF");
-      return textoParcial;
-    }
-
-    // ═══════════════════════════════════════════════════
-    // FASE 2: Streams do PDF — ÚLTIMO recurso, só para PDFs pequenos
-    // ═══════════════════════════════════════════════════
-    if (bytes.length < 300_000) {
-      const streamsTexto = await extrairStreamsPdf(raw, 3);
-      for (const streamTexto of streamsTexto) {
-        if (tentarExtrairDeTexto(streamTexto)) {
-          console.log("[parse-boleto-pdf] boleto encontrado em", Date.now() - startTime, "ms via stream");
-          return streamTexto;
-        }
-        textos.push(streamTexto);
-      }
-    }
-
-    const textoFinal = textos.join("\n");
-    console.log("[parse-boleto-pdf] extração completa em", Date.now() - startTime, "ms");
-    return textoFinal.length > 0 ? textoFinal : null;
-  } catch {
-    return null;
   }
+
+  // FASE 1: Extração completa de texto para metadados
+  const raw = bytesToLatin1(bytes);
+  const textos: string[] = [];
+  let boleto: BoletoParseado | null = null;
+
+  // 1a. Strings entre parênteses
+  let match: RegExpExecArray | null;
+  RE_PARENTHESES.lastIndex = 0;
+  while ((match = RE_PARENTHESES.exec(raw)) !== null) {
+    const text = match[1];
+    if (/[a-zA-Z0-9]/.test(text)) textos.push(text);
+  }
+
+  // 1b. Texto entre parênteses escapados
+  RE_ESCAPED.lastIndex = 0;
+  while ((match = RE_ESCAPED.exec(raw)) !== null) {
+    textos.push(match[1]);
+  }
+
+  // 1c. Strings hex
+  RE_HEX.lastIndex = 0;
+  let hexMatch: RegExpExecArray | null;
+  while ((hexMatch = RE_HEX.exec(raw)) !== null) {
+    const hexStr = hexMatch[1].replace(/\s/g, "");
+    if (hexStr.length % 2 === 0) {
+      let decoded = "";
+      for (let i = 0; i < hexStr.length; i += 2) {
+        const byte = parseInt(hexStr.substring(i, i + 2), 16);
+        if (byte >= 32 && byte < 127) decoded += String.fromCharCode(byte);
+        else if (byte >= 160 && byte < 256) decoded += String.fromCharCode(byte);
+      }
+      if (decoded.length > 2) textos.push(decoded);
+    }
+  }
+
+  const textoParcial = textos.join("\n");
+  boleto = tentarExtrairDeTexto(textoParcial);
+  if (boleto) {
+    console.log("[parse-boleto-pdf] boleto encontrado em", Date.now() - startTime, "ms via texto bruto");
+    return { texto: textoParcial, boleto };
+  }
+
+  // FASE 2: Streams do PDF (último recurso, só para PDFs pequenos)
+  if (bytes.length < 300_000) {
+    const streamsTexto = await extrairStreamsPdf(raw, 3);
+    for (const streamTexto of streamsTexto) {
+      boleto = tentarExtrairDeTexto(streamTexto);
+      if (boleto) {
+        console.log("[parse-boleto-pdf] boleto encontrado em", Date.now() - startTime, "ms via stream");
+        return { texto: streamTexto, boleto };
+      }
+      textos.push(streamTexto);
+    }
+  }
+
+  const textoFinal = textos.join("\n");
+  console.log("[parse-boleto-pdf] extração completa em", Date.now() - startTime, "ms");
+  return { texto: textoFinal, boleto: null };
+}
+
+// ============================================
+// METADADOS (EXTRAÇÃO LAZY)
+// ============================================
+
+function limparCpfCnpj(valor: string): string {
+  return valor.replace(/\D/g, "");
+}
+
+function validarCnpj(cnpj: string): boolean {
+  const clean = cnpj.replace(/\D/g, "");
+  if (clean.length !== 14) return false;
+  if (/(\d)\1{13}/.test(clean)) return false;
+  let tamanho = clean.length - 2;
+  let numeros = clean.substring(0, tamanho);
+  const digitos = clean.substring(tamanho);
+  let soma = 0;
+  let pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i), 10) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  let resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  if (resultado !== parseInt(digitos.charAt(0), 10)) return false;
+  tamanho++;
+  numeros = clean.substring(0, tamanho);
+  soma = 0;
+  pos = tamanho - 7;
+  for (let i = tamanho; i >= 1; i--) {
+    soma += parseInt(numeros.charAt(tamanho - i), 10) * pos--;
+    if (pos < 2) pos = 9;
+  }
+  resultado = soma % 11 < 2 ? 0 : 11 - (soma % 11);
+  return resultado === parseInt(digitos.charAt(1), 10);
+}
+
+function validarCpf(cpf: string): boolean {
+  const clean = cpf.replace(/\D/g, "");
+  if (clean.length !== 11) return false;
+  if (/(\d)\1{10}/.test(clean)) return false;
+  let soma = 0;
+  for (let i = 0; i < 9; i++) soma += parseInt(clean.charAt(i), 10) * (10 - i);
+  let rev = 11 - (soma % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  if (rev !== parseInt(clean.charAt(9), 10)) return false;
+  soma = 0;
+  for (let i = 0; i < 10; i++) soma += parseInt(clean.charAt(i), 10) * (11 - i);
+  rev = 11 - (soma % 11);
+  if (rev === 10 || rev === 11) rev = 0;
+  return rev === parseInt(clean.charAt(10), 10);
+}
+
+const PALAVRAS_BENEFICIARIO = new Set([
+  "beneficiario", "cedente", "beneficiário", "recebedor",
+  "emissor", "favorecido", "origem", "sacador",
+]);
+const PALAVRAS_PAGADOR = new Set([
+  "pagador", "sacado", "debitado", "cliente",
+  "devedor", "tomador", "destino",
+]);
+const PALAVRAS_DESCONTO = new Set(["desconto", "abatimento", "desc.", "abat.", "descontos"]);
+const PALAVRAS_MULTA = new Set(["multa", "mora", "punitive", "penalidade"]);
+const PALAVRAS_JUROS = new Set(["juros", "juro", "mora diaria", "mora diária"]);
+
+function extrairCpfCnpjDoTexto(texto: string): Array<{ numero: string; tipo: "CPF" | "CNPJ"; valido: boolean; contexto: string }> {
+  const encontrados: Array<{ numero: string; tipo: "CPF" | "CNPJ"; valido: boolean; contexto: string }> = [];
+  const vistos = new Set<string>();
+
+  function adicionar(m: RegExpExecArray, tipo: "CPF" | "CNPJ") {
+    const clean = limparCpfCnpj(m[1]);
+    if (vistos.has(clean)) return;
+    vistos.add(clean);
+    const valido = tipo === "CNPJ" ? validarCnpj(clean) : validarCpf(clean);
+    const start = Math.max(0, m.index - 80);
+    const end = Math.min(texto.length, (m.index || 0) + m[0].length + 80);
+    const contexto = texto.substring(start, end).replace(/\s+/g, " ").trim();
+    encontrados.push({ numero: clean, tipo, valido, contexto });
+  }
+
+  let m: RegExpExecArray | null;
+  RE_CNPJ_FMT.lastIndex = 0;
+  while ((m = RE_CNPJ_FMT.exec(texto)) !== null) adicionar(m, "CNPJ");
+
+  RE_CPF_FMT.lastIndex = 0;
+  while ((m = RE_CPF_FMT.exec(texto)) !== null) adicionar(m, "CPF");
+
+  RE_CNPJ_RAW.lastIndex = 0;
+  while ((m = RE_CNPJ_RAW.exec(texto)) !== null) {
+    const clean = m[1];
+    if (vistos.has(clean)) continue;
+    if (validarCnpj(clean)) {
+      const start = Math.max(0, m.index - 80);
+      const end = Math.min(texto.length, (m.index || 0) + m[0].length + 80);
+      const contexto = texto.substring(start, end).replace(/\s+/g, " ").trim();
+      vistos.add(clean);
+      encontrados.push({ numero: clean, tipo: "CNPJ", valido: true, contexto });
+    }
+  }
+
+  RE_CPF_RAW.lastIndex = 0;
+  while ((m = RE_CPF_RAW.exec(texto)) !== null) {
+    const clean = m[1];
+    if (vistos.has(clean)) continue;
+    if (validarCpf(clean)) {
+      const start = Math.max(0, m.index - 80);
+      const end = Math.min(texto.length, (m.index || 0) + m[0].length + 80);
+      const contexto = texto.substring(start, end).replace(/\s+/g, " ").trim();
+      vistos.add(clean);
+      encontrados.push({ numero: clean, tipo: "CPF", valido: true, contexto });
+    }
+  }
+
+  return encontrados;
+}
+
+function classificarCpfCnpjPorContexto(
+  lista: Array<{ numero: string; tipo: "CPF" | "CNPJ"; valido: boolean; contexto: string }>
+): { beneficiario: string | null; pagador: string | null } {
+  let beneficiario: string | null = null;
+  let pagador: string | null = null;
+
+  for (const item of lista) {
+    if (beneficiario && pagador) break;
+    const ctx = item.contexto.toLowerCase();
+
+    let scoreBeneficiario = 0;
+    let scorePagador = 0;
+    for (const p of PALAVRAS_BENEFICIARIO) if (ctx.includes(p)) scoreBeneficiario++;
+    for (const p of PALAVRAS_PAGADOR) if (ctx.includes(p)) scorePagador++;
+
+    if (scoreBeneficiario > scorePagador && !beneficiario) {
+      beneficiario = item.numero;
+    } else if (scorePagador > scoreBeneficiario && !pagador) {
+      pagador = item.numero;
+    } else if (!beneficiario && scoreBeneficiario > 0) {
+      beneficiario = item.numero;
+    } else if (!pagador && scorePagador > 0) {
+      pagador = item.numero;
+    } else if (!beneficiario) {
+      beneficiario = item.numero;
+    } else if (!pagador && item.numero !== beneficiario) {
+      pagador = item.numero;
+    }
+  }
+
+  return { beneficiario, pagador };
+}
+
+function extrairValoresMonetariosProximos(texto: string, palavrasChave: Set<string>, maxDistancia = 120): number[] {
+  const valores: number[] = [];
+  const vistos = new Set<number>();
+  const textoLower = texto.toLowerCase();
+
+  for (const palavra of palavrasChave) {
+    let idx = textoLower.indexOf(palavra);
+    while (idx !== -1) {
+      const inicio = Math.max(0, idx - maxDistancia);
+      const fim = Math.min(texto.length, idx + palavra.length + maxDistancia);
+      const trecho = texto.substring(inicio, fim);
+
+      RE_VALOR.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = RE_VALOR.exec(trecho)) !== null) {
+        const valorStr = m[1].replace(/\./g, "").replace(",", ".");
+        const valor = parseFloat(valorStr);
+        if (!isNaN(valor) && valor > 0 && !vistos.has(valor)) {
+          vistos.add(valor);
+          valores.push(valor);
+        }
+      }
+      idx = textoLower.indexOf(palavra, idx + 1);
+    }
+  }
+
+  return valores;
+}
+
+function extrairDescontoMultaJuros(texto: string): { desconto: number | null; multa: number | null; juros: number | null } {
+  const descontos = extrairValoresMonetariosProximos(texto, PALAVRAS_DESCONTO, 100);
+  const multas = extrairValoresMonetariosProximos(texto, PALAVRAS_MULTA, 100);
+  const jurosLista = extrairValoresMonetariosProximos(texto, PALAVRAS_JUROS, 100);
+
+  return {
+    desconto: descontos.length > 0 ? Math.min(...descontos) : null,
+    multa: multas.length > 0 ? Math.min(...multas) : null,
+    juros: jurosLista.length > 0 ? Math.min(...jurosLista) : null,
+  };
 }
 
 /**
- * Extrai TODO o texto bruto de um PDF (sem procurar boletos).
- * Usado para metadados (CNPJ, descontos, etc.) em paralelo com a busca da linha digitável.
+ * Extrai metadados do texto bruto do PDF.
+ * Só é chamado se o boleto foi encontrado (lazy evaluation).
  */
-async function extrairTextoBrutoPdf(bytes: Uint8Array): Promise<string> {
-  try {
-    const raw = bytesToLatin1(bytes);
-    const textos: string[] = [];
+function extrairMetadados(textoBruto: string): MetadadosExtraidos {
+  const metadados: MetadadosExtraidos = {};
 
-    // 1. Strings entre parênteses
-    const regexParenteses = /\(([^()]{2,})\)/g;
-    let match: RegExpExecArray | null;
-    while ((match = regexParenteses.exec(raw)) !== null) {
-      const text = match[1];
-      if (/[a-zA-Z0-9]/.test(text)) textos.push(text);
+  if (!textoBruto || textoBruto.length < 50) return metadados;
+
+  // CNPJ/CPF
+  const cpfsCnpjs = extrairCpfCnpjDoTexto(textoBruto);
+  if (cpfsCnpjs.length > 0) {
+    const { beneficiario, pagador } = classificarCpfCnpjPorContexto(cpfsCnpjs);
+    if (beneficiario) {
+      if (beneficiario.length === 14) metadados.cnpj_beneficiario = beneficiario;
+      else metadados.cpf_beneficiario = beneficiario;
     }
-
-    // 2. Texto entre parênteses escapados
-    const regexEscapados = /\\\(([^\\]*)\\\)/g;
-    while ((match = regexEscapados.exec(raw)) !== null) {
-      textos.push(match[1]);
+    if (pagador) {
+      if (pagador.length === 14) metadados.cnpj_pagador = pagador;
+      else metadados.cpf_pagador = pagador;
     }
-
-    // 3. Strings hex
-    const regexHexStrings = /<([0-9A-Fa-f\s]{10,})>/g;
-    let hexMatch: RegExpExecArray | null;
-    while ((hexMatch = regexHexStrings.exec(raw)) !== null) {
-      const hexStr = hexMatch[1].replace(/\s/g, "");
-      if (hexStr.length % 2 === 0) {
-        let decoded = "";
-        for (let i = 0; i < hexStr.length; i += 2) {
-          const byte = parseInt(hexStr.substring(i, i + 2), 16);
-          if (byte >= 32 && byte < 127) decoded += String.fromCharCode(byte);
-          else if (byte >= 160 && byte < 256) decoded += String.fromCharCode(byte);
-        }
-        if (decoded.length > 2) textos.push(decoded);
-      }
-    }
-
-    // 4. Streams (apenas para PDFs pequenos)
-    if (bytes.length < 300_000) {
-      const streamsTexto = await extrairStreamsPdf(raw, 3);
-      for (const st of streamsTexto) textos.push(st);
-    }
-
-    return textos.join("\n");
-  } catch {
-    return "";
-  }
-}
-
-function tentarExtrairDeTexto(texto: string): any {
-  let boleto: any = null;
-
-  // Tenta 47 dígitos (cobrança)
-  const linhas47 = texto.match(/\d{47}/g);
-  if (linhas47 && linhas47.length > 0) {
-    for (const linha of linhas47) {
-      try {
-        boleto = parsearLinhaDigitavelCobranca(linha);
-        break;
-      } catch {
-        try {
-          boleto = parsearLinhaDigitavelCobranca(linha, true);
-          break;
-        } catch {
-          continue;
-        }
-      }
-    }
+    metadados.cpfsCnpjs = cpfsCnpjs.map(c => ({ numero: c.numero, tipo: c.tipo, valido: c.valido }));
   }
 
-  // Tenta 48 dígitos (arrecadação)
-  if (!boleto) {
-    const linhas48 = texto.match(/\d{48}/g);
-    if (linhas48 && linhas48.length > 0) {
-      for (const linha of linhas48) {
-        try {
-          boleto = parsearLinhaDigitavelArrecadacao(linha);
-          break;
-        } catch {
-          try {
-            boleto = parsearLinhaDigitavelArrecadacao(linha, true);
-            break;
-          } catch {
-            continue;
-          }
-        }
-      }
-    }
-  }
+  // Descontos, multas, juros
+  const dmf = extrairDescontoMultaJuros(textoBruto);
+  if (dmf.desconto != null) metadados.desconto = dmf.desconto.toFixed(2);
+  if (dmf.multa != null) metadados.multa = dmf.multa.toFixed(2);
+  if (dmf.juros != null) metadados.juros = dmf.juros.toFixed(2);
 
-  // Tenta 44 dígitos (código de barras)
-  if (!boleto) {
-    const codigos44 = texto.match(/\d{44}/g);
-    if (codigos44 && codigos44.length > 0) {
-      for (const codigo of codigos44) {
-        try {
-          boleto = detectarETentarParse(codigo);
-          break;
-        } catch {
-          continue;
-        }
-      }
-    }
-  }
-
-  // Tenta qualquer sequência de 36-50 dígitos (fallback)
-  if (!boleto) {
-    const sequencias = texto.match(/\d{36,50}/g);
-    if (sequencias && sequencias.length > 0) {
-      for (const seq of sequencias) {
-        try {
-          boleto = detectarETentarParse(seq, true);
-          break;
-        } catch {
-          continue;
-        }
-      }
-    }
-  }
-
-  return boleto;
+  return metadados;
 }
 
 // ============================================
-// VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS
+// VALIDAÇÃO
 // ============================================
 
-interface ErroValidacao { campo: string; mensagem: string; severidade: "erro" | "aviso"; }
-
-function validarCamposBoleto(boleto: any, textoOriginal?: string): { valido: boolean; erros: ErroValidacao[]; boletoSanitizado: any } {
+function validarCamposBoleto(boleto: any, textoOriginal?: string): ValidacaoResultado {
   const erros: ErroValidacao[] = [];
   const sanitizado = { ...boleto };
 
-  // Valor
   if (boleto.valor == null || boleto.valor === "" || boleto.valor === "0.00" || boleto.valor === "0") {
-    erros.push({ campo: "valor", mensagem: "Valor do boleto não encontrado ou zerado. O código de barras pode estar incompleto.", severidade: "erro" });
+    erros.push({ campo: "valor", mensagem: "Valor do boleto não encontrado ou zerado.", severidade: "erro" });
   } else {
     const v = parseFloat(String(boleto.valor).replace(/\./g, "").replace(",", "."));
     if (isNaN(v) || v <= 0) {
-      erros.push({ campo: "valor", mensagem: `Valor inválido extraído: ${boleto.valor}. Verifique a linha digitável.`, severidade: "erro" });
+      erros.push({ campo: "valor", mensagem: `Valor inválido: ${boleto.valor}.`, severidade: "erro" });
     } else {
       sanitizado.valor = v.toFixed(2);
     }
   }
 
-  // Vencimento
   if (!boleto.data_vencimento) {
-    erros.push({ campo: "data_vencimento", mensagem: "Data de vencimento não encontrada no código de barras. Boleto de concessionária (arrecadação) ou código incompleto.", severidade: "aviso" });
+    erros.push({ campo: "data_vencimento", mensagem: "Data de vencimento não encontrada.", severidade: "aviso" });
   } else {
     const dataRegex = /^\d{4}-\d{2}-\d{2}$/;
     if (!dataRegex.test(boleto.data_vencimento)) {
-      erros.push({ campo: "data_vencimento", mensagem: `Data de vencimento em formato inesperado: ${boleto.data_vencimento}. Esperado YYYY-MM-DD.`, severidade: "erro" });
+      erros.push({ campo: "data_vencimento", mensagem: `Formato inesperado: ${boleto.data_vencimento}.`, severidade: "erro" });
     } else {
       const dataObj = new Date(boleto.data_vencimento + "T00:00:00");
       const hoje = new Date();
@@ -969,38 +983,104 @@ function validarCamposBoleto(boleto: any, textoOriginal?: string): { valido: boo
       const dataMaxima = new Date();
       dataMaxima.setFullYear(dataMaxima.getFullYear() + 10);
       if (dataObj < hoje || dataObj > dataMaxima) {
-        erros.push({ campo: "data_vencimento", mensagem: `Data de vencimento suspeita: ${boleto.data_vencimento}. Verifique se o fator de vencimento está correto.`, severidade: "aviso" });
+        erros.push({ campo: "data_vencimento", mensagem: `Data suspeita: ${boleto.data_vencimento}.`, severidade: "aviso" });
       }
     }
   }
 
-  // Código de barras
   if (!boleto.codigo_barras || boleto.codigo_barras.length < 36) {
-    erros.push({ campo: "codigo_barras", mensagem: `Código de barras incompleto (${boleto.codigo_barras?.length || 0} dígitos). Mínimo esperado: 44.`, severidade: "erro" });
+    erros.push({ campo: "codigo_barras", mensagem: `Código incompleto (${boleto.codigo_barras?.length || 0} dígitos).`, severidade: "erro" });
   }
 
-  // Beneficiário / Pagador
   if (!boleto.beneficiario) {
-    erros.push({ campo: "beneficiario", mensagem: "Beneficiário não identificado. Verifique se o PDF contém a palavra 'Beneficiário' ou 'Cedente'.", severidade: "aviso" });
+    erros.push({ campo: "beneficiario", mensagem: "Beneficiário não identificado.", severidade: "aviso" });
   }
 
-  // CNPJ/CPF
   if (!boleto.cnpj_beneficiario && !boleto.cpf_beneficiario && !boleto.cnpj_pagador && !boleto.cpf_pagador) {
     if (textoOriginal && textoOriginal.length > 50) {
-      erros.push({ campo: "cnpj_cpf", mensagem: "CNPJ/CPF não encontrado no texto do PDF. O documento pode estar em formato de imagem ou protegido.", severidade: "aviso" });
+      erros.push({ campo: "cnpj_cpf", mensagem: "CNPJ/CPF não encontrado no texto.", severidade: "aviso" });
     }
   }
 
-  // DVs
   if (boleto.validado === false) {
-    erros.push({ campo: "digito_verificador", mensagem: "Dígito verificador da linha digitável não confere. O código pode estar incompleto ou digitado incorretamente.", severidade: "erro" });
+    erros.push({ campo: "digito_verificador", mensagem: "DV da linha digitável não confere.", severidade: "erro" });
   }
 
   return { valido: !erros.some(e => e.severidade === "erro"), erros, boletoSanitizado: sanitizado };
 }
 
 // ============================================
-// EDGE FUNCTION
+// ORQUESTRADOR PRINCIPAL
+// ============================================
+
+/**
+ * Pipeline de processamento de boleto:
+ * 1. Parse direto de barcode (mais rápido)
+ * 2. Extração de texto do PDF (early return)
+ * 3. Metadados (lazy - só se boleto encontrado)
+ * 4. Validação
+ */
+async function processarBoleto(
+  barcode?: string,
+  text?: string,
+  pdfBytes?: Uint8Array
+): Promise<ExtracaoResultado> {
+
+  let boleto: BoletoParseado | null = null;
+  let textoBruto = "";
+
+  // Prioridade 1: barcode direto
+  if (barcode) {
+    const cleanBarcode = barcode.replace(/\D/g, "");
+    try {
+      boleto = detectarETentarParse(cleanBarcode);
+    } catch {
+      try {
+        boleto = detectarETentarParse(cleanBarcode, true);
+      } catch {
+        boleto = parsearGenerico(cleanBarcode);
+      }
+    }
+  }
+  // Prioridade 2: texto extraído
+  else if (text) {
+    textoBruto = text;
+    boleto = tentarExtrairDeTexto(text);
+    if (!boleto) {
+      throw new Error("Não foi possível encontrar uma linha digitável válida no texto fornecido.");
+    }
+  }
+  // Prioridade 3: PDF em bytes
+  else if (pdfBytes) {
+    const MAX_PDF_SIZE = 2 * 1024 * 1024;
+    if (pdfBytes.length > MAX_PDF_SIZE) {
+      throw new Error("PDF_EXCEEDS_LIMIT");
+    }
+
+    const resultado = await extrairTextoPdf(pdfBytes);
+    boleto = resultado.boleto;
+    textoBruto = resultado.texto;
+
+    if (!boleto) {
+      throw new Error("Não foi possível extrair a linha digitável do PDF.");
+    }
+  }
+
+  if (!boleto) {
+    throw new Error("Nenhum dado de boleto fornecido.");
+  }
+
+  // Metadados: lazy - só extrai se temos texto bruto e o boleto foi encontrado
+  const metadados = textoBruto.length > 50 ? extrairMetadados(textoBruto) : {};
+
+  // Merge metadados no boleto
+  const boletoFinal = { ...boleto, ...metadados };
+
+  return { boleto: boletoFinal, textoBruto, metadados };
+}
+
+// ============================================
+// EDGE FUNCTION HANDLER
 // ============================================
 
 serve(async (req) => {
@@ -1013,7 +1093,6 @@ serve(async (req) => {
     let barcode: string | undefined;
     let pdfBytes: Uint8Array | undefined;
 
-    // Aceita JSON (barcode/text ou pdfBase64 legado) ou FormData com arquivo PDF
     if (contentType.includes("application/json")) {
       const body = await req.json();
       text = body.text;
@@ -1022,14 +1101,12 @@ serve(async (req) => {
         pdfBytes = base64ToUint8Array(body.pdfBase64);
       }
     } else if (contentType.includes("multipart/form-data")) {
-      // PDF enviado via FormData (padrão, confiável, sem overhead de base64)
       const form = await req.formData();
       const file = form.get("pdf");
       if (file instanceof File) {
         pdfBytes = new Uint8Array(await file.arrayBuffer());
       }
     } else {
-      // Fallback: tenta ler como bytes diretos
       pdfBytes = new Uint8Array(await req.arrayBuffer());
     }
 
@@ -1039,107 +1116,37 @@ serve(async (req) => {
       });
     }
 
-    let boleto: any;
-    let textoBruto = "";
+    const resultado = await processarBoleto(barcode, text, pdfBytes);
 
-    // Prioridade 1: barcode direto
-    if (barcode) {
-      const cleanBarcode = barcode.replace(/\D/g, "");
-      try {
-        boleto = detectarETentarParse(cleanBarcode);
-      } catch {
-        try {
-          boleto = detectarETentarParse(cleanBarcode, true);
-        } catch {
-          boleto = parsearGenerico(cleanBarcode);
-        }
-      }
-    }
-    // Prioridade 2: texto extraído
-    else if (text) {
-      textoBruto = text;
-      boleto = tentarExtrairDeTexto(text);
-      if (!boleto) {
-        throw new Error("Não foi possível encontrar uma linha digitável válida no texto fornecido. Verifique se o código está completo (44, 47 ou 48 dígitos).");
-      }
-    }
-    // Prioridade 3: PDF em bytes
-    else if (pdfBytes) {
-      // Limite de tamanho para evitar timeouts (2 MB)
-      const MAX_PDF_SIZE = 2 * 1024 * 1024;
-      if (pdfBytes.length > MAX_PDF_SIZE) {
-        return new Response(
-          JSON.stringify({
-            error: "O PDF excede 2 MB. Boletos em PDF geralmente têm menos de 200 KB. Verifique se enviou o arquivo correto.",
-          }),
-          { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      // Extrai texto completo para metadados (CNPJ, descontos) em paralelo com a busca da linha digitável
-      const [textoExtraido, textoBrutoExtraido] = await Promise.all([
-        extrairTextoPdf(pdfBytes),
-        extrairTextoBrutoPdf(pdfBytes),
-      ]);
-      textoBruto = textoBrutoExtraido || "";
-
-      if (textoExtraido) {
-        boleto = tentarExtrairDeTexto(textoExtraido);
-      }
-
-      if (!boleto) {
-        return new Response(
-          JSON.stringify({
-            error: "Não foi possível extrair a linha digitável do PDF automaticamente. " +
-                   "Isso pode acontecer se o PDF estiver protegido, for uma imagem escaneada, ou usar compressão avançada. " +
-                   "Use o modo 'Código de Barras' e cole a linha digitável (47 dígitos para cobrança, 48 para concessionárias/tributos) ou o código de barras (44 dígitos) manualmente.",
-            dica: "Você pode encontrar a linha digitável no topo ou rodapé do boleto. É uma sequência de números geralmente formatada como: 00000.00000 00000.000000 00000.000000 0 00000000000000"
-          }),
-          { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
+    if (!resultado.boleto) {
+      return new Response(
+        JSON.stringify({
+          error: "Não foi possível extrair a linha digitável do PDF automaticamente.",
+          dica: "Você pode encontrar a linha digitável no topo ou rodapé do boleto. É uma sequência de números geralmente formatada como: 00000.00000 00000.000000 00000.000000 0 00000000000000"
+        }),
+        { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // ═══════════════════════════════════════════════════
-    // EXTRAÇÃO DE METADADOS DO TEXTO BRUTO
-    // ═══════════════════════════════════════════════════
-    if (textoBruto && textoBruto.length > 50) {
-      // CNPJ/CPF
-      const cpfsCnpjs = extrairCpfCnpjDoTexto(textoBruto);
-      if (cpfsCnpjs.length > 0) {
-        const { beneficiario, pagador } = classificarCpfCnpjPorContexto(cpfsCnpjs);
-        if (beneficiario) {
-          if (beneficiario.length === 14) boleto.cnpj_beneficiario = beneficiario;
-          else boleto.cpf_beneficiario = beneficiario;
-        }
-        if (pagador) {
-          if (pagador.length === 14) boleto.cnpj_pagador = pagador;
-          else boleto.cpf_pagador = pagador;
-        }
-        boleto.cnpj_cpf_extraidos = cpfsCnpjs.map(c => ({ numero: c.numero, tipo: c.tipo, valido: c.valido }));
-      }
-
-      // Descontos, multas, juros
-      const dmf = extrairDescontoMultaJuros(textoBruto);
-      if (dmf.desconto != null) boleto.desconto = dmf.desconto.toFixed(2);
-      if (dmf.multa != null) boleto.multa = dmf.multa.toFixed(2);
-      if (dmf.juros != null) boleto.juros = dmf.juros.toFixed(2);
-    }
-
-    // ═══════════════════════════════════════════════════
-    // VALIDAÇÃO DE CAMPOS OBRIGATÓRIOS
-    // ═══════════════════════════════════════════════════
-    const validacao = validarCamposBoleto(boleto, textoBruto);
-    boleto = validacao.boletoSanitizado;
+    const validacao = validarCamposBoleto(resultado.boleto, resultado.textoBruto);
+    const boleto = validacao.boletoSanitizado;
     boleto.erros_validacao = validacao.erros;
     boleto.validacao_passou = validacao.valido;
 
     return new Response(JSON.stringify({ boleto }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
+
   } catch (error) {
+    const errMsg = (error as Error).message;
+    if (errMsg === "PDF_EXCEEDS_LIMIT") {
+      return new Response(
+        JSON.stringify({ error: "O PDF excede 2 MB. Boletos em PDF geralmente têm menos de 200 KB." }),
+        { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     console.error("Error:", error);
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
+    return new Response(JSON.stringify({ error: errMsg }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

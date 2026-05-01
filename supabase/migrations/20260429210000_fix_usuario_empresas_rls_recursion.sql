@@ -14,6 +14,7 @@ CREATE POLICY "Usuário pode ver seus vínculos"
   USING (user_id = auth.uid());
 
 -- Política simples: usuário insere seus próprios vínculos
+DROP POLICY IF EXISTS "Usuário pode inserir seus vínculos" ON public.usuario_empresas;
 CREATE POLICY "Usuário pode inserir seus vínculos"
   ON public.usuario_empresas
   FOR INSERT
@@ -21,6 +22,7 @@ CREATE POLICY "Usuário pode inserir seus vínculos"
   WITH CHECK (user_id = auth.uid());
 
 -- Política simples: usuário atualiza seus próprios vínculos
+DROP POLICY IF EXISTS "Usuário pode atualizar seus vínculos" ON public.usuario_empresas;
 CREATE POLICY "Usuário pode atualizar seus vínculos"
   ON public.usuario_empresas
   FOR UPDATE
@@ -29,6 +31,7 @@ CREATE POLICY "Usuário pode atualizar seus vínculos"
   WITH CHECK (user_id = auth.uid());
 
 -- Política simples: usuário remove seus próprios vínculos
+DROP POLICY IF EXISTS "Usuário pode remover seus vínculos" ON public.usuario_empresas;
 CREATE POLICY "Usuário pode remover seus vínculos"
   ON public.usuario_empresas
   FOR DELETE
