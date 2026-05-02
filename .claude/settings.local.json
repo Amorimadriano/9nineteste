@@ -86,7 +86,8 @@
       "Bash(powershell *)",
       "PowerShell(npx vitest run src/test/nfse)",
       "PowerShell(npx supabase --version)",
-      "PowerShell(npx supabase functions deploy consultar-nfse emitir-nfse)"
+      "PowerShell(npx supabase functions deploy consultar-nfse emitir-nfse)",
+      "PowerShell(npx supabase functions deploy consultar-nfse emitir-nfse cancelar-nfse)"
     ]
   }
 }
