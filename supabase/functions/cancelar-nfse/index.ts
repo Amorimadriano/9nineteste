@@ -21,9 +21,8 @@ function getCorsHeaders(req: Request) {
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-
 // ============================================
-// INLINED: NFS-e GINFES Client Module (partial - cancelamento)
+// API Paulistana - Cancelamento NFS-e
 // ============================================
 
 interface CertificadoDigital {
@@ -37,32 +36,21 @@ interface CertificadoDigital {
   validoAte: Date;
 }
 
-const ABRASF_NAMESPACES = {
-  servicoCancelar: "http://www.ginfes.com.br/servico_cancelar_nfse_envio_v03.xsd",
-};
-
 /**
  * Proper C14N canonicalization for XMLDSIG.
- * Preserves xmlns attributes (required for GINFES XSD validation).
  */
 function canonicalizeXml(xml: string): string {
   let result = xml;
-  // Remove XML declaration
   result = result.replace(/<\?xml[^?]*\?>\s*/g, "");
-  // Remove processing instructions
   result = result.replace(/<\?[^?]*\?>\s*/g, "");
-  // Normalize empty elements
   result = result.replace(/<(\w+)([^>]*)\/>/g, (_match: string, tagName: string, attrs: string) => {
     if (attrs.trim()) {
       return `<${tagName}${attrs}></${tagName}>`;
     }
     return `<${tagName}></${tagName}>`;
   });
-  // Normalize whitespace between tags
   result = result.replace(/>\s+</g, "><");
-  // Normalize attribute whitespace
   result = result.replace(/\s+=\s+/g, "=");
-  // Trim
   result = result.replace(/\n\s+/g, "\n");
   result = result.trim();
   return result;
@@ -82,7 +70,6 @@ function extractElementById(xml: string, id: string): string | null {
   const startIndex = xml.indexOf(fullOpenMatch);
   if (startIndex === -1) return null;
 
-  // Balanced tag matching
   let depth = 0;
   let pos = startIndex;
 
@@ -123,7 +110,7 @@ function getElementName(xml: string, id: string): string {
   const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, "i");
   const match = xml.match(regex);
-  return match ? match[1] : "Pedido";
+  return match ? match[1] : "PedidoCancelamentoNFe";
 }
 
 async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
@@ -134,7 +121,6 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
     : forgeModule;
   (globalThis as any).forge = forge;
 
-  console.log("forge loaded, has util:", !!forge.util, "has pki:", !!forge.pki, "has pkcs12:", !!forge.pkcs12);
   const pfxDer = forge.util.decode64(pfxBase64);
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
@@ -164,19 +150,16 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
     }
   }
 
-  // Try pkcs8ShroudedKeyBag first (most common for ICP-Brasil)
   const keyBagsShrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
   if (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag] && keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]!.length > 0) {
     const key = keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]![0];
     keyPem = forge.pki.privateKeyToPem(key.key!);
   } else {
-    // Fallback to pkcs8ShorthandKeyBag
     const keyBagsShorthand = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
     if (keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag] && keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]!.length > 0) {
       const key = keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]![0];
       keyPem = forge.pki.privateKeyToPem(key.key!);
     } else {
-      // Fallback to keyBag
       const keyBags2 = p12.getBags({ bagType: forge.pki.oids.keyBag });
       if (keyBags2[forge.pki.oids.keyBag]) {
         const key = keyBags2[forge.pki.oids.keyBag]![0];
@@ -192,28 +175,35 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   return { pfxBase64, senha, cnpj, inscricaoMunicipal: "", razaoSocial, certPem, keyPem, validoAte };
 }
 
-function construirXmlCancelamento(numeroNfse: string, cnpj: string, inscricaoMunicipal: string, codigoCancelamento: string, codigoMunicipio?: string): string {
-  const municipio = codigoMunicipio || "3550308"; // Default São Paulo, allow override
+function construirXmlCancelamentoPaulistana(
+  numeroNfse: string,
+  codigoVerificacao: string,
+  inscricaoPrestador: string,
+  motivoCancelamento: string
+): string {
   const pedidoId = `CANC${numeroNfse}`;
-  return `<CancelarNfseEnvio xmlns="${ABRASF_NAMESPACES.servicoCancelar}">
-  <Pedido Id="${pedidoId}">
-    <InfPedidoCancelamento>
-      <IdentificacaoNfse>
-        <Numero>${numeroNfse}</Numero>
-        <Cnpj>${cnpj}</Cnpj>
-        <InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
-        <CodigoMunicipio>${municipio}</CodigoMunicipio>
-      </IdentificacaoNfse>
-      <CodigoCancelamento>${codigoCancelamento}</CodigoCancelamento>
-    </InfPedidoCancelamento>
-  </Pedido>
-</CancelarNfseEnvio>`;
+  return `<PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="${pedidoId}">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${inscricaoPrestador}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+  </Cabecalho>
+  <Detalhe>
+    <ChaveNFe>
+      <InscricaoPrestador>${inscricaoPrestador}</InscricaoPrestador>
+      <NumeroNFe>${numeroNfse}</NumeroNFe>
+      <CodigoVerificacao>${codigoVerificacao}</CodigoVerificacao>
+    </ChaveNFe>
+    <MotivoCancelamento>${motivoCancelamento}</MotivoCancelamento>
+  </Detalhe>
+</PedidoCancelamentoNFe>`;
 }
 
 /**
- * Signs XML using XMLDSIG. Throws error on failure instead of returning unsigned XML.
+ * Signs XML using XMLDSig SHA-256. Throws error on failure instead of returning unsigned XML.
  */
-function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
+function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) {
     throw new Error("node-forge não está disponível para assinatura XML. Cancelamento em produção requer assinatura digital.");
@@ -226,23 +216,22 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
       throw new Error(`Elemento com Id="${idReferencia}" não encontrado no XML para assinatura`);
     }
     const canonReferenced = canonicalizeXml(referencedXml);
-    const digest = forge.md.sha1.create();
+    const digest = forge.md.sha256.create();
     digest.update(canonReferenced, "utf8");
     const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
     const canonSignedInfo = canonicalizeXml(signedInfoXml);
-    const signatureMd = forge.md.sha1.create();
+    const signatureMd = forge.md.sha256.create();
     signatureMd.update(canonSignedInfo, "utf8");
     const signatureBytes = privateKey.sign(signatureMd);
     const signatureBase64 = forge.util.encode64(signatureBytes);
     const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
     const certBase64 = forge.util.encode64(certDer);
 
-    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
-    // Insert signature inside the referenced element
     const elementName = getElementName(xml, idReferencia);
     const closingTag = `</${elementName}>`;
     const insertionPoint = xml.lastIndexOf(closingTag);
@@ -256,31 +245,25 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
   }
 }
 
-function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+function criarEnvelopeSOAP11Paulistana(operacao: string, xmlAssinado: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns="">${cabecalhoXml}</arg0>
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
-}
-
-function criarCabecalhoGinfes(): string {
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <${operacao} xmlns="http://www.prefeitura.sp.gov.br/nfe">
+      <MensagemXML><![CDATA[
+${xmlAssinado}
+      ]]></MensagemXML>
+    </${operacao}>
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
 }
 
-const GINFES_URLS = {
-  homologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
-  producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
-};
+const PAULISTANA_URL = "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx";
 
 async function enviarRequisicaoSOAP(
   soapEnvelope: string,
@@ -294,7 +277,7 @@ async function enviarRequisicaoSOAP(
   };
 
   if (env === "homologacao") {
-    const response = await fetch(GINFES_URLS[env], {
+    const response = await fetch(PAULISTANA_URL, {
       method: "POST",
       headers: baseHeaders,
       body: soapEnvelope,
@@ -316,8 +299,7 @@ async function enviarRequisicaoSOAP(
   if (!proxyUrl) {
     throw new Error(
       "Variável MTLS_PROXY_URL não configurada. " +
-      "O cancelamento em produção requer um proxy mTLS. " +
-      "Configure a URL do proxy nas variáveis de ambiente do Supabase."
+      "O cancelamento em produção requer um proxy mTLS."
     );
   }
 
@@ -326,7 +308,7 @@ async function enviarRequisicaoSOAP(
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (proxyApiKey) headers["X-API-Key"] = proxyApiKey;
 
-  const proxyResponse = await fetch(`${proxyUrl}/proxy-ginfes`, {
+  const proxyResponse = await fetch(`${proxyUrl}/proxy-nfse`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -334,6 +316,7 @@ async function enviarRequisicaoSOAP(
       soapAction,
       certPem: certificado.certPem,
       keyPem: certificado.keyPem,
+      provider: "paulistana",
       ambiente: env,
     }),
   });
@@ -346,19 +329,27 @@ async function enviarRequisicaoSOAP(
   return await proxyResponse.text();
 }
 
-function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
+function parsearErrosPaulistana(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
-  const ERROS_GINFES: Record<string, string> = {
-    E1: "CNPJ do prestador inválido", E2: "Inscrição Municipal do prestador inválida",
-    E26: "NFS-e não encontrada", E27: "Cancelamento não permitido",
-    E28: "Certificado digital inválido", E29: "Assinatura digital inválida",
-    E30: "Arquivo XML mal formatado", E31: "Acesso negado", E32: "Prazo de cancelamento excedido",
-    E50: "Erro interno do servidor", E60: "Requisição mal formada",
+  const ERROS_PAULISTANA: Record<string, string> = {
+    "1001": "CNPJ do remetente inválido",
+    "1002": "Inscrição Municipal inválida",
+    "1003": "NFS-e não encontrada",
+    "1004": "Código de verificação inválido",
+    "1005": "Motivo de cancelamento inválido",
+    "1006": "Prazo de cancelamento excedido",
+    "1007": "NFS-e já cancelada",
+    "1008": "Certificado digital inválido",
+    "1009": "Assinatura digital inválida",
+    "1010": "XML mal formatado",
+    "1011": "Erro interno",
+    "1012": "Requisição mal formada",
+    "1013": "Não é permitido cancelar NFS-e substituída",
   };
-  const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]+)<\/Mensagem>/gi)].map(m => m[1]);
+  const mensagens = [...xml.matchAll(/<Alerta[^>]*>([\s\S]*?)<\/Alerta>/gi)].map(m => m[1].replace(/<[^>]+>/g, "").trim());
   const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]+)<\/Codigo>/gi)].map(m => m[1]);
   for (let i = 0; i < Math.max(mensagens.length, codigos.length); i++) {
-    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_GINFES[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
+    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_PAULISTANA[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
   }
   const faultMatch = xml.match(/<faultstring>([^<]+)<\/faultstring>/i);
   if (faultMatch && erros.length === 0) erros.push({ codigo: "SOAP_FAULT", mensagem: faultMatch[1], tipo: "Erro" });
@@ -389,7 +380,7 @@ async function analisarErroCancelamentoComIA(
           {
             role: "system",
             content:
-              "Você é um especialista em NFS-e GINFES e legislação tributária de São Paulo. Analise o erro de cancelamento e forneça explicação clara + ação sugerida. Retorne APENAS um JSON válido com: { explicacao: string, acaoSugerida: string }.",
+              "Você é um especialista em NFS-e API Paulistana (Prefeitura de SP) e legislação tributária. Analise o erro de cancelamento e forneça explicação clara + ação sugerida. Retorne APENAS um JSON válido com: { explicacao: string, acaoSugerida: string }.",
           },
           {
             role: "user",
@@ -413,19 +404,29 @@ async function analisarErroCancelamentoComIA(
 
 function parsearRespostaCancelamento(xml: string) {
   try {
-    const sucessoMatch = xml.match(/<Sucesso>true<\/Sucesso>/i);
-    const mensagensErro = parsearErros(xml);
-    if (sucessoMatch || mensagensErro.length === 0) {
+    let workXml = xml;
+    const cdataMatch = xml.match(/<(?:MensagemXML|return)[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/(?:MensagemXML|return)>/i);
+    if (cdataMatch) workXml = cdataMatch[1];
+    if (!cdataMatch && workXml.includes("&lt;")) {
+      workXml = workXml.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+    }
+    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+
+    const sucessoMatch = cleanXml.match(/<Sucesso>([^<]+)<\/Sucesso>/i);
+    const sucesso = sucessoMatch?.[1]?.toLowerCase() === "true";
+    const erros = parsearErrosPaulistana(cleanXml);
+
+    if (sucesso || erros.length === 0) {
       return { sucesso: true, xmlRetorno: xml, mensagens: [{ codigo: "0000", mensagem: "Cancelamento realizado com sucesso", tipo: "Sucesso" }] };
     }
-    return { sucesso: false, xmlRetorno: xml, mensagens: mensagensErro.length > 0 ? mensagensErro : [{ codigo: "ERR_CANCEL", mensagem: "Erro desconhecido no cancelamento", tipo: "Erro" }] };
+    return { sucesso: false, xmlRetorno: xml, mensagens: erros.length > 0 ? erros : [{ codigo: "ERR_CANCEL", mensagem: "Erro desconhecido no cancelamento", tipo: "Erro" }] };
   } catch (error) {
     return { sucesso: false, xmlRetorno: xml, mensagens: [{ codigo: "ERR_PARSE", mensagem: `Erro ao processar resposta: ${(error as Error).message}`, tipo: "Erro" }] };
   }
 }
 
 // ============================================
-// END INLINED MODULE
+// Handler
 // ============================================
 
 serve(async (req) => {
@@ -589,13 +590,12 @@ serve(async (req) => {
 });
 
 function cancelarHomologacao(nota: any, certificado: any, motivoCancelamento: string) {
-  console.log("Ambiente de homologação - retornando cancelamento simulado");
-  const xmlEnvio = construirXmlCancelamento(
+  console.log("Ambiente de homologação - retornando cancelamento simulado (Paulistana)");
+  const xmlEnvio = construirXmlCancelamentoPaulistana(
     nota.numero_nota || nota.numero_rps || "",
-    certificado.cnpj || "",
+    nota.codigo_verificacao || "",
     certificado.inscricao_municipal || "",
-    motivoCancelamento,
-    certificado.codigo_municipio
+    motivoCancelamento
   );
   return {
     sucesso: true,
@@ -603,7 +603,7 @@ function cancelarHomologacao(nota: any, certificado: any, motivoCancelamento: st
     xmlRetorno: "<Cancelamento>true</Cancelamento>",
     mensagens: [{
       codigo: "E001",
-      mensagem: "Cancelamento processado com sucesso - ambiente de homologação",
+      mensagem: "Cancelamento processado com sucesso - ambiente de homologação (Paulistana)",
       tipo: "Sucesso",
     }],
   };
@@ -611,23 +611,29 @@ function cancelarHomologacao(nota: any, certificado: any, motivoCancelamento: st
 
 async function cancelarProducao(nota: any, certDigital: CertificadoDigital, motivoCancelamento: string) {
   const numeroNfse = nota.numero_nota || nota.numero_rps || "";
-  const cnpj = certDigital.cnpj;
-  const inscricaoMunicipal = certDigital.inscricaoMunicipal;
-  const codigoMunicipio = nota.codigo_municipio || "3550308";
-  const xmlCancelamento = construirXmlCancelamento(numeroNfse, cnpj, inscricaoMunicipal, motivoCancelamento, codigoMunicipio);
+  const codigoVerificacao = nota.codigo_verificacao || "";
+  const inscricaoMunicipal = certDigital.inscricaoMunicipal || "";
+
+  if (!numeroNfse || !codigoVerificacao) {
+    throw new Error("Nota fiscal não possui número da NFSe ou código de verificação necessários para cancelamento na API Paulistana.");
+  }
+
+  const xmlCancelamento = construirXmlCancelamentoPaulistana(numeroNfse, codigoVerificacao, inscricaoMunicipal, motivoCancelamento);
   const pedidoId = `CANC${numeroNfse}`;
-  const signedXml = assinarXml(xmlCancelamento, certDigital, pedidoId);
-  const cabecalho = criarCabecalhoGinfes();
-  const soapEnvelope = criarEnvelopeSOAPGinfes("CancelarNfseV3", cabecalho, signedXml, "producao");
+  const signedXml = assinarXmlSHA256(xmlCancelamento, certDigital, pedidoId);
 
-  console.log("=== NFS-e Cancelamento Produção ===");
-  console.log("NFS-e:", numeroNfse, "CNPJ:", cnpj);
+  const operacao = "CancelamentoNFe";
+  const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, signedXml);
+  const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
 
-  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, "CancelarNfseV3", {
+  console.log("=== NFS-e Cancelamento Produção (Paulistana) ===");
+  console.log("NFS-e:", numeroNfse, "Inscricao:", inscricaoMunicipal);
+
+  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, soapAction, {
     certPem: certDigital.certPem,
     keyPem: certDigital.keyPem,
   });
-  console.log("Resposta GINFES Cancelamento:", soapResponse.substring(0, 500));
+  console.log("Resposta Paulistana Cancelamento:", soapResponse.substring(0, 500));
   const resultado = parsearRespostaCancelamento(soapResponse);
   return { ...resultado, xmlEnvio: signedXml };
 }

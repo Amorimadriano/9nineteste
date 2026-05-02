@@ -1,6 +1,6 @@
 /**
  * XML Builder para NFS-e (Nota Fiscal de Serviços Eletrônica)
- * Constrói XML conforme padrão ABRASF
+ * Constrói XML conforme padrão API Paulistana (Prefeitura de SP)
  */
 
 import type { NFSeEmissaoData } from "../../types/nfse";
@@ -8,7 +8,7 @@ import type { NFSeEmissaoData } from "../../types/nfse";
 export class NFSeXMLBuilder {
   /**
    * Constrói XML de RPS (Recibo Provisório de Serviços)
-   * Uses GINFES v03 namespace
+   * Uses API Paulistana namespace
    */
   buildRPS(data: NFSeEmissaoData): string {
     // Validações obrigatórias
@@ -36,7 +36,7 @@ export class NFSeXMLBuilder {
     const rpsId = `R${data.prestador.cnpj.replace(/\D/g, "")}${data.numero}`;
 
     return `<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsEnvio xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_envio_v03.xsd">
+<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="LOTE1">
   <LoteRps Id="${loteId}">
     <NumeroLote>1</NumeroLote>
     <Cnpj>${data.prestador.cnpj.replace(/\D/g, "")}</Cnpj>
@@ -111,17 +111,15 @@ export class NFSeXMLBuilder {
       </Rps>
     </ListaRps>
   </LoteRps>
-</EnviarLoteRpsEnvio>`;
+</PedidoEnvioLoteRPS>`;
   }
 
   /**
    * Constrói XML de RPS com placeholder para assinatura digital.
-   * A assinatura real deve ser feita pelo backend (Supabase edge function)
-   * usando node-forge, pois requer acesso à chave privada.
-   * O certificadoPem é incluído como referência, mas o DigestValue e SignatureValue
-   * serão preenchidos pelo serviço de assinatura no backend.
+   * A assinatura real (XML-DSig SHA-256 + hash RPS) deve ser feita pelo backend
+   * (Supabase edge function) usando node-forge, pois requer acesso à chave privada.
    */
-  buildSignedRPS(data: NFSeEmissaoData, certificadoPem: string): string {
+  buildSignedRPS(data: NFSeEmissaoData, _certificadoPem: string): string {
     // Just build the RPS XML - signing is done by the backend
     return this.buildRPS(data);
   }
@@ -136,7 +134,7 @@ export class NFSeXMLBuilder {
 
     const rpsList = dados.map((data) => this.buildRPS(data));
     return `<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsEnvio xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
+<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="LOTE1">
   <LoteRps>
     <NumeroLote>1</NumeroLote>
     <Cnpj>${dados[0].prestador.cnpj}</Cnpj>
@@ -146,7 +144,7 @@ export class NFSeXMLBuilder {
       ${rpsList.join("\n")}
     </ListaRps>
   </LoteRps>
-</EnviarLoteRpsEnvio>`;
+</PedidoEnvioLoteRPS>`;
   }
 
   /**

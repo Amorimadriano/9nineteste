@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Bypass typing for tables not present in generated types
 const db: any = supabase;
 import { toast } from "@/hooks/use-toast";
-import { traduzirErroGinfes } from "@/lib/nfse/ai";
+import { traduzirErroPaulistana } from "@/lib/nfse/ai";
 
 /** Status possíveis de uma NFS-e */
 export type NFSeStatus =
@@ -119,7 +119,7 @@ export function useNFSeSync() {
         // Tenta traduzir erro automaticamente via IA
         let mensagemTraduzida = msg;
         try {
-          const traducao = await traduzirErroGinfes("SYNC_ERROR", msg);
+          const traducao = await traduzirErroPaulistana("SYNC_ERROR", msg);
           mensagemTraduzida = `${traducao.explicacao}\n\nAção sugerida: ${traducao.acaoSugerida}`;
         } catch {
           // Falha silenciosa na tradução — mantém mensagem original

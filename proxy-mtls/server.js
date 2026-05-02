@@ -1,8 +1,8 @@
 /**
- * Proxy mTLS para NFS-e GINFES
+ * Proxy mTLS para NFS-e (GINFES e Paulistana)
  *
  * Recebe requisições SOAP da Edge Function do Supabase e encaminha
- * para a GINFES com autenticação por certificado digital (mTLS).
+ * para a prefeitura com autenticação por certificado digital (mTLS).
  *
  * Variáveis de ambiente:
  *   PROXY_PORT       - Porta do servidor (default: 3001)
@@ -22,10 +22,16 @@ app.use(express.json({ limit: "5mb" }));
 const PORT = parseInt(process.env.PORT || process.env.PROXY_PORT || "3001", 10);
 const API_KEY = process.env.PROXY_API_KEY || "";
 
-// URLs da GINFES
+// URLs da GINFES (legado - mantido para compatibilidade)
 const GINFES_URLS = {
   homologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
   producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
+};
+
+// URLs da API Paulistana
+const PAULISTANA_URLS = {
+  homologacao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
+  producao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
 };
 
 /**
@@ -48,19 +54,59 @@ function authenticate(req, res, next) {
  * Health check
  */
 app.get("/health", authenticate, (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+  res.json({ status: "ok", timestamp: new Date().toISOString(), providers: ["ginfes", "paulistana"] });
 });
 
 /**
- * Endpoint principal: encaminha requisição SOAP para GINFES com mTLS
+ * Resolve target URL from request body.
+ * Accepts explicit `url`, or `provider` + `ambiente` mapping.
+ */
+function resolveTargetUrl(body) {
+  if (body.url) return body.url;
+  const provider = body.provider || "ginfes";
+  const env = body.ambiente || "producao";
+  if (provider === "paulistana") {
+    return PAULISTANA_URLS[env] || PAULISTANA_URLS.producao;
+  }
+  return GINFES_URLS[env] || GINFES_URLS.producao;
+}
+
+/**
+ * Endpoint genérico: encaminha requisição SOAP com mTLS
  *
  * Body JSON esperado:
  *   {
  *     "soapEnvelope": "<soap12:Envelope>...</soap12:Envelope>",
  *     "certPem": "-----BEGIN CERTIFICATE-----\n...",
  *     "keyPem": "-----BEGIN PRIVATE KEY-----\n...",
- *     "ambiente": "producao" | "homologacao"
+ *     "ambiente": "producao" | "homologacao",
+ *     "provider": "ginfes" | "paulistana",
+ *     "url": "https://..." // opcional, sobrescreve provider/ambiente
  *   }
+ */
+app.post("/proxy-nfse", authenticate, (req, res) => {
+  const { soapEnvelope, certPem, keyPem, soapAction } = req.body;
+
+  if (!soapEnvelope) {
+    return res.status(400).json({ error: "soapEnvelope é obrigatório" });
+  }
+
+  const targetUrl = resolveTargetUrl(req.body);
+  const action = soapAction || "";
+
+  if (!certPem || !keyPem) {
+    console.log(`[proxy] Enviando sem mTLS para ${targetUrl} action=${action}`);
+    return sendWithoutMTLS(targetUrl, soapEnvelope, action, res);
+  }
+
+  console.log(`[proxy] Enviando com mTLS para ${targetUrl} action=${action}`);
+  console.log(`[proxy] Envelope preview: ${soapEnvelope.substring(0, 200)}...`);
+  sendWithMTLS(targetUrl, soapEnvelope, action, certPem, keyPem, res);
+});
+
+/**
+ * Endpoint legado: encaminha requisição SOAP para GINFES com mTLS
+ * (mantido para compatibilidade com versões antigas das edge functions)
  */
 app.post("/proxy-ginfes", authenticate, (req, res) => {
   const { soapEnvelope, certPem, keyPem, ambiente, soapAction } = req.body;
@@ -73,14 +119,13 @@ app.post("/proxy-ginfes", authenticate, (req, res) => {
   const targetUrl = GINFES_URLS[targetEnv] || GINFES_URLS.producao;
   const action = soapAction || "";
 
-  // Se não tem certificado, usar requisição sem mTLS (homologação)
   if (!certPem || !keyPem) {
-    console.log(`[proxy] Enviando sem mTLS para ${targetEnv} action=${action}`);
+    console.log(`[proxy] [legacy] Enviando sem mTLS para ${targetEnv} action=${action}`);
     return sendWithoutMTLS(targetUrl, soapEnvelope, action, res);
   }
 
-  console.log(`[proxy] Enviando com mTLS para ${targetEnv} action=${action}`);
-  console.log(`[proxy] Envelope preview: ${soapEnvelope.substring(0, 200)}...`);
+  console.log(`[proxy] [legacy] Enviando com mTLS para ${targetEnv} action=${action}`);
+  console.log(`[proxy] [legacy] Envelope preview: ${soapEnvelope.substring(0, 200)}...`);
   sendWithMTLS(targetUrl, soapEnvelope, action, certPem, keyPem, res);
 });
 
@@ -141,10 +186,8 @@ function sendWithMTLS(targetUrl, soapEnvelope, soapAction, certPem, keyPem, res)
       "SOAPAction": soapAction ? `"${soapAction}"` : "",
       "Content-Length": payload.length,
     },
-    // mTLS: certificado cliente no handshake TLS
     cert: certPem,
     key: keyPem,
-    // Não rejeitar certificados auto-assinados em homologação
     rejectUnauthorized: process.env.NODE_TLS_REJECT_UNAUTHORIZED !== "0",
   };
 
@@ -152,7 +195,7 @@ function sendWithMTLS(targetUrl, soapEnvelope, soapAction, certPem, keyPem, res)
     let data = "";
     response.on("data", (chunk) => { data += chunk; });
     response.on("end", () => {
-      console.log(`[proxy] Resposta GINFES: ${response.statusCode}`);
+      console.log(`[proxy] Resposta: ${response.statusCode}`);
       if (response.statusCode >= 300) {
         return res.status(response.statusCode).send(data.substring(0, 5000));
       }
@@ -174,6 +217,7 @@ const server = app.listen(PORT, () => {
   console.log(`[proxy] NFS-e mTLS proxy rodando na porta ${PORT}`);
   console.log(`[proxy] GINFES produção: ${GINFES_URLS.producao}`);
   console.log(`[proxy] GINFES homologação: ${GINFES_URLS.homologacao}`);
+  console.log(`[proxy] Paulistana: ${PAULISTANA_URLS.producao}`);
   console.log(`[proxy] Autenticação: ${API_KEY ? "API Key configurada" : "SEM AUTENTICAÇÃO (apenas para desenvolvimento)"}`);
 });
 

@@ -151,7 +151,7 @@ async function analisarRespostaAmbiguaComIA(
           {
             role: "system",
             content:
-              "Você é um especialista em parsing de XML de resposta da Prefeitura de São Paulo (GINFES). Analise o XML e determine o status real da nota. Retorne APENAS um JSON válido com: { status: 'autorizada' | 'rejeitada' | 'processando' | 'erro', numeroNota?: string, codigoVerificacao?: string, mensagemErro?: string }.",
+              "Você é um especialista em parsing de XML de resposta da Prefeitura de São Paulo (API Paulistana). Analise o XML e determine o status real da nota. Retorne APENAS um JSON válido com: { status: 'autorizada' | 'rejeitada' | 'processando' | 'erro', numeroNota?: string, codigoVerificacao?: string, mensagemErro?: string }.",
           },
           {
             role: "user",

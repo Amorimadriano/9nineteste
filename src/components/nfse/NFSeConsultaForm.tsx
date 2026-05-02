@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { statusCores } from "@/types/nfse-ui";
 import { formatCurrency, formatDate } from "@/lib/nfse-utils";
-import { useTraduzirErroGinfes } from "@/hooks/useAiNFSe";
+import { useTraduzirErroPaulistana } from "@/hooks/useAiNFSe";
 import {
   Search,
   Download,
@@ -65,7 +65,7 @@ interface NFSeConsultaFormProps {
 export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { traduzir, traducao, isLoading: traduzindoErro } = useTraduzirErroGinfes();
+  const { traduzir, traducao, isLoading: traduzindoErro } = useTraduzirErroPaulistana();
 
   const [notas, setNotas] = useState<NotaSimples[]>([]);
   const [selectedNotaId, setSelectedNotaId] = useState<string>("");

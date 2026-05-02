@@ -1,6 +1,7 @@
 /**
- * Parser de respostas NFS-e (GINFES v03)
+ * Parser de respostas NFS-e (API Paulistana)
  * Parseia XMLs de resposta da prefeitura usando extração robusta por regex
+ * Suporta API Paulistana (Prefeitura de São Paulo)
  */
 
 import type { NFSeResposta, MensagemRetorno, NFSeCancelamentoResposta } from "../../types/nfse";
@@ -21,8 +22,8 @@ function parseMessages(xml: string): MensagemRetorno[] {
   const msgs: MensagemRetorno[] = [];
   const blocks = [...xml.matchAll(/<MensagemRetorno[^>]*>([\s\S]*?)<\/MensagemRetorno>/gi)];
   if (blocks.length === 0) {
-    const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]*)<\/Codigo>/gi)].map(m => m[1]);
-    const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]*)<\/Mensagem>/gi)].map(m => m[1]);
+    const codigos = [...xml.matchAll(/<Codigo(?:\s[^>]*)?>([^<]*)<\/Codigo>/gi)].map(m => m[1]);
+    const mensagens = [...xml.matchAll(/<Mensagem(?:\s[^>]*)?>([^<]*)<\/Mensagem>/gi)].map(m => m[1]);
     for (let i = 0; i < Math.max(codigos.length, mensagens.length); i++) {
       msgs.push({ codigo: codigos[i] || "ERR", mensagem: mensagens[i] || "Erro desconhecido" });
     }
@@ -59,9 +60,9 @@ export function parseNfseResponse(xml: string): NFSeResposta {
   const nfseBlock = compNfse ? (extractBlock(compNfse, "Nfse") || compNfse) : workXml;
   const infNfse = extractBlock(nfseBlock, "InfNfse") || nfseBlock;
 
-  const numero = extractValue(infNfse, "NumeroNfse") || extractValue(infNfse, "Numero");
+  const numero = extractValue(infNfse, "NumeroNfse") || extractValue(infNfse, "NumeroNFe") || extractValue(infNfse, "Numero");
   const codigoVerificacao = extractValue(infNfse, "CodigoVerificacao");
-  const dataEmissao = extractValue(infNfse, "DataEmissaoNfse") || extractValue(infNfse, "DataEmissao");
+  const dataEmissao = extractValue(infNfse, "DataEmissaoNfse") || extractValue(infNfse, "DataEmissaoNFe") || extractValue(infNfse, "DataEmissao");
   const protocolo = extractValue(workXml, "Protocolo");
 
   const valoresBlock = extractBlock(infNfse, "ValoresNfse") || extractBlock(infNfse, "Valores");

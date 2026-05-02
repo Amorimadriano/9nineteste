@@ -103,8 +103,179 @@ function escapeXml(str: string): string {
 function formatarDataNfse(data: string | Date): string {
   const d = typeof data === "string" ? new Date(data) : data;
   const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function formatarDataHoraNfse(data: string | Date): string {
+  const d = typeof data === "string" ? new Date(data) : data;
+  const pad = (n: number) => n.toString().padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
+
+// --- Paulistana RPS Hash Signature ---
+
+function formatarValorAssinatura(valor: number): string {
+  const v = Math.round(valor * 100).toString();
+  return v.padStart(15, "0");
+}
+
+function gerarAssinaturaRpsPaulistana(
+  inscricaoPrestador: string,
+  serieRps: string,
+  numeroRps: string,
+  dataEmissao: string, // YYYY-MM-DD
+  tributacaoRps: string, // T/F/A...
+  statusRps: string, // N/C...
+  issRetido: boolean,
+  valorServicos: number,
+  valorDeducoes: number,
+  codigoServico: string,
+  indicadorCpfCnpj: string, // 1=CPF, 2=CNPJ, 3=NaoInformado
+  cpfCnpjTomador: string,
+  certificado: CertificadoDigital
+): string {
+  const forge = (globalThis as any).forge;
+  if (!forge) throw new Error("node-forge nao disponivel");
+
+  const signatureString =
+    inscricaoPrestador.padStart(8, "0") +
+    (serieRps || "1").padEnd(5, " ") +
+    numeroRps.padStart(12, "0") +
+    dataEmissao.replace(/-/g, "") +
+    tributacaoRps +
+    statusRps +
+    (issRetido ? "S" : "N") +
+    formatarValorAssinatura(valorServicos) +
+    formatarValorAssinatura(valorDeducoes) +
+    codigoServico.replace(/\D/g, "").padStart(5, "0") +
+    indicadorCpfCnpj +
+    cpfCnpjTomador.replace(/\D/g, "").padStart(14, "0");
+
+  const privateKey = forge.pki.privateKeyFromPem(certificado.keyPem);
+  const md = forge.md.sha1.create();
+  md.update(signatureString, "utf8");
+  const signatureBytes = privateKey.sign(md);
+  return forge.util.encode64(signatureBytes);
+}
+
+// --- XML builders (API Paulistana) ---
+
+function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital): { xml: string; rpsId: string } {
+  const rpsId = `rps${dados.identificacaoRps.numero}`;
+  const dataEmissao = formatarDataNfse(dados.dataEmissao);
+  const serieRps = dados.identificacaoRps.serie || "1";
+  const numeroRps = dados.identificacaoRps.numero;
+  const inscricaoPrestador = certificado.inscricaoMunicipal || dados.emitente.inscricaoMunicipal || "00000000";
+  const tributacaoRps = dados.tributacaoRps || "T"; // T=TRIBUTADA_MUNICIPIO
+  const statusRps = "N"; // N=NORMAL
+  const issRetido = !!dados.servico.issRetido;
+  const valorServicos = parseFloat(dados.servico.valores.valorServicos) || 0;
+  const valorDeducoes = parseFloat(dados.servico.valores.valorDeducoes) || 0;
+  const codigoServico = dados.servico.itemListaServico || dados.servico.codigo || "";
+
+  const tomadorCnpjCpf = (dados.tomador.cnpjCpf || "").replace(/\D/g, "");
+  const indicadorCpfCnpj = dados.tomador.tipoDocumento === "CPF" ? "1" : tomadorCnpjCpf ? "2" : "3";
+
+  const assinatura = gerarAssinaturaRpsPaulistana(
+    inscricaoPrestador, serieRps, numeroRps, dataEmissao,
+    tributacaoRps, statusRps, issRetido, valorServicos, valorDeducoes,
+    codigoServico, indicadorCpfCnpj, tomadorCnpjCpf, certificado
+  );
+
+  const valorServicosStr = valorServicos.toFixed(2);
+  const valorDeducoesStr = valorDeducoes.toFixed(2);
+  const valorPisStr = (parseFloat(dados.servico.valores.valorPis) || 0).toFixed(2);
+  const valorCofinsStr = (parseFloat(dados.servico.valores.valorCofins) || 0).toFixed(2);
+  const valorInssStr = (parseFloat(dados.servico.valores.valorInss) || 0).toFixed(2);
+  const valorIrStr = (parseFloat(dados.servico.valores.valorIr) || 0).toFixed(2);
+  const valorCsllStr = (parseFloat(dados.servico.valores.valorCsll) || 0).toFixed(2);
+  const aliquotaStr = (parseFloat(dados.servico.aliquotaIss) || 0.05).toFixed(4);
+
+  let xml = `<RPS Id="${rpsId}">
+    <Assinatura>${assinatura}</Assinatura>
+    <ChaveRPS>
+      <InscricaoPrestador>${inscricaoPrestador}</InscricaoPrestador>
+      <SerieRPS>${serieRps}</SerieRPS>
+      <NumeroRPS>${numeroRps}</NumeroRPS>
+    </ChaveRPS>
+    <TipoRPS>RPS</TipoRPS>
+    <DataEmissao>${dataEmissao}</DataEmissao>
+    <StatusRPS>${statusRps}</StatusRPS>
+    <TributacaoRPS>${tributacaoRps}</TributacaoRPS>
+    <ValorServicos>${valorServicosStr}</ValorServicos>
+    <ValorDeducoes>${valorDeducoesStr}</ValorDeducoes>
+    <ValorPIS>${valorPisStr}</ValorPIS>
+    <ValorCOFINS>${valorCofinsStr}</ValorCOFINS>
+    <ValorINSS>${valorInssStr}</ValorINSS>
+    <ValorIR>${valorIrStr}</ValorIR>
+    <ValorCSLL>${valorCsllStr}</ValorCSLL>
+    <CodigoServico>${codigoServico}</CodigoServico>
+    <AliquotaServicos>${aliquotaStr}</AliquotaServicos>
+    <ISSRetido>${issRetido ? "true" : "false"}</ISSRetido>`;
+
+  if (dados.tomador.cnpjCpf) {
+    xml += `
+    <CPFCNPJTomador>
+      <${dados.tomador.tipoDocumento === "CPF" ? "CPF" : "CNPJ"}>${dados.tomador.cnpjCpf}</${dados.tomador.tipoDocumento === "CPF" ? "CPF" : "CNPJ"}>
+    </CPFCNPJTomador>`;
+  }
+
+  if (dados.tomador.razaoSocial) {
+    xml += `
+    <RazaoSocialTomador>${escapeXml(dados.tomador.razaoSocial)}</RazaoSocialTomador>`;
+  }
+
+  if (dados.tomador.endereco?.logradouro) {
+    xml += `
+    <EnderecoTomador>
+      <Logradouro>${escapeXml(dados.tomador.endereco.logradouro)}</Logradouro>
+      <NumeroEndereco>${escapeXml(dados.tomador.endereco.numero || "S/N")}</NumeroEndereco>
+      ${dados.tomador.endereco.complemento ? `<ComplementoEndereco>${escapeXml(dados.tomador.endereco.complemento)}</ComplementoEndereco>` : ""}
+      <Bairro>${escapeXml(dados.tomador.endereco.bairro || "")}</Bairro>
+      <Cidade>${escapeXml(dados.tomador.endereco.cidade || "")}</Cidade>
+      <UF>${dados.tomador.endereco.uf || "SP"}</UF>
+      <CEP>${(dados.tomador.endereco.cep || "").replace(/\D/g, "")}</CEP>
+    </EnderecoTomador>`;
+  }
+
+  if (dados.tomador.email) {
+    xml += `
+    <EmailTomador>${escapeXml(dados.tomador.email)}</EmailTomador>`;
+  }
+
+  xml += `
+    <Discriminacao>${escapeXml(dados.servico.descricao || dados.servico.discriminacao || "")}</Discriminacao>
+  </RPS>`;
+
+  return { xml, rpsId };
+}
+
+function construirXmlLotePaulistana(dados: any, xmlRps: string): { xml: string; loteId: string } {
+  const numeroLote = Date.now().toString();
+  const loteId = `LOTE${numeroLote}`;
+  const dataInicio = formatarDataNfse(dados.dataEmissao);
+  const valorServicos = (parseFloat(dados.servico.valores.valorServicos) || 0).toFixed(2);
+  const valorDeducoes = (parseFloat(dados.servico.valores.valorDeducoes) || 0).toFixed(2);
+
+  const xml = `<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="${loteId}">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${dados.emitente.cnpj}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+    <dtInicio>${dataInicio}</dtInicio>
+    <dtFim>${dataInicio}</dtFim>
+    <QtdRPS>1</QtdRPS>
+    <ValorTotalServicos>${valorServicos}</ValorTotalServicos>
+    <ValorTotalDeducoes>${valorDeducoes}</ValorTotalDeducoes>
+  </Cabecalho>
+  ${xmlRps}
+</PedidoEnvioLoteRPS>`;
+
+  return { xml, loteId };
+}
+
+// --- XML-DSig SHA-256 ---
 
 function canonicalizeXml(xml: string): string {
   let result = xml;
@@ -154,101 +325,10 @@ function getElementName(xml: string, id: string): string {
   const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, "i");
   const match = xml.match(regex);
-  return match ? match[1] : "InfRps";
+  return match ? match[1] : "PedidoEnvioLoteRPS";
 }
 
-function construirXmlRps(dados: any): string {
-  const rpsId = `R${dados.emitente.cnpj}${dados.identificacaoRps.numero}`;
-  const valorServicos = dados.servico.valores.valorServicos.toFixed(2);
-  const valorIss = dados.servico.valores.valorIss.toFixed(2);
-  const issRetido = dados.servico.issRetido ? "1" : "2";
-  const optanteSimples = dados.optanteSimplesNacional ? "1" : "2";
-  const incentivoFiscal = dados.incentivoFiscal ? "1" : "2";
-  const cnae = dados.servico.codigoCnae || dados.servico.cnae;
-  const baseCalculo = (dados.servico.valores.valorServicos - dados.servico.valores.valorDeducoes).toFixed(2);
-  const dataEmissaoFormatada = formatarDataNfse(dados.dataEmissao);
-  const tomadorCodigoMunicipio = dados.tomador.endereco.cidade || dados.emitente.endereco.codigoMunicipio;
-
-  return `<InfRps Id="${rpsId}">
-      <IdentificacaoRps>
-        <Numero>${dados.identificacaoRps.numero}</Numero>
-        <Serie>${dados.identificacaoRps.serie}</Serie>
-        <Tipo>${dados.identificacaoRps.tipo}</Tipo>
-      </IdentificacaoRps>
-      <DataEmissao>${dataEmissaoFormatada}</DataEmissao>
-      <NaturezaOperacao>${dados.naturezaOperacao}</NaturezaOperacao>
-      <RegimeEspecialTributacao>${dados.regimeTributario}</RegimeEspecialTributacao>
-      <OptanteSimplesNacional>${optanteSimples}</OptanteSimplesNacional>
-      <IncentivadorCultural>${incentivoFiscal}</IncentivadorCultural>
-      <Status>1</Status>
-      <Servico>
-        <Valores>
-          <ValorServicos>${valorServicos}</ValorServicos>
-          <ValorDeducoes>${dados.servico.valores.valorDeducoes.toFixed(2)}</ValorDeducoes>
-          <ValorPis>${dados.servico.valores.valorPis.toFixed(2)}</ValorPis>
-          <ValorCofins>${dados.servico.valores.valorCofins.toFixed(2)}</ValorCofins>
-          <ValorInss>${dados.servico.valores.valorInss.toFixed(2)}</ValorInss>
-          <ValorIr>${dados.servico.valores.valorIr.toFixed(2)}</ValorIr>
-          <ValorCsll>${dados.servico.valores.valorCsll.toFixed(2)}</ValorCsll>
-          <IssRetido>${issRetido}</IssRetido>
-          <ValorIss>${valorIss}</ValorIss>
-          <BaseCalculo>${baseCalculo}</BaseCalculo>
-          <Aliquota>${dados.servico.aliquotaIss.toFixed(4)}</Aliquota>
-          <ValorLiquido>${dados.servico.valores.valorLiquido.toFixed(2)}</ValorLiquido>
-        </Valores>
-        <ItemListaServico>${dados.servico.itemListaServico}</ItemListaServico>
-        ${cnae ? `<CodigoCnae>${cnae}</CodigoCnae>` : ""}
-        ${dados.servico.codigoTributacao ? `<CodigoTributacaoMunicipio>${dados.servico.codigoTributacao}</CodigoTributacaoMunicipio>` : ""}
-        <Discriminacao>${escapeXml(dados.servico.descricao || dados.servico.discriminacao || "")}</Discriminacao>
-        <CodigoMunicipio>${dados.emitente.endereco.codigoMunicipio}</CodigoMunicipio>
-      </Servico>
-      <Prestador>
-        <Cnpj>${dados.emitente.cnpj}</Cnpj>
-        <InscricaoMunicipal>${dados.emitente.inscricaoMunicipal}</InscricaoMunicipal>
-      </Prestador>
-      <Tomador>
-        <IdentificacaoTomador>
-          <CpfCnpj>
-            <${dados.tomador.tipoDocumento === "CNPJ" ? "Cnpj" : "Cpf"}>${dados.tomador.cnpjCpf}</${dados.tomador.tipoDocumento === "CNPJ" ? "Cnpj" : "Cpf"}>
-          </CpfCnpj>
-          ${dados.tomador.tipoDocumento === "CNPJ" && dados.tomador.inscricaoMunicipal ? `<InscricaoMunicipal>${dados.tomador.inscricaoMunicipal}</InscricaoMunicipal>` : ""}
-        </IdentificacaoTomador>
-        <RazaoSocial>${escapeXml(dados.tomador.razaoSocial)}</RazaoSocial>
-        ${dados.tomador.endereco.logradouro ? `
-        <Endereco>
-          <Logradouro>${escapeXml(dados.tomador.endereco.logradouro)}</Logradouro>
-          <Numero>${dados.tomador.endereco.numero}</Numero>
-          ${dados.tomador.endereco.complemento ? `<Complemento>${escapeXml(dados.tomador.endereco.complemento)}</Complemento>` : ""}
-          <Bairro>${escapeXml(dados.tomador.endereco.bairro)}</Bairro>
-          <CodigoMunicipio>${tomadorCodigoMunicipio}</CodigoMunicipio>
-          <Uf>${dados.tomador.endereco.uf}</Uf>
-          <Cep>${dados.tomador.endereco.cep}</Cep>
-        </Endereco>` : ""}
-        ${dados.tomador.email ? `<Contato><Email>${dados.tomador.email}</Email>${dados.tomador.telefone ? `<Telefone>${dados.tomador.telefone}</Telefone>` : ""}</Contato>` : ""}
-      </Tomador>
-    </InfRps>`;
-}
-
-function construirXmlLoteRps(dados: any, xmlRps: string): { xml: string; loteId: string } {
-  const numeroLote = Date.now().toString();
-  const loteId = `LOTE${numeroLote}`;
-  const xml = `<EnviarLoteRpsEnvio xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_envio_v03.xsd">
-  <LoteRps Id="${loteId}">
-    <NumeroLote>${numeroLote}</NumeroLote>
-    <Cnpj>${dados.emitente.cnpj}</Cnpj>
-    <InscricaoMunicipal>${dados.emitente.inscricaoMunicipal}</InscricaoMunicipal>
-    <QuantidadeRps>1</QuantidadeRps>
-    <ListaRps>
-      <Rps>
-        ${xmlRps}
-      </Rps>
-    </ListaRps>
-  </LoteRps>
-</EnviarLoteRpsEnvio>`;
-  return { xml, loteId };
-}
-
-function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
+function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) throw new Error("node-forge nao disponivel");
   const privateKey = forge.pki.privateKeyFromPem(certificado.keyPem);
@@ -256,21 +336,21 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
   const referencedXml = extractElementById(xml, idReferencia);
   if (!referencedXml) throw new Error(`Elemento Id="${idReferencia}" nao encontrado`);
   const canonReferenced = canonicalizeXml(referencedXml);
-  const digest = forge.md.sha1.create();
+  const digest = forge.md.sha256.create();
   digest.update(canonReferenced, "utf8");
   const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-  const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
+  const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
   const canonSignedInfo = canonicalizeXml(signedInfoXml);
-  const signatureMd = forge.md.sha1.create();
+  const signatureMd = forge.md.sha256.create();
   signatureMd.update(canonSignedInfo, "utf8");
   const signatureBytes = privateKey.sign(signatureMd);
   const signatureBase64 = forge.util.encode64(signatureBytes);
   const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
   const certBase64 = forge.util.encode64(certDer);
 
-  const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+  const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
   const elementName = getElementName(xml, idReferencia);
   const closingTag = `</${elementName}>`;
@@ -279,53 +359,41 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
   return xml.substring(0, insertionPoint) + signatureBlock + xml.substring(insertionPoint);
 }
 
-function assinarLoteCompleto(xmlLote: string, certificado: CertificadoDigital): string {
-  let xml = xmlLote;
-  const infRpsRegex = /Id="(R[^"]+)"/g;
-  let match;
-  while ((match = infRpsRegex.exec(xml)) !== null) {
-    xml = assinarXml(xml, certificado, match[1]);
-  }
-  const loteMatch = xml.match(/Id="(LOTE[^"]+)"/);
-  if (loteMatch) xml = assinarXml(xml, certificado, loteMatch[1]);
-  return xml;
-}
+// --- SOAP Paulistana ---
 
-function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  // GINFES usa SOAP 1.1. arg0/arg1 devem ser unqualified (xmlns="") — schema usa elementFormDefault="unqualified"
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+function criarEnvelopeSOAP11Paulistana(operacao: string, xmlAssinado: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns="">${cabecalhoXml}</arg0>
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
-}
-
-function criarCabecalhoGinfes(): string {
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Header/>
+  <soapenv:Body>
+    <${operacao} xmlns="http://www.prefeitura.sp.gov.br/nfe">
+      <MensagemXML><![CDATA[
+${xmlAssinado}
+      ]]></MensagemXML>
+    </${operacao}>
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
 function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
 }
 
-const GINFES_URLS = {
-  homologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
-  producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
-};
+const PAULISTANA_URL = "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx";
 
-async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, certificado?: { certPem: string; keyPem: string }): Promise<string> {
+async function enviarRequisicaoSOAP(
+  soapEnvelope: string,
+  soapAction: string,
+  certificado?: { certPem: string; keyPem: string }
+): Promise<string> {
   const env = getAmbiente();
   const baseHeaders: Record<string, string> = {
     "Content-Type": "text/xml; charset=utf-8",
     "SOAPAction": `"${soapAction}"`,
   };
+
   if (env === "homologacao") {
-    const response = await fetch(GINFES_URLS[env], {
+    const response = await fetch(PAULISTANA_URL, {
       method: "POST",
       headers: baseHeaders,
       body: soapEnvelope,
@@ -336,16 +404,25 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
     }
     return await response.text();
   }
+
   if (!certificado) throw new Error("Certificado obrigatorio em producao");
   const proxyUrl = Deno.env.get("MTLS_PROXY_URL");
   if (!proxyUrl) throw new Error("MTLS_PROXY_URL nao configurada");
   const proxyApiKey = Deno.env.get("MTLS_PROXY_API_KEY") || "";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (proxyApiKey) headers["X-API-Key"] = proxyApiKey;
-  const proxyResponse = await fetch(`${proxyUrl}/proxy-ginfes`, {
+
+  const proxyResponse = await fetch(`${proxyUrl}/proxy-nfse`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ soapEnvelope, soapAction, certPem: certificado.certPem, keyPem: certificado.keyPem, ambiente: env }),
+    body: JSON.stringify({
+      soapEnvelope,
+      soapAction,
+      certPem: certificado.certPem,
+      keyPem: certificado.keyPem,
+      provider: "paulistana",
+      ambiente: env,
+    }),
   });
   if (!proxyResponse.ok) {
     const text = await proxyResponse.text();
@@ -354,66 +431,81 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
   return await proxyResponse.text();
 }
 
-function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
+function parsearErrosPaulistana(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
-  const ERROS_GINFES: Record<string, string> = {
-    E1: "CNPJ invalido", E2: "Inscricao Municipal invalida", E3: "RPS ja informado",
-    E4: "Serie invalida", E5: "Tipo invalido", E6: "Data de emissao invalida",
-    E7: "Natureza da operacao invalida", E8: "Regime especial de tributacao invalido",
-    E9: "Optante pelo Simples Nacional invalido", E10: "Tomador nao informado",
-    E11: "Cidade do tomador invalida", E12: "UF do tomador invalida",
-    E13: "CEP do tomador invalido", E14: "Email do tomador invalido",
-    E15: "Telefone do tomador invalido", E16: "Servico nao informado",
-    E17: "Item da lista de servicos invalido", E18: "Codigo CNAE invalido",
-    E19: "Codigo de tributacao invalido", E20: "Discriminacao do servico invalida",
-    E21: "Valor dos servicos invalido", E22: "Valor das deducoes invalido",
-    E23: "Base de calculo invalida", E24: "Aliquota ISS invalida",
-    E25: "Valor do ISS invalido", E26: "NFS-e nao encontrada",
-    E27: "NFS-e ja cancelada", E28: "Certificado invalido",
-    E29: "Assinatura invalida", E30: "XML mal formatado",
-    E31: "Lote ja processado", E32: "Quantidade de RPS invalida",
-    E33: "RPS nao encontrado", E34: "Inscricao Municipal do prestador invalida",
-    E35: "Razao Social do prestador invalida", E36: "Endereco do prestador invalido",
-    E37: "Codigo do municipio do prestador invalido", E38: "Valor do PIS invalido",
-    E39: "Valor do COFINS invalido", E40: "Valor do INSS invalido",
-    E41: "Valor do IR invalido", E42: "Valor do CSLL invalido",
-    E43: "ISS retido invalido", E44: "Valor do ISS retido invalido",
-    E45: "Outras retencoes invalidas", E46: "Valor liquido invalido",
-    E47: "Desconto incondicionado invalido", E48: "Desconto condicionado invalido",
-    E49: "Responsavel pelo recolhimento invalido", E50: "Erro interno",
-    E51: "Timeout na prefeitura", E52: "Prefeitura indisponivel",
-    E53: "Limite de requisicoes excedido", E54: "IP bloqueado",
-    E55: "Manutencao na prefeitura", E56: "Versao do schema invalida",
-    E57: "Namespace invalido", E58: "Encoding invalido",
-    E59: "Elemento obrigatorio ausente", E60: "Requisicao mal formada",
+  const ERROS_PAULISTANA: Record<string, string> = {
+    "1001": "CNPJ do remetente invalido",
+    "1002": "Inscricao Municipal invalida",
+    "1003": "RPS ja informado",
+    "1004": "Serie invalida",
+    "1005": "Tipo invalido",
+    "1006": "Data de emissao invalida",
+    "1007": "Natureza da operacao invalida",
+    "1008": "Valor dos servicos invalido",
+    "1009": "Assinatura do RPS invalida",
+    "1010": "Certificado invalido",
+    "1011": "Assinatura XML invalida",
+    "1012": "XML mal formatado",
+    "1013": "Erro interno",
+    "1014": "Requisicao mal formada",
+    "1015": "Lote ja processado",
+    "1016": "Quantidade de RPS invalida",
+    "1017": "Valor total dos servicos invalido",
+    "1018": "Codigo de servico invalido",
+    "1019": "Aliquota invalida",
+    "1020": "Tomador nao informado",
+    "1021": "CNPJ/CPF do tomador invalido",
+    "1022": "Municipio do prestador invalido",
   };
-  const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]+)<\/Mensagem>/gi)].map(m => m[1]);
+  const mensagens = [...xml.matchAll(/<Alerta[^>]*>([\s\S]*?)<\/Alerta>/gi)].map(m => m[1].replace(/<[^>]+>/g, "").trim());
   const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]+)<\/Codigo>/gi)].map(m => m[1]);
   for (let i = 0; i < Math.max(mensagens.length, codigos.length); i++) {
-    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_GINFES[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
+    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_PAULISTANA[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
   }
   const faultMatch = xml.match(/<faultstring>([^<]+)<\/faultstring>/i);
   if (faultMatch && erros.length === 0) erros.push({ codigo: "SOAP_FAULT", mensagem: faultMatch[1], tipo: "Erro" });
   return erros;
 }
 
-function parsearRespostaEmissao(xml: string) {
+function parsearRespostaEmissaoPaulistana(xml: string) {
   try {
-    const numeroMatch = xml.match(/<NumeroNfse>([^<]+)<\/NumeroNfse>/);
-    const codigoVerificacaoMatch = xml.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/);
-    const protocoloMatch = xml.match(/<Protocolo>([^<]+)<\/Protocolo>/) || xml.match(/<NumeroProtocolo>([^<]+)<\/NumeroProtocolo>/);
-    const mensagensErro = parsearErros(xml);
-    if (mensagensErro.length > 0 && !numeroMatch) {
-      return { sucesso: false, xmlRetorno: xml, mensagens: mensagensErro };
+    // Extrai XML interno do CDATA ou do envelope SOAP
+    let workXml = xml;
+    const cdataMatch = xml.match(/<(?:MensagemXML|return)[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/(?:MensagemXML|return)>/i);
+    if (cdataMatch) workXml = cdataMatch[1];
+    if (!cdataMatch && workXml.includes("&lt;")) {
+      workXml = workXml.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
     }
+    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+
+    const erros = parsearErrosPaulistana(cleanXml);
+    const sucessoMatch = cleanXml.match(/<Sucesso>([^<]+)<\/Sucesso>/i);
+    const sucesso = sucessoMatch?.[1]?.toLowerCase() === "true";
+
+    if (!sucesso && erros.length > 0) {
+      return { sucesso: false, xmlRetorno: xml, mensagens: erros };
+    }
+
+    const chaveLoteMatch = cleanXml.match(/<ChaveLoteRPS>([\s\S]*?)<\/ChaveLoteRPS>/i);
+    const chaveLote = chaveLoteMatch ? chaveLoteMatch[1] : "";
+    const numeroLoteMatch = chaveLote.match(/<NumeroLote>([^<]+)<\/NumeroLote>/i) || cleanXml.match(/<NumeroLote>([^<]+)<\/NumeroLote>/i);
+    const dataEnvioMatch = cleanXml.match(/<DataEnvioLote>([^<]+)<\/DataEnvioLote>/i);
+    const numeroNfseMatch = cleanXml.match(/<NumeroNfseGeradas>([^<]+)<\/NumeroNfseGeradas>/i);
+
+    // Tenta extrair numero NFSe da resposta de consulta vinculada
+    const nfseMatch = cleanXml.match(/<NFe>[\s\S]*?<NumeroNFe>([^<]+)<\/NumeroNFe>/i);
+    const codigoVerificacaoMatch = cleanXml.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i);
+
     return {
-      sucesso: true,
-      numeroNfse: numeroMatch?.[1],
-      protocolo: protocoloMatch?.[1],
+      sucesso: sucesso || !!numeroLoteMatch,
+      numeroNfse: nfseMatch?.[1] || numeroNfseMatch?.[1],
+      numeroLote: numeroLoteMatch?.[1],
+      protocolo: numeroLoteMatch?.[1],
       codigoVerificacao: codigoVerificacaoMatch?.[1],
-      linkNfse: numeroMatch?.[1] ? `https://${getAmbiente() === "homologacao" ? "homologacao" : "producao"}.ginfes.com.br/visualizar/${numeroMatch[1]}` : undefined,
+      dataEnvio: dataEnvioMatch?.[1],
+      linkNfse: numeroLoteMatch?.[1] ? `https://nfe.prefeitura.sp.gov.br/${nfseMatch?.[1] || ""}` : undefined,
       xmlRetorno: xml,
-      mensagens: [{ codigo: "0000", mensagem: "Nota emitida com sucesso", tipo: "Sucesso" }],
+      mensagens: erros.length > 0 ? erros : [{ codigo: "0000", mensagem: "Lote enviado com sucesso", tipo: "Sucesso" }],
     };
   } catch (error) {
     return { sucesso: false, xmlRetorno: xml, mensagens: [{ codigo: "ERR_PARSE", mensagem: `Erro: ${(error as Error).message}`, tipo: "Erro" }] };
@@ -475,12 +567,13 @@ serve(async (req) => {
 
     const dadosNota = {
       identificacaoRps: { numero: nota.numero_rps || nota.numero_nota || gerarNumeroRps(), serie: nota.serie || "1", tipo: nota.tipo_rps || "RPS" },
-      dataEmissao: formatarDataNfse(nota.data_emissao || new Date().toISOString()),
+      dataEmissao: nota.data_emissao || new Date().toISOString(),
       competencia: nota.data_competencia || new Date().toISOString().split("T")[0],
       naturezaOperacao: nota.natureza_operacao || 1,
       regimeTributario: nota.regime_tributario || 1,
       optanteSimplesNacional: nota.regime_tributario === 1,
       incentivoFiscal: false,
+      tributacaoRps: nota.tributacao_rps || "T",
       emitente: {
         cnpj: certDigital.cnpj,
         inscricaoMunicipal: certDigital.inscricaoMunicipal,
@@ -527,7 +620,7 @@ serve(async (req) => {
         body: JSON.stringify({
           taskType: "code",
           messages: [
-            { role: "system", content: "Você é um validador de XML NFSe ABRASF 2.04. Analise o JSON da nota e retorne um JSON com { valido: boolean, problemas: string[], sugestoes: string[] }. Retorne SOMENTE o JSON." },
+            { role: "system", content: "Você é um validador de XML NFSe Paulistana (Prefeitura de SP). Analise o JSON da nota e retorne um JSON com { valido: boolean, problemas: string[], sugestoes: string[] }. Retorne SOMENTE o JSON." },
             { role: "user", content: JSON.stringify(dadosNota, null, 2) },
           ],
           temperature: 0.1,
@@ -550,22 +643,32 @@ serve(async (req) => {
       resultado = {
         sucesso: true,
         numeroNfse: dadosNota.identificacaoRps.numero,
+        numeroLote: `HOM${Date.now()}`,
         protocolo: `PROT${Date.now()}`,
         codigoVerificacao: `HOM${Date.now().toString(36).toUpperCase()}`,
-        linkNfse: `https://homologacao.ginfes.com.br/visualizar/${dadosNota.identificacaoRps.numero}`,
+        linkNfse: `https://nfe.prefeitura.sp.gov.br/${dadosNota.identificacaoRps.numero}`,
         xmlEnvio: "<homologacao>simulado</homologacao>",
         xmlRetorno: "<Compl>true</Compl>",
-        mensagens: [{ codigo: "AA001", mensagem: "RPS processado - ambiente de homologacao", tipo: "Sucesso" }],
+        mensagens: [{ codigo: "AA001", mensagem: "RPS processado - ambiente de homologacao (Paulistana)", tipo: "Sucesso" }],
       };
     } else {
-      const xmlRps = construirXmlRps(dadosNota);
-      const { xml: xmlLote } = construirXmlLoteRps(dadosNota, xmlRps);
-      const signedLote = assinarLoteCompleto(xmlLote, certDigital);
-      const cabecalho = criarCabecalhoGinfes();
-      const soapAction = "RecepcionarLoteRpsV3";
-      const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, signedLote, "producao");
+      const { xml: xmlRps, rpsId } = construirXmlRpsPaulistana(dadosNota, certDigital);
+      console.log(`[emitir-nfse] RPS ${rpsId} construido`);
+
+      const { xml: xmlLote, loteId } = construirXmlLotePaulistana(dadosNota, xmlRps);
+      console.log(`[emitir-nfse] Lote ${loteId} construido`);
+
+      // Assina o lote com XML-DSig SHA-256
+      const signedLote = assinarXmlSHA256(xmlLote, certDigital, loteId);
+      console.log("[emitir-nfse] Lote assinado com XML-DSig SHA-256");
+
+      const operacao = "EnvioLoteRPS";
+      const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, signedLote);
+      const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
+
+      console.log(`[emitir-nfse] Enviando para ${PAULISTANA_URL} action=${soapAction}`);
       const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
-      resultado = { ...parsearRespostaEmissao(soapResponse), xmlEnvio: signedLote };
+      resultado = { ...parsearRespostaEmissaoPaulistana(soapResponse), xmlEnvio: signedLote };
     }
 
     const updateData: any = {

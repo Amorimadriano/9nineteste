@@ -1,6 +1,6 @@
 /**
- * Client NFS-e - GINFES v03 Adapter
- * Implementação unificada com protocolo SOAP 1.2 e namespaces GINFES v03.
+ * Client NFS-e - API Paulistana Adapter
+ * Implementação unificada com protocolo SOAP 1.1 e API Paulistana (Prefeitura de SP).
  * Mantém compatibilidade de API com NFSeClient (emitir/consultar/cancelar).
  */
 
@@ -13,7 +13,15 @@ import type {
   CertificadoDigital,
   NFSeConfiguracao,
 } from "../../types/nfse";
-import { NFSeConfig } from "../nfs-e/config";
+
+const NFSeConfig = {
+  urls: {
+    homologacao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
+    producao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
+  },
+  versaoLayout: "1",
+  timeout: 30000,
+};
 
 interface NFSeClientConfig {
   urlHomologacao: string;
@@ -27,8 +35,8 @@ interface NFSeClientConfig {
 function mapConfig(src: NFSeClientConfig | NFSeConfiguracao): NFSeClientConfig {
   if ("urlHomologacao" in src) return src as NFSeClientConfig;
   return {
-    urlHomologacao: src.urlHomologacao || NFSeConfig.urls.homologacao + "/ServiceGinfesImpl",
-    urlProducao: src.urlProducao || NFSeConfig.urls.producao + "/ServiceGinfesImpl",
+    urlHomologacao: src.urlHomologacao || NFSeConfig.urls.homologacao,
+    urlProducao: src.urlProducao || NFSeConfig.urls.producao,
     ambiente: src.ambiente,
     versao: src.versao || NFSeConfig.versaoLayout,
     timeoutMs: src.timeoutMs || NFSeConfig.timeout,
@@ -58,22 +66,17 @@ function formatValor(v: number | undefined): string {
   return (v ?? 0).toFixed(2);
 }
 
-function buildCabecalhoGinfes(): string {
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+function buildCabecalhoPaulistana(): string {
+  return `<cabecalho xmlns="http://www.prefeitura.sp.gov.br/nfe" versao="1"></cabecalho>`;
 }
 
-function buildEnvelope(soapAction: string, dadosXml: string, ambiente?: "homologacao" | "producao"): string {
-  const cabecalho = buildCabecalhoGinfes();
-  // GINFES usa SOAP 1.1 (schemas.xmlsoap.org)
-  // Divergência: produção usa namespace http://producao.ginfes.com.br, homologação usa http://www.ginfes.com.br/
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+function buildEnvelope(operacao: string, dadosXml: string, _ambiente?: "homologacao" | "producao"): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <ns1:${soapAction} xmlns:ns1="${namespace}">
-      <ns1:arg0>${cabecalho}</ns1:arg0>
-      <ns1:arg1>${dadosXml}</ns1:arg1>
-    </ns1:${soapAction}>
+    <${operacao} xmlns="http://www.prefeitura.sp.gov.br/nfe">
+      <MensagemXML><![CDATA[${dadosXml}]]></MensagemXML>
+    </${operacao}>
   </soap:Body>
 </soap:Envelope>`;
 }
@@ -82,139 +85,135 @@ function buildLoteRpsXml(data: NFSeEmissaoData): string {
   const p = data.prestador;
   const t = data.tomador;
   const s = data.servico;
-  const rpsId = `R${formatCnpj(p.cnpj)}${String(data.numero).padStart(15, "0")}`;
-  const loteId = `LOTE${formatCnpj(p.cnpj)}${Date.now()}`;
+  const rpsId = `R${formatCnpj(p.cnpj)}${String(data.numero).padStart(12, "0")}`;
+  const loteId = `LOTE${Date.now()}`;
 
-  const valores = `<Valores>
-  <ValorServicos>${formatValor(s.valorServicos)}</ValorServicos>
-  <ValorDeducoes>${formatValor(s.valorDeducoes)}</ValorDeducoes>
-  <ValorPis>${formatValor(s.valorPis)}</ValorPis>
-  <ValorCofins>${formatValor(s.valorCofins)}</ValorCofins>
-  <ValorInss>${formatValor(s.valorInss)}</ValorInss>
-  <ValorIr>${formatValor(s.valorIr)}</ValorIr>
-  <ValorCsll>${formatValor(s.valorCsll)}</ValorCsll>
-  <IssRetido>${s.issRetido}</IssRetido>
-  <ValorIss>${formatValor(s.valorIss)}</ValorIss>
-  <ValorIssRetido>${formatValor(s.valorIssRetido)}</ValorIssRetido>
-  <OutrasRetencoes>${formatValor(s.outrasRetencoes)}</OutrasRetencoes>
-  <BaseCalculo>${formatValor(s.baseCalculo)}</BaseCalculo>
-  <Aliquota>${s.aliquota.toFixed(4)}</Aliquota>
-  <ValorLiquidoNfse>${formatValor(s.valorLiquidoNfse)}</ValorLiquidoNfse>
-  <ValorDescontoIncondicionado>${formatValor(s.valorDescontoIncondicionado)}</ValorDescontoIncondicionado>
-  <ValorDescontoCondicionado>${formatValor(s.valorDescontoCondicionado)}</ValorDescontoCondicionado>
-</Valores>`;
-
-  const rps = `  <Rps>
-    <InfRps Id="${rpsId}">
-      <IdentificacaoRps>
-        <Numero>${data.numero}</Numero>
-        <Serie>${escapeXml(data.serie)}</Serie>
-        <Tipo>${data.tipo}</Tipo>
-      </IdentificacaoRps>
-      <DataEmissao>${data.dataEmissao}</DataEmissao>
-      <NaturezaOperacao>${data.naturezaOperacao}</NaturezaOperacao>
-      <OptanteSimplesNacional>${data.optanteSimplesNacional}</OptanteSimplesNacional>
-      <IncentivadorCultural>${data.incentivadorCultural}</IncentivadorCultural>
-      <Status>${data.status}</Status>
-      <Servico>
-        ${valores}
-        <ItemListaServico>${escapeXml(s.itemListaServico)}</ItemListaServico>
-        ${s.codigoCnae ? `<CodigoCnae>${escapeXml(s.codigoCnae)}</CodigoCnae>` : ""}
-        ${s.codigoTributacaoMunicipio ? `<CodigoTributacaoMunicipio>${escapeXml(s.codigoTributacaoMunicipio)}</CodigoTributacaoMunicipio>` : ""}
-        <Discriminacao>${escapeXml(s.discriminacao)}</Discriminacao>
-        <CodigoMunicipio>${s.codigoMunicipio}</CodigoMunicipio>
-        <ExigibilidadeISS>${s.exigibilidadeISS}</ExigibilidadeISS>
-        ${s.municipioIncidencia ? `<MunicipioIncidencia>${s.municipioIncidencia}</MunicipioIncidencia>` : ""}
-      </Servico>
-      <Prestador>
-        <Cnpj>${formatCnpj(p.cnpj)}</Cnpj>
-        <InscricaoMunicipal>${escapeXml(p.inscricaoMunicipal)}</InscricaoMunicipal>
-      </Prestador>
-      <Tomador>
-        <IdentificacaoTomador>
-          <CpfCnpj>
-            ${t.cnpj ? `<Cnpj>${formatCnpj(t.cnpj)}</Cnpj>` : ""}
-            ${t.cpf ? `<Cpf>${formatCpf(t.cpf)}</Cpf>` : ""}
-          </CpfCnpj>
-          ${t.inscricaoMunicipal ? `<InscricaoMunicipal>${escapeXml(t.inscricaoMunicipal)}</InscricaoMunicipal>` : ""}
-        </IdentificacaoTomador>
-        <RazaoSocial>${escapeXml(t.razaoSocial)}</RazaoSocial>
-        <Endereco>
-          <Endereco>${escapeXml(t.endereco.logradouro)}</Endereco>
-          <Numero>${escapeXml(t.endereco.numero || "")}</Numero>
-          ${t.endereco.complemento ? `<Complemento>${escapeXml(t.endereco.complemento)}</Complemento>` : ""}
-          <Bairro>${escapeXml(t.endereco.bairro || "")}</Bairro>
-          <CodigoMunicipio>${t.endereco.codigoMunicipio || ""}</CodigoMunicipio>
-          <Uf>${t.endereco.uf || ""}</Uf>
-          <Cep>${(t.endereco.cep || "").replace(/\D/g, "")}</Cep>
-        </Endereco>
-      </Tomador>
-    </InfRps>
-  </Rps>`;
+  const rps = `<RPS Id="${rpsId}">
+    <Assinatura>ASSINATURA_HASH_PLACEHOLDER</Assinatura>
+    <ChaveRPS>
+      <InscricaoPrestador>${escapeXml(p.inscricaoMunicipal)}</InscricaoPrestador>
+      <SerieRPS>${escapeXml(data.serie)}</SerieRPS>
+      <NumeroRPS>${data.numero}</NumeroRPS>
+    </ChaveRPS>
+    <TipoRPS>RPS</TipoRPS>
+    <DataEmissao>${data.dataEmissao}</DataEmissao>
+    <StatusRPS>N</StatusRPS>
+    <TributacaoRPS>T</TributacaoRPS>
+    <ValorServicos>${formatValor(s.valorServicos)}</ValorServicos>
+    <ValorDeducoes>${formatValor(s.valorDeducoes)}</ValorDeducoes>
+    <ValorPIS>${formatValor(s.valorPis)}</ValorPIS>
+    <ValorCOFINS>${formatValor(s.valorCofins)}</ValorCOFINS>
+    <ValorINSS>${formatValor(s.valorInss)}</ValorINSS>
+    <ValorIR>${formatValor(s.valorIr)}</ValorIR>
+    <ValorCSLL>${formatValor(s.valorCsll)}</ValorCSLL>
+    <CodigoServico>${escapeXml(s.itemListaServico)}</CodigoServico>
+    <AliquotaServicos>${s.aliquota.toFixed(4)}</AliquotaServicos>
+    <ISSRetido>${s.issRetido === 1 ? "true" : "false"}</ISSRetido>
+    <CPFCNPJTomador>
+      ${t.cnpj ? `<CNPJ>${formatCnpj(t.cnpj)}</CNPJ>` : ""}
+      ${t.cpf ? `<CPF>${formatCpf(t.cpf)}</CPF>` : ""}
+    </CPFCNPJTomador>
+    <RazaoSocialTomador>${escapeXml(t.razaoSocial)}</RazaoSocialTomador>
+    <EnderecoTomador>
+      <Logradouro>${escapeXml(t.endereco.logradouro)}</Logradouro>
+      <NumeroEndereco>${escapeXml(t.endereco.numero || "S/N")}</NumeroEndereco>
+      ${t.endereco.complemento ? `<ComplementoEndereco>${escapeXml(t.endereco.complemento)}</ComplementoEndereco>` : ""}
+      <Bairro>${escapeXml(t.endereco.bairro || "")}</Bairro>
+      <Cidade>${escapeXml(t.endereco.codigoMunicipio || "")}</Cidade>
+      <UF>${t.endereco.uf || ""}</UF>
+      <CEP>${(t.endereco.cep || "").replace(/\D/g, "")}</CEP>
+    </EnderecoTomador>
+    <Discriminacao>${escapeXml(s.discriminacao)}</Discriminacao>
+  </RPS>`;
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsEnvio xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_envio_v03.xsd">
-  <LoteRps Id="${loteId}">
-    <NumeroLote>1</NumeroLote>
-    <Cnpj>${formatCnpj(p.cnpj)}</Cnpj>
-    <InscricaoMunicipal>${escapeXml(p.inscricaoMunicipal)}</InscricaoMunicipal>
-    <QuantidadeRps>1</QuantidadeRps>
-    <ListaRps>
-${rps}
-    </ListaRps>
-  </LoteRps>
-</EnviarLoteRpsEnvio>`;
+<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="${loteId}">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${formatCnpj(p.cnpj)}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+    <dtInicio>${data.dataEmissao}</dtInicio>
+    <dtFim>${data.dataEmissao}</dtFim>
+    <QtdRPS>1</QtdRPS>
+    <ValorTotalServicos>${formatValor(s.valorServicos)}</ValorTotalServicos>
+    <ValorTotalDeducoes>${formatValor(s.valorDeducoes)}</ValorTotalDeducoes>
+  </Cabecalho>
+  ${rps}
+</PedidoEnvioLoteRPS>`;
 }
 
 function buildConsultaXml(data: NFSeConsultaData): string {
-  if (data.cnpjTomador || data.cpfTomador) {
+  const cnpj = formatCnpj(data.cnpjPrestador || "");
+  const im = escapeXml(data.inscricaoMunicipalPrestador || "");
+
+  if (data.cnpjTomador || data.cpfTomador || data.dataInicio) {
+    let detalhe = `
+    <CPFCNPJPrestador>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJPrestador>
+    <InscricaoPrestador>${im}</InscricaoPrestador>`;
+    if (data.dataInicio) detalhe += `
+    <dtInicio>${data.dataInicio}</dtInicio>
+    <dtFim>${data.dataFim || data.dataInicio}</dtFim>`;
+    if (data.cnpjTomador) detalhe += `
+    <CPFCNPJTomador>
+      <CNPJ>${formatCnpj(data.cnpjTomador)}</CNPJ>
+    </CPFCNPJTomador>`;
+    if (data.cpfTomador) detalhe += `
+    <CPFCNPJTomador>
+      <CPF>${formatCpf(data.cpfTomador)}</CPF>
+    </CPFCNPJTomador>`;
     return `<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_servico_prestado_envio_v03.xsd">
-  <Prestador>
-    ${data.cnpjPrestador ? `<Cnpj>${formatCnpj(data.cnpjPrestador)}</Cnpj>` : ""}
-    ${data.inscricaoMunicipalPrestador ? `<InscricaoMunicipal>${escapeXml(data.inscricaoMunicipalPrestador)}</InscricaoMunicipal>` : ""}
-  </Prestador>
-  <Tomador>
-    <CpfCnpj>
-      ${data.cnpjTomador ? `<Cnpj>${formatCnpj(data.cnpjTomador)}</Cnpj>` : ""}
-      ${data.cpfTomador ? `<Cpf>${formatCpf(data.cpfTomador)}</Cpf>` : ""}
-    </CpfCnpj>
-  </Tomador>
-  ${data.dataInicio ? `<Periodo><DataInicial>${data.dataInicio}</DataInicial><DataFinal>${data.dataFim || data.dataInicio}</DataFinal></Periodo>` : ""}
-</ConsultarNfseServicoPrestadoEnvio>`;
+<PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="Lote1">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+  </Cabecalho>
+  <Detalhe>${detalhe}
+  </Detalhe>
+</PedidoConsultaNFe>`;
   }
 
   return `<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
-  <IdentificacaoRps>
-    ${data.numero ? `<Numero>${data.numero}</Numero>` : ""}
-    ${data.serie ? `<Serie>${escapeXml(data.serie)}</Serie>` : ""}
-    ${data.tipo ? `<Tipo>${data.tipo}</Tipo>` : ""}
-  </IdentificacaoRps>
-  <Prestador>
-    ${data.cnpjPrestador ? `<Cnpj>${formatCnpj(data.cnpjPrestador)}</Cnpj>` : ""}
-    ${data.inscricaoMunicipalPrestador ? `<InscricaoMunicipal>${escapeXml(data.inscricaoMunicipalPrestador)}</InscricaoMunicipal>` : ""}
-  </Prestador>
-</ConsultarNfseRpsEnvio>`;
+<PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="Lote1">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+  </Cabecalho>
+  <Detalhe>
+    <CPFCNPJPrestador>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJPrestador>
+    <InscricaoPrestador>${im}</InscricaoPrestador>
+    <NumeroNFe>${data.numero || ""}</NumeroNFe>
+  </Detalhe>
+</PedidoConsultaNFe>`;
 }
 
 function buildCancelamentoXml(data: NFSeCancelamentoData): string {
   const pedidoId = `CANC${data.numero}`;
   return `<?xml version="1.0" encoding="UTF-8"?>
-<CancelarNfseEnvio xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_envio_v03.xsd">
-  <Pedido Id="${pedidoId}">
-    <InfPedidoCancelamento>
-      <IdentificacaoNfse>
-        <Numero>${data.numero}</Numero>
-        <Cnpj>${formatCnpj(data.cnpjPrestador)}</Cnpj>
-        <InscricaoMunicipal>${escapeXml(data.inscricaoMunicipalPrestador)}</InscricaoMunicipal>
-        <CodigoMunicipio>${data.codigoMunicipio}</CodigoMunicipio>
-      </IdentificacaoNfse>
-      <CodigoCancelamento>${data.codigoCancelamento}</CodigoCancelamento>
-      ${data.motivoCancelamento ? `<MotivoCancelamento>${escapeXml(data.motivoCancelamento)}</MotivoCancelamento>` : ""}
-    </InfPedidoCancelamento>
-  </Pedido>
-</CancelarNfseEnvio>`;
+<PedidoCancelamentoNFe xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="${pedidoId}">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${formatCnpj(data.cnpjPrestador)}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+  </Cabecalho>
+  <Detalhe>
+    <ChaveNFe>
+      <InscricaoPrestador>${escapeXml(data.inscricaoMunicipalPrestador)}</InscricaoPrestador>
+      <NumeroNFe>${data.numero}</NumeroNFe>
+      <CodigoVerificacao>${data.codigoCancelamento}</CodigoVerificacao>
+    </ChaveNFe>
+    <MotivoCancelamento>${escapeXml(data.motivoCancelamento)}</MotivoCancelamento>
+  </Detalhe>
+</PedidoCancelamentoNFe>`;
 }
 
 function extractValue(xml: string, tag: string): string | undefined {
@@ -233,8 +232,8 @@ function parseMessages(xml: string): Array<{ codigo: string; mensagem: string; t
   const msgs: Array<{ codigo: string; mensagem: string; tipo: "Sucesso" | "Erro" | "Aviso" }> = [];
   const blocks = [...xml.matchAll(/<MensagemRetorno[^>]*>([\s\S]*?)<\/MensagemRetorno>/gi)];
   if (blocks.length === 0) {
-    const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]*)<\/Codigo>/gi)].map(m => m[1]);
-    const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]*)<\/Mensagem>/gi)].map(m => m[1]);
+    const codigos = [...xml.matchAll(/<Codigo(?:\s[^>]*)?>([^<]*)<\/Codigo>/gi)].map(m => m[1]);
+    const mensagens = [...xml.matchAll(/<Mensagem(?:\s[^>]*)?>([^<]*)<\/Mensagem>/gi)].map(m => m[1]);
     for (let i = 0; i < Math.max(codigos.length, mensagens.length); i++) {
       msgs.push({ codigo: codigos[i] || "ERR", mensagem: mensagens[i] || "Erro desconhecido", tipo: "Erro" });
     }
@@ -264,9 +263,9 @@ function parseNfseResponse(xml: string): NFSeResposta {
   const nfseBlock = compNfse ? (extractBlock(compNfse, "Nfse") || compNfse) : cleanXml;
   const infNfse = extractBlock(nfseBlock, "InfNfse") || nfseBlock;
 
-  const numero = extractValue(infNfse, "NumeroNfse") || extractValue(infNfse, "Numero");
+  const numero = extractValue(infNfse, "NumeroNfse") || extractValue(infNfse, "NumeroNFe") || extractValue(infNfse, "Numero");
   const codigoVerificacao = extractValue(infNfse, "CodigoVerificacao");
-  const dataEmissao = extractValue(infNfse, "DataEmissaoNfse") || extractValue(infNfse, "DataEmissao");
+  const dataEmissao = extractValue(infNfse, "DataEmissaoNfse") || extractValue(infNfse, "DataEmissaoNFe") || extractValue(infNfse, "DataEmissao");
   const protocolo = extractValue(cleanXml, "Protocolo");
 
   const valoresBlock = extractBlock(infNfse, "ValoresNfse") || extractBlock(infNfse, "Valores");
@@ -333,8 +332,9 @@ export class NFSeClient {
     return this.config.ambiente === "producao" ? this.config.urlProducao : this.config.urlHomologacao;
   }
 
-  private async request(soapAction: string, dadosXml: string): Promise<string> {
-    const envelope = buildEnvelope(soapAction, dadosXml, this.config.ambiente);
+  private async request(operacao: string, dadosXml: string): Promise<string> {
+    const envelope = buildEnvelope(operacao, dadosXml, this.config.ambiente);
+    const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
@@ -396,15 +396,14 @@ export class NFSeClient {
     const xmlEnvio = buildLoteRpsXml(data);
 
     return this.withRetry(async () => {
-      const xmlRetorno = await this.request("RecepcionarLoteRpsV3", xmlEnvio);
+      const xmlRetorno = await this.request("EnvioLoteRPS", xmlEnvio);
       return { ...parseNfseResponse(xmlRetorno), xmlEnvio, xmlRetorno };
     });
   }
 
   async consultar(data: NFSeConsultaData): Promise<NFSeResposta> {
     const xmlConsulta = buildConsultaXml(data);
-    const action = data.cnpjTomador || data.cpfTomador ? "ConsultarNfseServicoPrestadoV3" : "ConsultarNfsePorRpsV3";
-    const xmlRetorno = await this.request(action, xmlConsulta);
+    const xmlRetorno = await this.request("ConsultaNFe", xmlConsulta);
     return parseConsultaResponse(xmlRetorno);
   }
 
@@ -415,7 +414,7 @@ export class NFSeClient {
     this.validarCertificado(certificado);
     const xmlCancelamento = buildCancelamentoXml(data);
     return this.withRetry(async () => {
-      const xmlRetorno = await this.request("CancelarNfseV3", xmlCancelamento);
+      const xmlRetorno = await this.request("CancelamentoNFe", xmlCancelamento);
       return parseCancelamentoResponse(xmlRetorno);
     });
   }

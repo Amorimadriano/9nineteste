@@ -1,6 +1,6 @@
 /**
  * Testes de XML Builder NFS-e
- * Valida construção de RPS e XML conforme padrão ABRASF
+ * Valida construção de RPS e XML conforme padrão API Paulistana
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
@@ -23,7 +23,7 @@ describe("NFSeXMLBuilder", () => {
       const xml = builder.buildRPS(dadosNotaFiscalValida);
 
       expect(xml).toContain('<?xml version="1.0"');
-      expect(xml).toContain("EnviarLoteRpsEnvio");
+      expect(xml).toContain("PedidoEnvioLoteRPS");
       expect(xml).toContain(dadosNotaFiscalValida.prestador.cnpj);
       expect(xml).toContain(dadosNotaFiscalValida.tomador.cnpj);
     });
@@ -63,11 +63,11 @@ describe("NFSeXMLBuilder", () => {
       expect(xml).not.toContain("<Cnpj>" + dadosNotaFiscalCPF.tomador.cpf);
     });
 
-    it("deve gerar XML com estrutura GINFES v03 válida", () => {
+    it("deve gerar XML com estrutura API Paulistana válida", () => {
       const xml = builder.buildRPS(dadosNotaFiscalValida);
 
-      // Verificar estrutura básica GINFES v03
-      expect(xml).toContain("ginfes.com.br");
+      // Verificar estrutura básica API Paulistana
+      expect(xml).toContain("prefeitura.sp.gov.br");
       expect(xml).toContain("<Rps>");
       expect(xml).toContain("<InfRps");
       expect(xml).toContain("IdentificacaoTomador");
@@ -288,7 +288,7 @@ describe("NFSeXMLBuilder", () => {
 
       const xml = builder.buildLote([dadosNotaFiscalValida, dados2]);
 
-      expect(xml).toContain("<EnviarLoteRpsEnvio");
+      expect(xml).toContain("<PedidoEnvioLoteRPS");
       expect(xml).toContain("<LoteRps>");
       expect(xml).toContain("<QuantidadeRps>2</QuantidadeRps>");
     });

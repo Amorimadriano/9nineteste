@@ -9,7 +9,7 @@ import {
   sugerirServico,
   analisarTomador,
   validarPreEmissao,
-  traduzirErroGinfes,
+  traduzirErroPaulistana,
   sugerirRetencoes,
   analisarLoteNotas,
   type SugestaoServico,
@@ -75,13 +75,13 @@ export function useValidarPreEmissao() {
   };
 }
 
-/** Hook para traduzir erros do GINFES */
-export function useTraduzirErroGinfes() {
+/** Hook para traduzir erros da API Paulistana */
+export function useTraduzirErroPaulistana() {
   const [traducao, setTraducao] = useState<ErroTraduzido | null>(null);
   const queryClient = useQueryClient();
 
   const mutation = useMutation<ErroTraduzido, Error, { codigo: string; mensagem: string; xmlContexto?: string }>({
-    mutationFn: ({ codigo, mensagem, xmlContexto }) => traduzirErroGinfes(codigo, mensagem, xmlContexto),
+    mutationFn: ({ codigo, mensagem, xmlContexto }) => traduzirErroPaulistana(codigo, mensagem, xmlContexto),
     onSuccess: (data, variables) => {
       // Cacheia traduções para reutilização
       queryClient.setQueryData(["nfse", "erro", variables.codigo], data);

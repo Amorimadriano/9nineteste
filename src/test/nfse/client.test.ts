@@ -1,6 +1,6 @@
 /**
- * Testes de Client NFS-e (GINFES v03)
- * Valida chamadas SOAP 1.2, emissão, consulta, cancelamento e tratamento de erros
+ * Testes de Client NFS-e (API Paulistana)
+ * Valida chamadas SOAP 1.1, emissão, consulta, cancelamento e tratamento de erros
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -23,7 +23,7 @@ import type {
   NFSeCancelamentoData,
 } from "@/types/nfse";
 
-describe("NFSeClient (GINFES v03)", () => {
+describe("NFSeClient (API Paulistana)", () => {
   let client: NFSeClient;
   let mockFetch: ReturnType<typeof vi.fn>;
 
@@ -58,7 +58,7 @@ describe("NFSeClient (GINFES v03)", () => {
       );
     });
 
-    it("deve incluir envelope SOAP 1.2 GINFES v03 na requisição", async () => {
+    it("deve incluir envelope SOAP 1.1 API Paulistana na requisição", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -71,12 +71,12 @@ describe("NFSeClient (GINFES v03)", () => {
       const requestBody = callArgs[1].body as string;
 
       expect(requestBody).toContain("soap:Envelope");
-      expect(requestBody).toContain("RecepcionarLoteRpsV3");
-      expect(requestBody).toContain("cabecalho");
-      expect(requestBody).toContain("versaoDados");
+      expect(requestBody).toContain("EnvioLoteRPS");
+      expect(requestBody).toContain("Cabecalho");
+      expect(requestBody).toContain("transacao");
     });
 
-    it("deve enviar XML com namespace GINFES v03", async () => {
+    it("deve enviar XML com namespace API Paulistana", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -88,7 +88,7 @@ describe("NFSeClient (GINFES v03)", () => {
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = callArgs[1].body as string;
 
-      expect(requestBody).toContain("ginfes.com.br");
+      expect(requestBody).toContain("prefeitura.sp.gov.br");
     });
 
     it("deve fazer requisição para URL correta de homologação", async () => {
@@ -216,7 +216,7 @@ describe("NFSeClient (GINFES v03)", () => {
       expect(resposta.sucesso).toBe(true);
     });
 
-    it("deve usar action ConsultarNfseServicoPrestadoV3 quando há tomador", async () => {
+    it("deve usar operação ConsultaNFe com detalhes do tomador quando há tomador", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -230,7 +230,7 @@ describe("NFSeClient (GINFES v03)", () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const body = callArgs[1].body as string;
-      expect(body).toContain("ConsultarNfseServicoPrestadoV3");
+      expect(body).toContain("ConsultaNFe");
     });
 
     it("deve retornar erro quando NFSe não é encontrada", async () => {
@@ -246,7 +246,7 @@ describe("NFSeClient (GINFES v03)", () => {
       });
 
       expect(resposta.sucesso).toBe(false);
-      expect(resposta.mensagens?.[0].codigo).toBe("E5");
+      expect(resposta.mensagens?.[0].codigo).toBe("1005");
     });
   });
 
@@ -280,17 +280,17 @@ describe("NFSeClient (GINFES v03)", () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:CancelamentoNFeResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
+<CancelamentoNFeResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaMensagemRetorno>
     <MensagemRetorno>
-      <Codigo>E10</Codigo>
+      <Codigo>1010</Codigo>
       <Mensagem>NFS-e não pode ser cancelada</Mensagem>
     </MensagemRetorno>
   </ListaMensagemRetorno>
-</CancelarNfseResposta>]]></return>
-    </ns2:CancelarNfseV3Response>
+</CancelamentoNFeResposta>]]></return>
+    </ns2:CancelamentoNFeResponse>
   </soap:Body>
 </soap:Envelope>`;
 
@@ -315,7 +315,7 @@ describe("NFSeClient (GINFES v03)", () => {
       );
 
       expect(resposta.sucesso).toBe(false);
-      expect(resposta.mensagens?.[0].codigo).toBe("E10");
+      expect(resposta.mensagens?.[0].codigo).toBe("1010");
     });
 
     it("deve incluir motivo do cancelamento no XML", async () => {

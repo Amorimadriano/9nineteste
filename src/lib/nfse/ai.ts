@@ -189,16 +189,16 @@ Retorne SOMENTE o JSON, sem markdown.`;
 }
 
 /**
- * Traduz erros do GINFES em mensagens amigáveis e acionáveis.
+ * Traduz erros da API Paulistana em mensagens amigáveis e acionáveis.
  *
  * Usa GPT-4o (code) para parsing estruturado de XML/erros.
  */
-export async function traduzirErroGinfes(
+export async function traduzirErroPaulistana(
   codigo: string,
   mensagemOriginal: string,
   xmlContexto?: string
 ): Promise<ErroTraduzido> {
-  const systemPrompt = `Você é um especialista em integração com a Prefeitura de São Paulo (GINFES).
+  const systemPrompt = `Você é um especialista em integração com a Prefeitura de São Paulo (API Paulistana).
 Traduza erros técnicos em instruções claras para o usuário.
 
 Retorne APENAS um JSON com:
@@ -208,17 +208,18 @@ Retorne APENAS um JSON com:
 - acaoSugerida: string (passo a passo do que fazer)
 - documentacao: string (URL ou referência, se conhecida)
 
-CÓDIGOS GINFES CONHECIDOS:
-E1 - CNPJ inválido → Verificar se o CNPJ do tomador está correto
-E2 - Inscrição Municipal inválida → Verificar inscrição municipal do prestador
-E3 - RPS já informado → O número do RPS já foi usado; gerar novo número
-E10 - Tomador não informado → Preencher dados do tomador
-E26 - NFS-e não encontrada → Verificar número da nota ou consultar novamente mais tarde
-E28 - Certificado inválido → Verificar validade e CNPJ do certificado digital
-E29 - Assinatura inválida → Reassinar o XML ou verificar certificado
-E30 - XML mal formatado → Verificar estrutura do XML enviado
-E50 - Erro interno da prefeitura → Tentar novamente em alguns minutos
-E60 - Requisição mal formada → Verificar parâmetros da requisição
+CÓDIGOS PAULISTANA CONHECIDOS:
+1001 - CNPJ do remetente inválido → Verificar se o CNPJ do remetente está correto
+1002 - Inscrição Municipal inválida → Verificar inscrição municipal do prestador
+1003 - RPS já informado → O número do RPS já foi usado; gerar novo número
+1004 - NFS-e não encontrada → Verificar número da nota ou consultar novamente mais tarde
+1005 - Certificado inválido → Verificar validade e CNPJ do certificado digital
+1006 - Assinatura inválida → Reassinar o XML ou verificar certificado
+1007 - XML mal formatado → Verificar estrutura do XML enviado
+1008 - Erro interno da prefeitura → Tentar novamente em alguns minutos
+1009 - Requisição mal formada → Verificar parâmetros da requisição
+1010 - Período de consulta inválido → Ajustar datas da consulta
+1011 - Limite de registros excedido → Reduzir período de consulta
 
 Retorne SOMENTE o JSON, sem markdown.`;
 

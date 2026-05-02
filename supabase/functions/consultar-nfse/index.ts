@@ -91,63 +91,82 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   return { cnpj, inscricaoMunicipal: "", certPem, keyPem };
 }
 
-// --- XML builders (ABRASF v3) ---
+// --- XML builders (API Paulistana) ---
 
-function xmlConsultaPorRps(numeroRps: string, serie: string, tipo: string, cnpj: string, im: string): string {
-  const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "2" ? "2" : tipo === "3" ? "3" : "1";
-  return `<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
-  <IdentificacaoRps>
-    <Numero>${numeroRps}</Numero>
-    <Serie>${serie}</Serie>
-    <Tipo>${tipoCodigo}</Tipo>
-  </IdentificacaoRps>
-  <Prestador>
-    <Cnpj>${cnpj}</Cnpj>
-    <InscricaoMunicipal>${im}</InscricaoMunicipal>
-  </Prestador>
-</ConsultarNfseRpsEnvio>`;
+function xmlPedidoConsultaNFe(cnpj: string, numeroNFe: string, inscricaoMunicipal?: string): string {
+  const im = inscricaoMunicipal || "";
+  return `<PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="Lote1">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+  </Cabecalho>
+  <Detalhe>
+    <CPFCNPJPrestador>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJPrestador>
+    <InscricaoPrestador>${im}</InscricaoPrestador>
+    <NumeroNFe>${numeroNFe}</NumeroNFe>
+  </Detalhe>
+</PedidoConsultaNFe>`;
 }
 
-function xmlConsultaServicoPrestado(cnpj: string, im: string, dataInicio?: string, dataFim?: string, cnpjTomador?: string, cpfTomador?: string): string {
-  let xml = `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_servico_prestado_envio_v03.xsd">
-  <Prestador>
-    <Cnpj>${cnpj}</Cnpj>
-    <InscricaoMunicipal>${im}</InscricaoMunicipal>
-  </Prestador>`;
-  if (cnpjTomador || cpfTomador) {
-    xml += `\n  <Tomador>\n    <CpfCnpj>`;
-    if (cnpjTomador) xml += `\n      <Cnpj>${cnpjTomador}</Cnpj>`;
-    if (cpfTomador) xml += `\n      <Cpf>${cpfTomador}</Cpf>`;
-    xml += `\n    </CpfCnpj>\n  </Tomador>`;
+function xmlPedidoConsultaNFePeriodo(
+  cnpj: string,
+  inscricaoMunicipal: string,
+  dataInicio: string,
+  dataFim: string,
+  cnpjTomador?: string,
+  cpfTomador?: string
+): string {
+  let detalhe = `
+    <CPFCNPJPrestador>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJPrestador>
+    <InscricaoPrestador>${inscricaoMunicipal}</InscricaoPrestador>
+    <dtInicio>${dataInicio}</dtInicio>
+    <dtFim>${dataFim}</dtFim>`;
+  if (cnpjTomador) {
+    detalhe += `
+    <CPFCNPJTomador>
+      <CNPJ>${cnpjTomador}</CNPJ>
+    </CPFCNPJTomador>`;
+  } else if (cpfTomador) {
+    detalhe += `
+    <CPFCNPJTomador>
+      <CPF>${cpfTomador}</CPF>
+    </CPFCNPJTomador>`;
   }
-  if (dataInicio) {
-    xml += `\n  <Periodo>\n    <DataInicial>${dataInicio}</DataInicial>\n    <DataFinal>${dataFim || dataInicio}</DataFinal>\n  </Periodo>`;
-  }
-  xml += `\n</ConsultarNfseServicoPrestadoEnvio>`;
-  return xml;
+  return `<PedidoConsultaNFe xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="Lote1">
+  <Cabecalho Versao="1">
+    <CPFCNPJRemetente>
+      <CNPJ>${cnpj}</CNPJ>
+    </CPFCNPJRemetente>
+    <transacao>true</transacao>
+  </Cabecalho>
+  <Detalhe>${detalhe}
+  </Detalhe>
+</PedidoConsultaNFe>`;
 }
 
-function criarCabecalhoGinfes(): string {
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
-}
+// --- Envelope SOAP 1.1 API Paulistana ---
 
-// Envelope SOAP 1.1 padrao GINFES (exatamente como a documentacao)
-function criarEnvelopeSOAP11(soapAction: string, xmlDados: string, xmlAssinado?: string): string {
-  const xmlPayload = xmlAssinado || xmlDados;
-  const cabecalho = criarCabecalhoGinfes();
-
+function criarEnvelopeSOAP11Paulistana(operacao: string, xmlAssinado: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
+  <soapenv:Header/>
   <soapenv:Body>
-    <${soapAction} xmlns="http://ws.opus.com.br">
-      <arg0><![CDATA[${cabecalho}]]></arg0>
-      <arg1><![CDATA[${xmlPayload}]]></arg1>
-    </${soapAction}>
+    <${operacao} xmlns="http://www.prefeitura.sp.gov.br/nfe">
+      <MensagemXML><![CDATA[
+${xmlAssinado}
+      ]]></MensagemXML>
+    </${operacao}>
   </soapenv:Body>
 </soapenv:Envelope>`;
 }
 
-// --- Assinatura digital XMLDSig ---
+// --- Assinatura digital XMLDSig (SHA-256) ---
 
 function canonicalizeXml(xml: string): string {
   let result = xml;
@@ -214,7 +233,7 @@ function getElementName(xml: string, id: string): string {
   return match ? match[1] : "Pedido";
 }
 
-function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
+function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) throw new Error("node-forge nao disponivel");
 
@@ -225,21 +244,21 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
     if (!referencedXml) throw new Error(`Elemento Id="${idReferencia}" nao encontrado`);
 
     const canonReferenced = canonicalizeXml(referencedXml);
-    const digest = forge.md.sha1.create();
+    const digest = forge.md.sha256.create();
     digest.update(canonReferenced, "utf8");
     const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
     const canonSignedInfo = canonicalizeXml(signedInfoXml);
-    const signatureMd = forge.md.sha1.create();
+    const signatureMd = forge.md.sha256.create();
     signatureMd.update(canonSignedInfo, "utf8");
     const signatureBytes = privateKey.sign(signatureMd);
     const signatureBase64 = forge.util.encode64(signatureBytes);
     const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
     const certBase64 = forge.util.encode64(certDer);
 
-    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
     const elementName = getElementName(xml, idReferencia);
     const closingTag = `</${elementName}>`;
@@ -254,23 +273,20 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
 
 // --- Envio SOAP ---
 
-function getAmbiente(): "homologacao" | "producao" {
-  return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
-}
+const PAULISTANA_URL = "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx";
 
-const GINFES_URLS = {
-  homologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
-  producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
-};
+async function enviarRequisicaoSOAP(
+  soapEnvelope: string,
+  soapAction: string,
+  certificado?: { certPem: string; keyPem: string }
+): Promise<string> {
+  const ambiente = getAmbiente();
 
-async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, certificado?: { certPem: string; keyPem: string }): Promise<string> {
-  const env = getAmbiente();
-
-  if (env === "homologacao") {
-    const response = await fetch(GINFES_URLS[env], {
+  if (ambiente === "homologacao") {
+    const response = await fetch(PAULISTANA_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "text/xml; charset=UTF-8",
+        "Content-Type": "text/xml; charset=utf-8",
         "SOAPAction": `"${soapAction}"`,
       },
       body: soapEnvelope,
@@ -290,10 +306,17 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (proxyApiKey) headers["X-API-Key"] = proxyApiKey;
 
-  const proxyResponse = await fetch(`${proxyUrl}/proxy-ginfes`, {
+  const proxyResponse = await fetch(`${proxyUrl}/proxy-nfse`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ soapEnvelope, soapAction, certPem: certificado.certPem, keyPem: certificado.keyPem, ambiente: env }),
+    body: JSON.stringify({
+      soapEnvelope,
+      soapAction,
+      certPem: certificado.certPem,
+      keyPem: certificado.keyPem,
+      provider: "paulistana",
+      ambiente,
+    }),
   });
   if (!proxyResponse.ok) {
     const text = await proxyResponse.text();
@@ -302,109 +325,122 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
   return await proxyResponse.text();
 }
 
-// --- Parser de resposta ---
+function getAmbiente(): "homologacao" | "producao" {
+  return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
+}
 
-function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
+// --- Parser de resposta Paulistana ---
+
+function parsearErrosPaulistana(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
-  const ERROS_GINFES: Record<string, string> = {
-    E1: "CNPJ invalido", E2: "Inscricao Municipal invalida", E26: "NFS-e nao encontrada",
-    E28: "Certificado invalido", E29: "Assinatura invalida", E30: "XML mal formatado",
-    E50: "Erro interno", E60: "Requisicao mal formada",
+  const ERROS_PAULISTANA: Record<string, string> = {
+    "1001": "CNPJ do remetente invalido",
+    "1002": "Inscricao Municipal invalida",
+    "1003": "Numero da NFS-e invalido",
+    "1004": "NFS-e nao encontrada",
+    "1005": "Certificado invalido",
+    "1006": "Assinatura invalida",
+    "1007": "XML mal formatado",
+    "1008": "Erro interno",
+    "1009": "Requisicao mal formada",
+    "1010": "Periodo de consulta invalido",
+    "1011": "Limite de registros excedido",
   };
-  const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]+)<\/Mensagem>/gi)].map(m => m[1]);
+  const mensagens = [...xml.matchAll(/<Alerta[^>]*>([\s\S]*?)<\/Alerta>/gi)].map(m => m[1].replace(/<[^>]+>/g, "").trim());
   const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]+)<\/Codigo>/gi)].map(m => m[1]);
   for (let i = 0; i < Math.max(mensagens.length, codigos.length); i++) {
-    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_GINFES[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
+    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_PAULISTANA[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
   }
   const faultMatch = xml.match(/<faultstring>([^<]+)<\/faultstring>/i);
   if (faultMatch && erros.length === 0) erros.push({ codigo: "SOAP_FAULT", mensagem: faultMatch[1], tipo: "Erro" });
   return erros;
 }
 
-function parsearRespostaConsulta(xml: string) {
-  try {
-    let workXml = xml;
-    const cdataMatch = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
-    if (cdataMatch) workXml = cdataMatch[1];
-    if (!cdataMatch && workXml.includes("&lt;")) {
-      workXml = workXml.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
-    }
-    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+function extrairXmlInterno(soapXml: string): string {
+  // Tenta extrair CDATA dentro de <MensagemXML> ou <return>
+  const cdataMatch = soapXml.match(/<(?:MensagemXML|return)[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/(?:MensagemXML|return)>/i);
+  if (cdataMatch) return cdataMatch[1];
+  // Tenta extrair conteudo XML escapado
+  if (soapXml.includes("&lt;")) {
+    return soapXml.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  }
+  // Remove namespaces SOAP para facilitar parsing
+  return soapXml.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+}
 
-    const erros = parsearErros(cleanXml);
-    if (erros.length > 0 && !cleanXml.includes("<CompNfse") && !cleanXml.includes("<InfNfse") && !cleanXml.includes("<Numero")) {
+function parsearRespostaConsultaPaulistana(xml: string) {
+  try {
+    const innerXml = extrairXmlInterno(xml);
+    const cleanXml = innerXml.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+
+    const erros = parsearErrosPaulistana(cleanXml);
+    const sucessoMatch = cleanXml.match(/<Sucesso>([^<]+)<\/Sucesso>/i);
+    const sucesso = sucessoMatch?.[1]?.toLowerCase() === "true";
+
+    if (!sucesso && erros.length > 0) {
       return { sucesso: false, xmlRetorno: xml, mensagens: erros };
     }
 
-    const infNfseMatch = cleanXml.match(/<InfNfse[^>]*>([\s\S]*?)<\/InfNfse>/i);
-    const infNfse = infNfseMatch ? infNfseMatch[1] : cleanXml;
+    const nfeMatch = cleanXml.match(/<NFe>([\s\S]*?)<\/NFe>/i);
+    const nfe = nfeMatch ? nfeMatch[1] : cleanXml;
 
-    const numeroNfseMatch = infNfse.match(/<NumeroNfse>([^<]+)<\/NumeroNfse>/i);
-    let numeroNfse: string | undefined;
-    if (numeroNfseMatch) {
-      numeroNfse = numeroNfseMatch[1];
-    } else {
-      const beforeRps = infNfse.split(/<IdentificacaoRps/i)[0];
-      const numeroMatch = beforeRps.match(/<Numero>([^<]+)<\/Numero>/i);
-      numeroNfse = numeroMatch?.[1];
-    }
+    const chaveNfeMatch = nfe.match(/<ChaveNFe>([\s\S]*?)<\/ChaveNFe>/i);
+    const chaveNfe = chaveNfeMatch ? chaveNfeMatch[1] : "";
 
-    const codigoVerificacaoMatch = infNfse.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i);
-    const dataEmissaoMatch = infNfse.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i) || infNfse.match(/<DataEmissao>([^<]+)<\/DataEmissao>/i);
-    const dataAutorizacaoMatch = infNfse.match(/<DataAutorizacao>([^<]+)<\/DataAutorizacao>/i) || infNfse.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i);
-    const situacaoMatch = infNfse.match(/<SituacaoNfse>([^<]+)<\/SituacaoNfse>/i) || infNfse.match(/<Situacao>([^<]+)<\/Situacao>/i);
-    const situacao = situacaoMatch?.[1];
-    let status: string;
-    if (situacao === "2") status = "cancelada";
-    else if (situacao === "3") status = "substituida";
-    else status = "autorizada";
+    const numeroNfeMatch = chaveNfe.match(/<NumeroNFe>([^<]+)<\/NumeroNFe>/i) || nfe.match(/<NumeroNFe>([^<]+)<\/NumeroNFe>/i);
+    const codigoVerificacaoMatch = chaveNfe.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i) || nfe.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i);
+    const inscricaoPrestadorMatch = chaveNfe.match(/<InscricaoPrestador>([^<]+)<\/InscricaoPrestador>/i);
 
-    const valorServicosMatch = infNfse.match(/<ValorServicos>([^<]+)<\/ValorServicos>/i);
-    const valorIssMatch = infNfse.match(/<ValorIss>([^<]+)<\/ValorIss>/i);
-    const baseCalculoMatch = infNfse.match(/<BaseCalculo>([^<]+)<\/BaseCalculo>/i);
-    const aliquotaMatch = infNfse.match(/<Aliquota>([^<]+)<\/Aliquota>/i);
-    const issRetidoMatch = infNfse.match(/<IssRetido>([^<]+)<\/IssRetido>/i);
-    const issRetido = issRetidoMatch?.[1] === "1" || issRetidoMatch?.[1]?.toLowerCase() === "sim";
+    const dataEmissaoMatch = nfe.match(/<DataEmissaoNFe>([^<]+)<\/DataEmissaoNFe>/i) || nfe.match(/<DataEmissao>([^<]+)<\/DataEmissao>/i);
+    const numeroRpsMatch = nfe.match(/<NumeroRPS>([^<]+)<\/NumeroRPS>/i) || nfe.match(/<NumeroRps>([^<]+)<\/NumeroRps>/i);
+    const serieRpsMatch = nfe.match(/<SerieRPS>([^<]+)<\/SerieRPS>/i) || nfe.match(/<SerieRps>([^<]+)<\/SerieRps>/i);
+    const statusNfeMatch = nfe.match(/<StatusNFe>([^<]+)<\/StatusNFe>/i);
+    let status = "autorizada";
+    const statusNfe = statusNfeMatch?.[1];
+    if (statusNfe === "C") status = "cancelada";
+    else if (statusNfe === "E") status = "cancelada";
 
-    const tomadorRazaoMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i) || cleanXml.match(/<Tomador>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i);
-    const tomadorCnpjMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i) || cleanXml.match(/<Tomador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
-    const tomadorCpfMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i) || cleanXml.match(/<Tomador>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i);
+    const valorServicosMatch = nfe.match(/<ValorServicos>([^<]+)<\/ValorServicos>/i);
+    const valorDeducoesMatch = nfe.match(/<ValorDeducoes>([^<]+)<\/ValorDeducoes>/i);
+    const valorIssMatch = nfe.match(/<ValorISS>([^<]+)<\/ValorISS>/i) || nfe.match(/<ValorIss>([^<]+)<\/ValorIss>/i);
+    const baseCalculoMatch = nfe.match(/<BaseCalculo>([^<]+)<\/BaseCalculo>/i);
+    const aliquotaMatch = nfe.match(/<AliquotaServicos>([^<]+)<\/AliquotaServicos>/i) || nfe.match(/<Aliquota>([^<]+)<\/Aliquota>/i);
+    const issRetidoMatch = nfe.match(/<ISSRetido>([^<]+)<\/ISSRetido>/i);
+    const issRetido = issRetidoMatch?.[1]?.toLowerCase() === "true" || issRetidoMatch?.[1] === "1";
 
-    const prestadorCnpjMatch = cleanXml.match(/<PrestadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i) || cleanXml.match(/<Prestador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
-    const prestadorIMMatch = cleanXml.match(/<PrestadorServico>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i) || cleanXml.match(/<Prestador>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i);
+    const tomadorRazaoMatch = nfe.match(/<RazaoSocialTomador>([^<]+)<\/RazaoSocialTomador>/i);
+    const tomadorCnpjMatch = nfe.match(/<CPFCNPJTomador>[\s\S]*?<CNPJ>([^<]+)<\/CNPJ>/i) || nfe.match(/<CnpjTomador>([^<]+)<\/CnpjTomador>/i);
+    const tomadorCpfMatch = nfe.match(/<CPFCNPJTomador>[\s\S]*?<CPF>([^<]+)<\/CPF>/i);
 
-    let linkNfse = (cleanXml.match(/<LinkNfse>([^<]+)<\/LinkNfse>/i) || cleanXml.match(/<linkNfse>([^<]+)<\/linkNfse>/i))?.[1];
-    if (!linkNfse && numeroNfse && codigoVerificacaoMatch?.[1]) {
-      const baseUrl = getAmbiente() === "producao" ? "https://producao.ginfes.com.br" : "https://homologacao.ginfes.com.br";
-      linkNfse = `${baseUrl}/VisualizarNfse?num=${numeroNfse}&cod=${codigoVerificacaoMatch[1]}`;
-    }
+    const prestadorCnpjMatch = nfe.match(/<CPFCNPJPrestador>[\s\S]*?<CNPJ>([^<]+)<\/CNPJ>/i) || cleanXml.match(/<CNPJ>([^<]+)<\/CNPJ>/i);
+    const prestadorIMMatch = inscricaoPrestadorMatch || nfe.match(/<InscricaoPrestador>([^<]+)<\/InscricaoPrestador>/i);
 
-    const discriminacaoMatch = cleanXml.match(/<Discriminacao>([^<]+)<\/Discriminacao>/i);
-    const itemListaServicoMatch = cleanXml.match(/<ItemListaServico>([^<]+)<\/ItemListaServico>/i);
+    const discriminacaoMatch = nfe.match(/<Discriminacao>([^<]+)<\/Discriminacao>/i);
+    const codigoServicoMatch = nfe.match(/<CodigoServico>([^<]+)<\/CodigoServico>/i);
 
-    const sucesso = !!numeroNfse || cleanXml.includes("<CompNfse");
+    const numeroLoteMatch = cleanXml.match(/<NumeroLote>([^<]+)<\/NumeroLote>/i);
 
     return {
-      sucesso,
-      numeroNfse,
+      sucesso: sucesso || !!numeroNfeMatch,
+      numeroNfse: numeroNfeMatch?.[1],
+      numeroRps: numeroRpsMatch?.[1],
+      serieRps: serieRpsMatch?.[1],
+      numeroLote: numeroLoteMatch?.[1],
       codigoVerificacao: codigoVerificacaoMatch?.[1],
       dataEmissao: dataEmissaoMatch?.[1],
-      dataAutorizacao: dataAutorizacaoMatch?.[1],
       status,
       valorServicos: valorServicosMatch?.[1],
+      valorDeducoes: valorDeducoesMatch?.[1],
       valorIss: valorIssMatch?.[1],
       baseCalculo: baseCalculoMatch?.[1],
       aliquotaIss: aliquotaMatch?.[1],
       issRetido,
       tomador: { razaoSocial: tomadorRazaoMatch?.[1] || "", cnpjCpf: tomadorCnpjMatch?.[1] || tomadorCpfMatch?.[1] || "" },
       prestador: { cnpj: prestadorCnpjMatch?.[1] || "", inscricaoMunicipal: prestadorIMMatch?.[1] || "" },
-      linkPdf: (cleanXml.match(/<LinkPdf>([^<]+)<\/LinkPdf>/i) || cleanXml.match(/<linkPdf>([^<]+)<\/linkPdf>/i))?.[1],
-      linkXml: (cleanXml.match(/<LinkXml>([^<]+)<\/LinkXml>/i) || cleanXml.match(/<linkXml>([^<]+)<\/linkXml>/i))?.[1],
-      linkNfse,
       discriminacao: discriminacaoMatch?.[1],
-      itemListaServico: itemListaServicoMatch?.[1],
+      itemListaServico: codigoServicoMatch?.[1],
       xmlRetorno: xml,
-      mensagens: erros.length > 0 ? erros : sucesso ? [{ codigo: "0000", mensagem: "Consulta realizada com sucesso", tipo: "Sucesso" }] : undefined,
+      mensagens: erros.length > 0 ? erros : sucesso || numeroNfeMatch ? [{ codigo: "0000", mensagem: "Consulta realizada com sucesso", tipo: "Sucesso" }] : [{ codigo: "WARN", mensagem: "Resposta sem dados de NFSe", tipo: "Aviso" }],
     };
   } catch (error) {
     return { sucesso: false, xmlRetorno: xml, mensagens: [{ codigo: "ERR_PARSE", mensagem: `Erro: ${(error as Error).message}`, tipo: "Erro" }] };
@@ -448,20 +484,18 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
     let certDigital: CertificadoDigital | null = null;
+    let numeroNFe = body.numeroNFe || body.numeroNfse || "";
     let numeroRps = body.numeroRps || "";
-    let serie = body.serie || "1";
-    let tipo = body.tipo || "RPS";
     let cnpj = body.cnpj || "";
     let im = body.inscricaoMunicipal || "";
-    let operacao = body.operacao || "ConsultarNfsePorRpsV3";
+    let operacao = body.operacao || "ConsultaNFe";
     let notaId: string | undefined = body.notaId;
 
     if (notaId) {
       const { data: nota, error: notaError } = await supabase.from("notas_fiscais_servico").select("*").eq("id", notaId).eq("user_id", user.id).single();
       if (notaError || !nota) throw new Error("Nota nao encontrada");
-      numeroRps = nota.numero_rps || nota.numero_nota || "";
-      serie = nota.serie || "1";
-      tipo = nota.tipo_rps || "RPS";
+      numeroNFe = nota.numero_nota || nota.numero_rps || "";
+      numeroRps = nota.numero_rps || "";
 
       if (nota.certificado_id) {
         const { data: cert, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
@@ -492,12 +526,13 @@ serve(async (req) => {
     if (ambiente === "homologacao" && body.modo !== "real") {
       return new Response(JSON.stringify({
         sucesso: true,
-        numeroNfse: numeroRps || "99999",
+        numeroNfse: numeroNFe || "99999",
+        numeroRps: numeroRps || "12345",
         codigoVerificacao: "HOM-VERIF-12345",
         dataEmissao: new Date().toISOString(),
         status: "autorizada",
         valorServicos: "0",
-        mensagens: [{ codigo: "H001", mensagem: "Homologacao mock", tipo: "Sucesso" }],
+        mensagens: [{ codigo: "H001", mensagem: "Homologacao mock - API Paulistana", tipo: "Sucesso" }],
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -505,36 +540,36 @@ serve(async (req) => {
       throw new Error("CNPJ e Inscricao Municipal sao obrigatorios para consulta");
     }
 
-    // Construir XML ABRASF
+    // Construir XML Paulistana
     let xmlDados = "";
-    if (operacao === "ConsultarNfseServicoPrestadoV3") {
-      xmlDados = xmlConsultaServicoPrestado(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
+    if (operacao === "ConsultaNFePeriodo" || (body.dataInicio && body.dataFim)) {
+      xmlDados = xmlPedidoConsultaNFePeriodo(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
+      operacao = "ConsultaNFe";
     } else {
-      xmlDados = xmlConsultaPorRps(numeroRps, serie, tipo, cnpj, im);
-      operacao = "ConsultarNfsePorRpsV3";
+      xmlDados = xmlPedidoConsultaNFe(cnpj, numeroNFe || numeroRps, im);
+      operacao = "ConsultaNFe";
     }
 
-    // Assinar XML (obrigatorio em producao, opcional em homologacao)
+    // Assinar XML (SHA-256)
     let xmlAssinado = xmlDados;
     if (certDigital && ambiente === "producao") {
-      const idRef = `RPS${numeroRps}`;
-      xmlAssinado = assinarXml(xmlDados, certDigital, idRef);
+      xmlAssinado = assinarXmlSHA256(xmlDados, certDigital, "Lote1");
     }
 
-    // Construir envelope SOAP 1.1 padrao GINFES
-    const soapEnvelope = criarEnvelopeSOAP11(operacao, xmlDados, xmlAssinado);
+    // Construir envelope SOAP 1.1 Paulistana
+    const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, xmlAssinado);
+    const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
 
-    console.log(`[consultar-nfse] Operacao: ${operacao} | Ambiente: ${ambiente}`);
+    console.log(`[consultar-nfse] Operacao: ${operacao} | Ambiente: ${ambiente} | Provider: paulistana`);
     console.log("[consultar-nfse] Envelope SOAP (primeiros 500 chars):", soapEnvelope.substring(0, 500));
 
     // Enviar requisicao
     let soapResponse: string;
     try {
-      soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, operacao, certDigital || undefined));
+      soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, certDigital || undefined));
     } catch (err: any) {
       console.error("[consultar-nfse] Erro ao enviar SOAP:", err.message);
 
-      // Analise IA do erro via orquestrador
       let analiseIA = null;
       try {
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -546,8 +581,8 @@ serve(async (req) => {
           body: JSON.stringify({
             taskType: "code",
             messages: [
-              { role: "system", content: "Voce e um especialista em integracao SOAP GINFES. Analise o erro e sugira: 1) Causa provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
-              { role: "user", content: `Erro: ${err.message}\n\nOperacao: ${operacao}\nAmbiente: ${ambiente}` },
+              { role: "system", content: "Voce e um especialista em integracao SOAP API Paulistana (Prefeitura de SP). Analise o erro e sugira: 1) Causa provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
+              { role: "user", content: `Erro: ${err.message}\n\nOperacao: ${operacao}\nAmbiente: ${ambiente}\nURL: ${PAULISTANA_URL}` },
             ],
             temperature: 0.1,
           }),
@@ -572,16 +607,16 @@ serve(async (req) => {
 
     console.log("[consultar-nfse] Resposta (primeiros 500 chars):", soapResponse.substring(0, 500));
 
-    const resultado = parsearRespostaConsulta(soapResponse);
+    const resultado = parsearRespostaConsultaPaulistana(soapResponse);
     const resultadoFinal = {
       ...resultado,
       xmlEnvio: xmlDados,
       xmlBruto: soapResponse.substring(0, 8000),
       operacaoUsada: operacao,
-      formatoUsado: "SOAP11_GINFES_PADRAO",
+      formatoUsado: "SOAP11_PAULISTANA",
+      provider: "paulistana",
     };
 
-    // Analise IA para erros ambiguos
     if (!resultado.sucesso) {
       try {
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -593,7 +628,7 @@ serve(async (req) => {
           body: JSON.stringify({
             taskType: "code",
             messages: [
-              { role: "system", content: "Voce e um especialista em parsing XML GINFES. Analise a resposta e sugira: 1) Erro provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
+              { role: "system", content: "Voce e um especialista em parsing XML API Paulistana (Prefeitura de SP). Analise a resposta e sugira: 1) Erro provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
               { role: "user", content: `Resposta:\n${soapResponse.substring(0, 3000)}` },
             ],
             temperature: 0.1,
@@ -614,10 +649,7 @@ serve(async (req) => {
       const updateData: any = { updated_at: new Date().toISOString() };
       if (resultado.numeroNfse) updateData.numero_nota = resultado.numeroNfse;
       if (resultado.codigoVerificacao) updateData.codigo_verificacao = resultado.codigoVerificacao;
-      if (resultado.dataAutorizacao) updateData.data_autorizacao = resultado.dataAutorizacao;
-      if (resultado.linkPdf) updateData.link_pdf = resultado.linkPdf;
-      if (resultado.linkXml) updateData.link_xml = resultado.linkXml;
-      if (resultado.linkNfse) updateData.link_nfse = resultado.linkNfse;
+      if (resultado.dataEmissao) updateData.data_autorizacao = resultado.dataEmissao;
       if (resultado.status) updateData.status = resultado.status === "substituida" ? "cancelada" : resultado.status;
       await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
     }

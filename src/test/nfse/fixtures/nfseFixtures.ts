@@ -1,6 +1,6 @@
 /**
- * Fixtures para testes de integração NFS-e (GINFES v03)
- * XMLs de resposta seguem layout GINFES v03 / ABRASF 2.04
+ * Fixtures para testes de integração NFS-e (API Paulistana)
+ * XMLs de resposta seguem layout API Paulistana (Prefeitura de São Paulo)
  */
 
 import type { NFSeEmissaoData, CertificadoDigital } from "../../../types/nfse";
@@ -107,21 +107,19 @@ export const dadosNotaFiscalCPF: NFSeEmissaoData = {
 };
 
 /**
- * XML de resposta de autorização bem-sucedida (GINFES v03)
- * Inclui envelope SOAP 1.2 e return com CDATA
+ * XML de resposta de autorização bem-sucedida (API Paulistana)
+ * Inclui envelope SOAP 1.1 e return com CDATA
  */
 export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:EnvioLoteRPSResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
-  <NumeroLote>1</NumeroLote>
-  <DataRecebimento>2024-01-15T10:00:05</DataRecebimento>
+<EnvioLoteRPSResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <Protocolo>PROT123456789</Protocolo>
   <ListaMensagemRetorno/>
-</EnviarLoteRpsResposta>]]></return>
-    </ns2:RecepcionarLoteRpsV3Response>
+</EnvioLoteRPSResposta>]]></return>
+    </ns2:EnvioLoteRPSResponse>
   </soap:Body>
 </soap:Envelope>`;
 
@@ -131,10 +129,9 @@ export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
 export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:ConsultarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:EnvioLoteRPSResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_lote_rps_resposta_v03.xsd">
-  <Situacao>3</Situacao>
+<ConsultarNFeResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaNfse>
     <CompNfse>
       <Nfse>
@@ -184,96 +181,85 @@ export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-
       </Nfse>
     </CompNfse>
   </ListaNfse>
-</ConsultarLoteRpsResposta>]]></return>
-    </ns2:ConsultarLoteRpsResponse>
+</ConsultarNFeResposta>]]></return>
+    </ns2:EnvioLoteRPSResponse>
   </soap:Body>
 </soap:Envelope>`;
 
 /**
- * XML de resposta de rejeição (GINFES v03)
+ * XML de resposta de rejeição (API Paulistana)
  */
 export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:EnvioLoteRPSResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+<EnvioLoteRPSResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaMensagemRetorno>
     <MensagemRetorno>
-      <Codigo>E1</Codigo>
+      <Codigo>1001</Codigo>
       <Mensagem>CNPJ do prestador inválido</Mensagem>
       <Correcao>Verifique o CNPJ informado e tente novamente</Correcao>
     </MensagemRetorno>
     <MensagemRetorno>
-      <Codigo>E2</Codigo>
+      <Codigo>1002</Codigo>
       <Mensagem>Alíquota inválida para o município</Mensagem>
       <Correcao>Informe uma alíquota válida para o código de tributação</Correcao>
     </MensagemRetorno>
   </ListaMensagemRetorno>
-</EnviarLoteRpsResposta>]]></return>
-    </ns2:RecepcionarLoteRpsV3Response>
+</EnvioLoteRPSResposta>]]></return>
+    </ns2:EnvioLoteRPSResponse>
   </soap:Body>
 </soap:Envelope>`;
 
 /**
- * XML de resposta de consulta por RPS (GINFES v03)
+ * XML de resposta de consulta por número (API Paulistana)
  */
 export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:ConsultarNfsePorRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:ConsultaNFeResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
-  <CompNfse>
-    <Nfse>
-      <InfNfse>
-        <Numero>12345</Numero>
-        <CodigoVerificacao>A1B2C3D4</CodigoVerificacao>
-        <DataEmissaoNfse>2024-01-15T10:00:00</DataEmissaoNfse>
-        <ValoresNfse>
-          <ValorServicos>1000.00</ValorServicos>
-          <ValorDeducoes>100.00</ValorDeducoes>
-          <ValorPis>6.50</ValorPis>
-          <ValorCofins>3.00</ValorCofins>
-          <ValorInss>11.00</ValorInss>
-          <ValorIr>1.50</ValorIr>
-          <ValorCsll>1.00</ValorCsll>
-          <IssRetido>1</IssRetido>
-          <ValorIss>50.00</ValorIss>
-          <ValorIssRetido>50.00</ValorIssRetido>
-          <OutrasRetencoes>0.00</OutrasRetencoes>
-          <BaseCalculo>900.00</BaseCalculo>
-          <Aliquota>5.00</Aliquota>
-          <ValorLiquidoNfse>827.00</ValorLiquidoNfse>
-        </ValoresNfse>
-        <PrestadorServico>
-          <Cnpj>12345678000195</Cnpj>
-          <InscricaoMunicipal>123456</InscricaoMunicipal>
-          <RazaoSocial>Empresa Teste LTDA</RazaoSocial>
-        </PrestadorServico>
-        <TomadorServico>
-          <IdentificacaoTomador>
-            <CpfCnpj>
-              <Cnpj>98765432000198</Cnpj>
-            </CpfCnpj>
-          </IdentificacaoTomador>
-          <RazaoSocial>Tomador Teste LTDA</RazaoSocial>
-        </TomadorServico>
-        <DeclaracaoPrestacaoServico>
-          <Rps>
-            <IdentificacaoRps>
-              <Numero>1</Numero>
-              <Serie>1</Serie>
-              <Tipo>1</Tipo>
-            </IdentificacaoRps>
-          </Rps>
-        </DeclaracaoPrestacaoServico>
-        <NfseSubstituida>0</NfseSubstituida>
-      </InfNfse>
-    </Nfse>
-  </CompNfse>
-</ConsultarNfseRpsResposta>]]></return>
-    </ns2:ConsultarNfsePorRpsV3Response>
+<ConsultaNFeResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
+  <Detalhe>
+    <NFe>
+      <NumeroNFe>12345</NumeroNFe>
+      <CodigoVerificacao>A1B2C3D4</CodigoVerificacao>
+      <DataEmissaoNFe>2024-01-15T10:00:00</DataEmissaoNFe>
+      <ValoresNfse>
+        <ValorServicos>1000.00</ValorServicos>
+        <ValorDeducoes>100.00</ValorDeducoes>
+        <ValorPis>6.50</ValorPis>
+        <ValorCofins>3.00</ValorCofins>
+        <ValorInss>11.00</ValorInss>
+        <ValorIr>1.50</ValorIr>
+        <ValorCsll>1.00</ValorCsll>
+        <IssRetido>1</IssRetido>
+        <ValorIss>50.00</ValorIss>
+        <ValorIssRetido>50.00</ValorIssRetido>
+        <OutrasRetencoes>0.00</OutrasRetencoes>
+        <BaseCalculo>900.00</BaseCalculo>
+        <Aliquota>5.00</Aliquota>
+        <ValorLiquidoNfse>827.00</ValorLiquidoNfse>
+      </ValoresNfse>
+      <PrestadorServico>
+        <Cnpj>12345678000195</Cnpj>
+        <InscricaoMunicipal>123456</InscricaoMunicipal>
+        <RazaoSocial>Empresa Teste LTDA</RazaoSocial>
+      </PrestadorServico>
+      <TomadorServico>
+        <IdentificacaoTomador>
+          <CpfCnpj>
+            <Cnpj>98765432000198</Cnpj>
+          </CpfCnpj>
+        </IdentificacaoTomador>
+        <RazaoSocial>Tomador Teste LTDA</RazaoSocial>
+      </TomadorServico>
+      <NfseSubstituida>0</NfseSubstituida>
+    </NFe>
+  </Detalhe>
+</ConsultaNFeResposta>]]></return>
+    </ns2:ConsultaNFeResponse>
   </soap:Body>
 </soap:Envelope>`;
 
@@ -283,29 +269,29 @@ export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
 export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:ConsultarNfsePorRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:ConsultaNFeResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
+<ConsultaNFeResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaMensagemRetorno>
     <MensagemRetorno>
-      <Codigo>E5</Codigo>
+      <Codigo>1005</Codigo>
       <Mensagem>NFS-e não encontrada</Mensagem>
     </MensagemRetorno>
   </ListaMensagemRetorno>
-</ConsultarNfseRpsResposta>]]></return>
-    </ns2:ConsultarNfsePorRpsV3Response>
+</ConsultaNFeResposta>]]></return>
+    </ns2:ConsultaNFeResponse>
   </soap:Body>
 </soap:Envelope>`;
 
 /**
- * XML de resposta de cancelamento bem-sucedido (GINFES v03)
+ * XML de resposta de cancelamento bem-sucedido (API Paulistana)
  */
 export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
   <soap:Body>
-    <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:CancelamentoNFeResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
+<CancelamentoNFeResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <NfseCancelamento>
     <Confirmacao>
       <DataHoraCancelamento>2024-01-15T14:30:00</DataHoraCancelamento>
@@ -313,8 +299,8 @@ export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
       <Sucesso>true</Sucesso>
     </Confirmacao>
   </NfseCancelamento>
-</CancelarNfseResposta>]]></return>
-    </ns2:CancelarNfseV3Response>
+</CancelamentoNFeResposta>]]></return>
+    </ns2:CancelamentoNFeResponse>
   </soap:Body>
 </soap:Envelope>`;
 
@@ -365,10 +351,10 @@ export const certificadoDigitalMock: CertificadoDigital = {
 };
 
 export const configuracaoAmbienteTeste = {
-  urlHomologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
-  urlProducao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
+  urlHomologacao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
+  urlProducao: "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx",
   ambiente: "homologacao" as const,
-  versao: "3",
+  versao: "1",
   timeoutMs: 30000,
   retryAttempts: 3,
 };

@@ -1,5 +1,5 @@
 /**
- * Testes de Parser NFS-e (GINFES v03)
+ * Testes de Parser NFS-e (API Paulistana)
  * Valida parse de respostas da prefeitura (autorização, rejeição, erros)
  */
 
@@ -16,7 +16,7 @@ import {
   xmlErroTimeout,
 } from "./fixtures/nfseFixtures";
 
-describe("NFSeParser (GINFES v03)", () => {
+describe("NFSeParser (API Paulistana)", () => {
   let parser: NFSeParser;
 
   beforeEach(() => {
@@ -67,12 +67,12 @@ describe("NFSeParser (GINFES v03)", () => {
       const xmlSemNFSe = `<?xml version="1.0" encoding="UTF-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Body>
-            <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+            <ns2:EnvioLoteRPSResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+<EnvioLoteRPSResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaMensagemRetorno/>
-</EnviarLoteRpsResposta>]]></return>
-            </ns2:RecepcionarLoteRpsV3Response>
+</EnvioLoteRPSResposta>]]></return>
+            </ns2:EnvioLoteRPSResponse>
           </soap:Body>
         </soap:Envelope>`;
 
@@ -94,8 +94,8 @@ describe("NFSeParser (GINFES v03)", () => {
     it("deve extrair códigos de erro corretamente", () => {
       const resposta = parser.parseRespostaAutorizacao(xmlRespostaRejeicao);
 
-      expect(resposta.mensagens?.[0].codigo).toBe("E1");
-      expect(resposta.mensagens?.[1].codigo).toBe("E2");
+      expect(resposta.mensagens?.[0].codigo).toBe("1001");
+      expect(resposta.mensagens?.[1].codigo).toBe("1002");
     });
 
     it("deve extrair mensagens de erro", () => {
@@ -117,17 +117,17 @@ describe("NFSeParser (GINFES v03)", () => {
       const xmlErroUnico = `<?xml version="1.0" encoding="UTF-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Body>
-            <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+            <ns2:EnvioLoteRPSResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+<EnvioLoteRPSResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaMensagemRetorno>
     <MensagemRetorno>
-      <Codigo>E999</Codigo>
+      <Codigo>1999</Codigo>
       <Mensagem>Erro genérico</Mensagem>
     </MensagemRetorno>
   </ListaMensagemRetorno>
-</EnviarLoteRpsResposta>]]></return>
-            </ns2:RecepcionarLoteRpsV3Response>
+</EnvioLoteRPSResposta>]]></return>
+            </ns2:EnvioLoteRPSResponse>
           </soap:Body>
         </soap:Envelope>`;
 
@@ -135,7 +135,7 @@ describe("NFSeParser (GINFES v03)", () => {
 
       expect(resposta.sucesso).toBe(false);
       expect(resposta.mensagens?.length).toBe(1);
-      expect(resposta.mensagens?.[0].codigo).toBe("E999");
+      expect(resposta.mensagens?.[0].codigo).toBe("1999");
     });
   });
 
@@ -203,7 +203,7 @@ describe("NFSeParser (GINFES v03)", () => {
       const resposta = parser.parseRespostaConsulta(xmlRespostaConsultaNaoEncontrada);
 
       expect(resposta.sucesso).toBe(false);
-      expect(resposta.mensagens?.[0].codigo).toBe("E5");
+      expect(resposta.mensagens?.[0].codigo).toBe("1005");
     });
   });
 
@@ -219,24 +219,24 @@ describe("NFSeParser (GINFES v03)", () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
         <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
           <soap:Body>
-            <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+            <ns2:CancelamentoNFeResponse xmlns:ns2="http://www.prefeitura.sp.gov.br/nfe">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
-<CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
+<CancelamentoNFeResposta xmlns="http://www.prefeitura.sp.gov.br/nfe">
   <ListaMensagemRetorno>
     <MensagemRetorno>
-      <Codigo>E10</Codigo>
+      <Codigo>1010</Codigo>
       <Mensagem>NFS-e já cancelada anteriormente</Mensagem>
     </MensagemRetorno>
   </ListaMensagemRetorno>
-</CancelarNfseResposta>]]></return>
-            </ns2:CancelarNfseV3Response>
+</CancelamentoNFeResposta>]]></return>
+            </ns2:CancelamentoNFeResponse>
           </soap:Body>
         </soap:Envelope>`;
 
       const resposta = parser.parseRespostaCancelamento(xmlErroCancelamento);
 
       expect(resposta.sucesso).toBe(false);
-      expect(resposta.mensagens?.[0].codigo).toBe("E10");
+      expect(resposta.mensagens?.[0].codigo).toBe("1010");
     });
   });
 
@@ -302,8 +302,8 @@ describe("NFSeParser (GINFES v03)", () => {
 
     it("deve lidar com namespaces diferentes", () => {
       const xmlNSDiferente = xmlRespostaAutorizacaoComNfse.replace(
-        'xmlns="http://www.ginfes.com.br/servico_consultar_lote_rps_resposta_v03.xsd"',
-        'xmlns="http://www.prefeitura.sp.gov.br/nfe"'
+        'xmlns="http://www.prefeitura.sp.gov.br/nfe"',
+        'xmlns="http://www.example.com/nfe"'
       );
 
       const resposta = parser.parseRespostaAutorizacao(xmlNSDiferente);
