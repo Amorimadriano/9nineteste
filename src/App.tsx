@@ -347,6 +347,7 @@ const App = () => (
                   <NFSeHistorico />
                 </Suspense>
               } />
+              <Route path="/nfse/historico" element={<Navigate to="/nfse-historico" replace />} />
               <Route path="/integracao-contabil" element={
                 <Suspense fallback={<PageLoader />}>
                   <ContabilidadeIntegracao />
