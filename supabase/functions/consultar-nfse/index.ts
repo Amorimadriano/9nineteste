@@ -536,22 +536,31 @@ serve(async (req) => {
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!certDigital && (!cnpj || !im)) {
-      throw new Error("CNPJ e Inscricao Municipal sao obrigatorios para consulta");
+    // Validar dados obrigatorios
+    const numeroConsulta = numeroNFe || numeroRps || body.numero || body.numeroNfse || "";
+    const camposFaltantes = [];
+    if (!cnpj) camposFaltantes.push("CNPJ do prestador");
+    if (!im) camposFaltantes.push("Inscricao Municipal do prestador");
+    if (!numeroConsulta) camposFaltantes.push("Numero da NFSe ou RPS");
+
+    if (camposFaltantes.length > 0) {
+      console.log("[consultar-nfse] Dados faltantes:", camposFaltantes, "| notaId:", notaId, "| cnpj:", cnpj, "| im:", im, "| numero:", numeroConsulta);
+      throw new Error(`Dados obrigatorios faltantes: ${camposFaltantes.join(", ")}. Verifique se a nota foi emitida corretamente.`);
     }
 
-    // Construir XML Paulistana
-    let xmlDados = "";
-    if (operacao === "ConsultaNFePeriodo" || (body.dataInicio && body.dataFim)) {
-      xmlDados = xmlPedidoConsultaNFePeriodo(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
-      operacao = "ConsultaNFe";
-    } else {
-      const numeroConsulta = numeroNFe || numeroRps || body.numero || body.numeroNfse || "";
-      console.log("[consultar-nfse] numeroConsulta:", numeroConsulta, "| numeroNFe:", numeroNFe, "| numeroRps:", numeroRps);
-      xmlDados = xmlPedidoConsultaNFe(cnpj, numeroConsulta, im);
-      operacao = "ConsultaNFe";
+    if (!certDigital && ambiente === "producao") {
+      throw new Error("Certificado digital obrigatorio em producao");
     }
-    console.log("[consultar-nfse] XML dados:", xmlDados);
+
+    // Montar XML de consulta
+    let xmlDados = "";
+    if (operacao === "ConsultaNFe") {
+      xmlDados = xmlPedidoConsultaNFe(cnpj, numeroConsulta, im);
+    } else if (operacao === "ConsultaNFePeriodo") {
+      xmlDados = xmlPedidoConsultaNFePeriodo(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
+    } else {
+      throw new Error("Operacao nao suportada: " + operacao);
+    }
 
     // Assinar XML (SHA-256)
     let xmlAssinado = xmlDados;
@@ -562,7 +571,7 @@ serve(async (req) => {
 
     // Construir envelope SOAP 1.1 Paulistana
     const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, xmlAssinado);
-    const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
+    const soapAction = "http://www.prefeitura.sp.gov.br/nfe/" + operacao;
 
     console.log(`[consultar-nfse] Operacao: ${operacao} | Ambiente: ${ambiente} | Provider: paulistana`);
     console.log("[consultar-nfse] Envelope SOAP (primeiros 500 chars):", soapEnvelope.substring(0, 500));
