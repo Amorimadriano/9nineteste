@@ -331,6 +331,7 @@ async function enviarRequisicaoSOAP(
     headers,
     body: JSON.stringify({
       soapEnvelope,
+      soapAction,
       certPem: certificado.certPem,
       keyPem: certificado.keyPem,
       ambiente: env,

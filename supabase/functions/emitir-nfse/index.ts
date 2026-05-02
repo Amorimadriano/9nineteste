@@ -345,7 +345,7 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
   const proxyResponse = await fetch(`${proxyUrl}/proxy-ginfes`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ soapEnvelope, certPem: certificado.certPem, keyPem: certificado.keyPem, ambiente: env }),
+    body: JSON.stringify({ soapEnvelope, soapAction, certPem: certificado.certPem, keyPem: certificado.keyPem, ambiente: env }),
   });
   if (!proxyResponse.ok) {
     const text = await proxyResponse.text();

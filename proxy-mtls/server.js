@@ -63,7 +63,7 @@ app.get("/health", authenticate, (_req, res) => {
  *   }
  */
 app.post("/proxy-ginfes", authenticate, (req, res) => {
-  const { soapEnvelope, certPem, keyPem, ambiente } = req.body;
+  const { soapEnvelope, certPem, keyPem, ambiente, soapAction } = req.body;
 
   if (!soapEnvelope) {
     return res.status(400).json({ error: "soapEnvelope é obrigatório" });
@@ -71,21 +71,23 @@ app.post("/proxy-ginfes", authenticate, (req, res) => {
 
   const targetEnv = ambiente || "producao";
   const targetUrl = GINFES_URLS[targetEnv] || GINFES_URLS.producao;
+  const action = soapAction || "";
 
   // Se não tem certificado, usar requisição sem mTLS (homologação)
   if (!certPem || !keyPem) {
-    console.log(`[proxy] Enviando sem mTLS para ${targetEnv}`);
-    return sendWithoutMTLS(targetUrl, soapEnvelope, res);
+    console.log(`[proxy] Enviando sem mTLS para ${targetEnv} action=${action}`);
+    return sendWithoutMTLS(targetUrl, soapEnvelope, action, res);
   }
 
-  console.log(`[proxy] Enviando com mTLS para ${targetEnv}`);
-  sendWithMTLS(targetUrl, soapEnvelope, certPem, keyPem, res);
+  console.log(`[proxy] Enviando com mTLS para ${targetEnv} action=${action}`);
+  console.log(`[proxy] Envelope preview: ${soapEnvelope.substring(0, 200)}...`);
+  sendWithMTLS(targetUrl, soapEnvelope, action, certPem, keyPem, res);
 });
 
 /**
  * Envia requisição SOAP sem mTLS (para homologação)
  */
-function sendWithoutMTLS(targetUrl, soapEnvelope, res) {
+function sendWithoutMTLS(targetUrl, soapEnvelope, soapAction, res) {
   const parsedUrl = new URL(targetUrl);
   const payload = Buffer.from(soapEnvelope, "utf-8");
 
@@ -96,7 +98,7 @@ function sendWithoutMTLS(targetUrl, soapEnvelope, res) {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": "",
+      "SOAPAction": soapAction ? `"${soapAction}"` : "",
       "Content-Length": payload.length,
     },
   };
@@ -125,7 +127,7 @@ function sendWithoutMTLS(targetUrl, soapEnvelope, res) {
 /**
  * Envia requisição SOAP com mTLS (certificado digital no handshake TLS)
  */
-function sendWithMTLS(targetUrl, soapEnvelope, certPem, keyPem, res) {
+function sendWithMTLS(targetUrl, soapEnvelope, soapAction, certPem, keyPem, res) {
   const parsedUrl = new URL(targetUrl);
   const payload = Buffer.from(soapEnvelope, "utf-8");
 
@@ -136,7 +138,7 @@ function sendWithMTLS(targetUrl, soapEnvelope, certPem, keyPem, res) {
     method: "POST",
     headers: {
       "Content-Type": "text/xml; charset=utf-8",
-      "SOAPAction": "",
+      "SOAPAction": soapAction ? `"${soapAction}"` : "",
       "Content-Length": payload.length,
     },
     // mTLS: certificado cliente no handshake TLS
