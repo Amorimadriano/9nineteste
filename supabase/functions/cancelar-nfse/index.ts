@@ -257,18 +257,13 @@ function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: 
 }
 
 function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const ginfesNs = ambiente === "producao"
-    ? "http://producao.ginfes.com.br"
-    : "http://homologacao.ginfes.com.br";
-
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="${ginfesNs}">
-      <arg0 xmlns=""><![CDATA[${cabecalhoXml}]]></arg0>
-      <arg1 xmlns=""><![CDATA[${dadosXml}]]></arg1>
+    <${soapAction} xmlns="${namespace}">
+      <arg0 xmlns="">${cabecalhoXml}</arg0>
+      <arg1 xmlns="">${dadosXml}</arg1>
     </${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
@@ -289,14 +284,19 @@ const GINFES_URLS = {
 
 async function enviarRequisicaoSOAP(
   soapEnvelope: string,
+  soapAction: string,
   certificado?: { certPem: string; keyPem: string },
 ): Promise<string> {
   const env = getAmbiente();
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "text/xml; charset=utf-8",
+    "SOAPAction": `"${soapAction}"`,
+  };
 
   if (env === "homologacao") {
     const response = await fetch(GINFES_URLS[env], {
       method: "POST",
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
+      headers: baseHeaders,
       body: soapEnvelope,
     });
     if (!response.ok) {
@@ -565,7 +565,7 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
   console.log("=== NFS-e Cancelamento Produção ===");
   console.log("NFS-e:", numeroNfse, "CNPJ:", cnpj);
 
-  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, {
+  const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, "CancelarNfseV3", {
     certPem: certDigital.certPem,
     keyPem: certDigital.keyPem,
   });

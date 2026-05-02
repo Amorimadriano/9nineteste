@@ -292,14 +292,15 @@ function assinarLoteCompleto(xmlLote: string, certificado: CertificadoDigital): 
 }
 
 function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  // GINFES usa SOAP 1.1. arg0/arg1 devem ser unqualified (xmlns="") — schema usa elementFormDefault="unqualified"
   const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <ns1:${soapAction} xmlns:ns1="${namespace}">
-      <ns1:arg0>${cabecalhoXml}</ns1:arg0>
-      <ns1:arg1>${dadosXml}</ns1:arg1>
-    </ns1:${soapAction}>
+    <${soapAction} xmlns="${namespace}">
+      <arg0 xmlns="">${cabecalhoXml}</arg0>
+      <arg1 xmlns="">${dadosXml}</arg1>
+    </${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
 }
