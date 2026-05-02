@@ -90,7 +90,9 @@
       "PowerShell(npx supabase functions deploy consultar-nfse emitir-nfse cancelar-nfse)",
       "PowerShell(npx supabase functions deploy consultar-nfse)",
       "WebFetch(domain:www.nuvemfiscal.com.br)",
-      "WebFetch(domain:dev.nuvemfiscal.com.br)"
+      "WebFetch(domain:dev.nuvemfiscal.com.br)",
+      "WebFetch(domain:9nineteste.9ninebusinesscontrol.com.br)",
+      "Bash(gh run *)"
     ]
   }
 }
