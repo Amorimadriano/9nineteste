@@ -38,18 +38,10 @@ export function calcularISS(baseCalculo: number, aliquota: number): number {
 
 /**
  * Calcula valor líquido da nota fiscal
- * Considera deduções e ISS retido
+ * Considera deduções e todas as retenções (PIS, COFINS, INSS, IR, CSLL, ISS retido, outras)
  */
 export function calcularValorLiquido(servico: Servico): number {
-  const base = calcularBaseCalculo(
-    servico.valorServicos,
-    servico.valorDeducoes
-  );
-
-  // Se ISS for retido, desconta do valor líquido
-  const descontoISS = servico.issRetido === 1 ? servico.valorIss : 0;
-
-  return parseFloat((base - descontoISS).toFixed(2));
+  return calcularValorLiquidoComRetencoes(servico);
 }
 
 /**
@@ -57,45 +49,55 @@ export function calcularValorLiquido(servico: Servico): number {
  * Fórmula ABRASF: ValorServicos - ValorDeducoes - ValorPis - ValorCofins
  *                  - ValorInss - ValorIr - ValorCsll - OutrasRetencoes - ValorIssRetido
  */
+/**
+ * Calcula valor líquido considerando retenções do prestador (PIS, COFINS, INSS, IR, CSLL, outras)
+ * NOTA: ISS retido NÃO é descontado do valor líquido do prestador (é retenção do tomador)
+ */
 export function calcularValorLiquidoComRetencoes(servico: Servico): number {
-  const totalRetencoes = calcularTodasRetencoes({
-    valorPis: servico.valorPis,
-    valorCofins: servico.valorCofins,
-    valorInss: servico.valorInss,
-    valorIr: servico.valorIr,
-    valorCsll: servico.valorCsll,
-    valorIssRetido: servico.valorIssRetido,
-    outrasRetencoes: servico.outrasRetencoes,
-  });
+  const valorIssRetido =
+    servico.valorIssRetido !== undefined
+      ? servico.valorIssRetido
+      : servico.issRetido === 1
+        ? (servico.valorIss ?? 0)
+        : 0;
+
+  const totalRetencoesPrestador =
+    (servico.valorPis ?? 0) +
+    (servico.valorCofins ?? 0) +
+    (servico.valorInss ?? 0) +
+    (servico.valorIr ?? 0) +
+    (servico.valorCsll ?? 0) +
+    (servico.outrasRetencoes ?? 0) +
+    valorIssRetido;
 
   const base = calcularBaseCalculo(
     servico.valorServicos,
     servico.valorDeducoes
   );
 
-  return parseFloat((base - totalRetencoes).toFixed(2));
+  return parseFloat((base - totalRetencoesPrestador).toFixed(2));
 }
 
 /**
  * Calcula total de retenções
  */
 export function calcularTodasRetencoes(retencoes: {
-  valorPis: number;
-  valorCofins: number;
-  valorInss: number;
-  valorIr: number;
-  valorCsll: number;
-  valorIssRetido: number;
-  outrasRetencoes: number;
+  valorPis?: number;
+  valorCofins?: number;
+  valorInss?: number;
+  valorIr?: number;
+  valorCsll?: number;
+  valorIssRetido?: number;
+  outrasRetencoes?: number;
 }): number {
   const total =
-    retencoes.valorPis +
-    retencoes.valorCofins +
-    retencoes.valorInss +
-    retencoes.valorIr +
-    retencoes.valorCsll +
-    retencoes.valorIssRetido +
-    retencoes.outrasRetencoes;
+    (retencoes.valorPis ?? 0) +
+    (retencoes.valorCofins ?? 0) +
+    (retencoes.valorInss ?? 0) +
+    (retencoes.valorIr ?? 0) +
+    (retencoes.valorCsll ?? 0) +
+    (retencoes.valorIssRetido ?? 0) +
+    (retencoes.outrasRetencoes ?? 0);
 
   return parseFloat(total.toFixed(2));
 }

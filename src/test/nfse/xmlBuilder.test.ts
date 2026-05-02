@@ -218,7 +218,7 @@ describe("NFSeXMLBuilder", () => {
 
     it("deve formatar valor líquido com 2 decimais", () => {
       const xml = builder.buildRPS(dadosNotaFiscalValida);
-      expect(xml).toContain("<ValorLiquidoNfse>877.00</ValorLiquidoNfse>");
+      expect(xml).toContain("<ValorLiquidoNfse>827.00</ValorLiquidoNfse>");
     });
   });
 

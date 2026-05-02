@@ -56,7 +56,8 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
     for (const attr of subject.attributes) {
       if (attr.shortName === "CN") razaoSocial = attr.value;
     }
-    const icpCnpjAttr = subject.attributes.find((a: any) => a.oid === "2.16.76.4.3.3");
+    // OID ICP-Brasil para CNPJ do responsável: 2.16.76.1.3.3
+    const icpCnpjAttr = subject.attributes.find((a: any) => a.oid === "2.16.76.1.3.3");
     if (icpCnpjAttr) {
       const digits = icpCnpjAttr.value.replace(/\D/g, "");
       if (digits.length >= 14) cnpj = digits.substring(digits.length - 14);
@@ -126,24 +127,18 @@ function criarEnvelopeSOAPGinfes(
   soapAction: string,
   cabecalhoXml: string,
   dadosXml: string,
-  ambiente?: string
 ): string {
-
-  const ginfesNs = ambiente === "producao"
-    ? "http://producao.ginfes.com.br"
-    : "http://homologacao.ginfes.com.br";
-
+  // GINFES v03 exige SOAP 1.2 (http://www.w3.org/2003/05/soap-envelope)
+  // e namespace fixo http://www.ginfes.com.br/ para as operações
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soapenv:Envelope 
-  xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-  xmlns:ns1="${ginfesNs}">
-<soapenv:Body>
-<ns1:${soapAction}>
-<arg0>${cabecalhoXml}</arg0>
-<arg1><![CDATA[${dadosXml}]]></arg1>
-</ns1:${soapAction}>
-</soapenv:Body>
-</soapenv:Envelope>`;
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap12:Body>
+    <${soapAction} xmlns="http://www.ginfes.com.br/">
+      <arg0>${cabecalhoXml}</arg0>
+      <arg1><![CDATA[${dadosXml}]]></arg1>
+    </${soapAction}>
+  </soap12:Body>
+</soap12:Envelope>`;
 }
 
 function criarCabecalhoGinfes(): string {
@@ -162,12 +157,21 @@ const GINFES_URLS = {
   producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
 };
 
-async function enviarRequisicaoSOAP(soapEnvelope: string, certificado?: { certPem: string; keyPem: string }): Promise<string> {
+async function enviarRequisicaoSOAP(
+  soapEnvelope: string,
+  soapAction: string,
+  certificado?: { certPem: string; keyPem: string }
+): Promise<string> {
   const env = getAmbiente();
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "application/soap+xml; charset=utf-8",
+    "SOAPAction": `"${soapAction}"`,
+  };
+
   if (env === "homologacao") {
     const response = await fetch(GINFES_URLS[env], {
       method: "POST",
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
+      headers: baseHeaders,
       body: soapEnvelope,
     });
     if (!response.ok) {
@@ -176,6 +180,8 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, certificado?: { certPe
     }
     return await response.text();
   }
+
+  // Produção: requer mTLS via proxy
   if (!certificado) throw new Error("Certificado obrigatorio em producao");
   const proxyUrl = Deno.env.get("MTLS_PROXY_URL");
   if (!proxyUrl) throw new Error("MTLS_PROXY_URL nao configurada");
@@ -360,16 +366,6 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     const { data: nota, error: notaError } = await supabase.from("notas_fiscais_servico").select("*").eq("id", notaId).eq("user_id", user.id).single();
     if (notaError || !nota) throw new Error("Nota nao encontrada");
-    if (!nota.certificado_id) throw new Error("Certificado nao vinculado");
-
-    const { data: certificado, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
-    if (certError || !certificado) throw new Error("Certificado nao encontrado");
-    if (!certificado.arquivo_pfx) throw new Error("Certificado sem arquivo PFX");
-
-    const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
-    certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
-    certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
-
     const ambiente = getAmbiente();
     let resultado;
     if (ambiente === "homologacao") {
@@ -386,7 +382,7 @@ serve(async (req) => {
         aliquotaIss: nota.aliquota_iss?.toString() || "0",
         issRetido: false,
         tomador: { razaoSocial: nota.cliente_razao_social || nota.cliente_nome || "", cnpjCpf: nota.cliente_cnpj_cpf || "" },
-        prestador: { cnpj: certificado.cnpj || "", inscricaoMunicipal: certificado.inscricao_municipal || "" },
+        prestador: { cnpj: nota.prestador_cnpj || "", inscricaoMunicipal: nota.prestador_inscricao_municipal || "" },
         linkPdf: nota.link_pdf || undefined,
         linkXml: nota.link_xml || undefined,
         linkNfse: nota.link_nfse || undefined,
@@ -397,26 +393,30 @@ serve(async (req) => {
         mensagens: [{ codigo: "E001", mensagem: "Consulta realizada com sucesso - ambiente de homologacao", tipo: "Sucesso" }],
       };
     } else {
+      if (!nota.certificado_id) throw new Error("Certificado nao vinculado");
+
+      const { data: certificado, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
+      if (certError || !certificado) throw new Error("Certificado nao encontrado");
+      if (!certificado.arquivo_pfx) throw new Error("Certificado sem arquivo PFX");
+
+      const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
+      certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
+      certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
+
       const numeroRps = nota.numero_rps || nota.numero_nota || "";
       const serie = nota.serie || "1";
       const tipo = nota.tipo_rps || "RPS";
-      //const xmlConsulta = construirXmlConsultaRps(numeroRps, nota.serie || "1", nota.tipo_rps || "RPS", certDigital.cnpj, certDigital.inscricaoMunicipal);
       const xmlConsulta = construirXmlConsultaRps(
-    numeroRps,
-    serie,
-    tipo,
-    certDigital.cnpj,
-    certDigital.inscricaoMunicipal
-  );
+        numeroRps,
+        serie,
+        tipo,
+        certDigital.cnpj,
+        certDigital.inscricaoMunicipal
+      );
       const cabecalho = criarCabecalhoGinfes();
-      //const soapEnvelope = criarEnvelopeSOAPGinfes("ConsultarNfsePorRpsV3", cabecalho, xmlConsulta, "producao");
-      const soapEnvelope = criarEnvelopeSOAPGinfes(
-    "ConsultarNfsePorRpsV3",
-    cabecalho,
-    xmlConsulta,
-    "producao"
-  );
-      const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
+      const soapAction = "ConsultarNfseRpsV3";
+      const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, xmlConsulta);
+      const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
       resultado = { ...parsearRespostaConsulta(soapResponse), xmlEnvio: xmlConsulta, xmlBruto: soapResponse.substring(0, 8000) };
     }
 

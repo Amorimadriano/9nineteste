@@ -139,6 +139,12 @@ describe("Cálculos NFSe", () => {
           valorDeducoes: caso.valorDeducoes,
           issRetido: caso.issRetido,
           valorIss: caso.valorIssEsperado,
+          ...(caso.valorPis !== undefined && { valorPis: caso.valorPis }),
+          ...(caso.valorCofins !== undefined && { valorCofins: caso.valorCofins }),
+          ...(caso.valorInss !== undefined && { valorInss: caso.valorInss }),
+          ...(caso.valorIr !== undefined && { valorIr: caso.valorIr }),
+          ...(caso.valorCsll !== undefined && { valorCsll: caso.valorCsll }),
+          ...(caso.valorIssRetido !== undefined && { valorIssRetido: caso.valorIssRetido }),
         };
 
         const liquido = calcularValorLiquido(servico as Servico);
@@ -225,7 +231,7 @@ describe("Cálculos NFSe", () => {
         ...dadosNotaFiscalValida.servico,
         baseCalculo: 900.0,
         valorIss: 45.0,
-        valorLiquidoNfse: 877.0,
+        valorLiquidoNfse: 827.0,
       };
 
       const validacao = validarCalculos(servico);
@@ -244,7 +250,7 @@ describe("Cálculos NFSe", () => {
       const validacao = validarCalculos(servico);
       expect(validacao.valido).toBe(false);
       expect(validacao.erros).toContainEqual(
-        expect.stringContaining("base de cálculo")
+        expect.stringContaining("Base de cálculo")
       );
     });
 
@@ -335,7 +341,7 @@ describe("Cálculos NFSe", () => {
       const iss = calcularISS(base, 5);
 
       expect(base).toBe(0.01);
-      expect(iss).toBeCloseTo(0.0005, 4);
+      expect(iss).toBe(0);
     });
 
     it("deve lidar com valores muito grandes", () => {

@@ -1,256 +1,152 @@
 /**
- * Parser de respostas NFS-e
- * Parseia XMLs de resposta da prefeitura
+ * Parser de respostas NFS-e (GINFES v03)
+ * Parseia XMLs de resposta da prefeitura usando extração robusta por regex
  */
 
 import type { NFSeResposta, MensagemRetorno, NFSeCancelamentoResposta } from "../../types/nfse";
 
-interface ConsultaResposta extends NFSeResposta {
-  status?: string;
-  cancelada?: boolean;
-  substituida?: boolean;
+function extractValue(xml: string, tag: string): string | undefined {
+  const regex = new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, "i");
+  const match = xml.match(regex);
+  return match ? match[1].trim() : undefined;
 }
 
-interface ErroSOAP {
-  tipo: "SOAP_FAULT" | "PARSE_ERROR" | "UNKNOWN";
-  codigo?: string;
-  mensagem: string;
-  faultCode?: string;
-  faultString?: string;
+function extractBlock(xml: string, tag: string): string | null {
+  const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i");
+  const match = xml.match(regex);
+  return match ? match[1].trim() : null;
 }
 
-export class NFSeParser {
-  /**
-   * Parseia resposta de autorização de emissão
-   */
-  parseRespostaAutorizacao(xml: string): NFSeResposta {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xml, "text/xml");
-
-      // Verificar erro de parse
-      const parseError = doc.querySelector("parsererror");
-      if (parseError) {
-        throw new Error("XML mal formatado");
-      }
-
-      // Verificar se há lista de mensagens de erro
-      const mensagensRetorno = doc.querySelectorAll("MensagemRetorno");
-      if (mensagensRetorno.length > 0) {
-        const mensagens: MensagemRetorno[] = Array.from(mensagensRetorno).map((msg) => ({
-          codigo: msg.querySelector("Codigo")?.textContent || "",
-          mensagem: msg.querySelector("Mensagem")?.textContent || "",
-          correcao: msg.querySelector("Correcao")?.textContent || undefined,
-        }));
-
-        return {
-          sucesso: false,
-          mensagens,
-        };
-      }
-
-      // Parsear dados da NFSe
-      const nfse = doc.querySelector("Nfse");
-      if (!nfse) {
-        return { sucesso: false };
-      }
-
-      const infNfse = nfse.querySelector("InfNfse");
-      if (!infNfse) {
-        return { sucesso: false };
-      }
-
-      const valoresNfse = infNfse.querySelector("ValoresNfse");
-      const prestador = infNfse.querySelector("PrestadorServico");
-      const tomador = infNfse.querySelector("TomadorServico");
-      const declaracao = infNfse.querySelector("DeclaracaoPrestacaoServico");
-      const rps = declaracao?.querySelector("Rps")?.querySelector("IdentificacaoRps");
-
-      return {
-        sucesso: true,
-        numero: infNfse.querySelector("Numero")?.textContent || undefined,
-        codigoVerificacao: infNfse.querySelector("CodigoVerificacao")?.textContent || undefined,
-        dataEmissao: infNfse.querySelector("DataEmissao")?.textContent || undefined,
-        valores: valoresNfse
-          ? {
-              valorServicos: this.parseFloat(valoresNfse.querySelector("ValorServicos")?.textContent),
-              valorDeducoes: this.parseFloat(valoresNfse.querySelector("ValorDeducoes")?.textContent),
-              valorPis: this.parseFloat(valoresNfse.querySelector("ValorPis")?.textContent),
-              valorCofins: this.parseFloat(valoresNfse.querySelector("ValorCofins")?.textContent),
-              valorInss: this.parseFloat(valoresNfse.querySelector("ValorInss")?.textContent),
-              valorIr: this.parseFloat(valoresNfse.querySelector("ValorIr")?.textContent),
-              valorCsll: this.parseFloat(valoresNfse.querySelector("ValorCsll")?.textContent),
-              valorIss: this.parseFloat(valoresNfse.querySelector("ValorIss")?.textContent),
-              valorIssRetido: this.parseFloat(valoresNfse.querySelector("ValorIssRetido")?.textContent),
-              outrasRetencoes: this.parseFloat(valoresNfse.querySelector("OutrasRetencoes")?.textContent),
-              baseCalculo: this.parseFloat(valoresNfse.querySelector("BaseCalculo")?.textContent),
-              aliquota: this.parseFloat(valoresNfse.querySelector("Aliquota")?.textContent),
-              valorLiquidoNfse: this.parseFloat(valoresNfse.querySelector("ValorLiquidoNfse")?.textContent),
-            }
-          : undefined,
-        prestador: prestador
-          ? {
-              cnpj: prestador.querySelector("Cnpj")?.textContent || "",
-              inscricaoMunicipal: prestador.querySelector("InscricaoMunicipal")?.textContent || "",
-              razaoSocial: prestador.querySelector("RazaoSocial")?.textContent || "",
-            }
-          : undefined,
-        tomador: tomador
-          ? {
-              cnpj:
-                tomador.querySelector("CnpjCpf Cnpj")?.textContent ||
-                tomador.querySelector("Cnpj")?.textContent ||
-                "",
-              razaoSocial: tomador.querySelector("RazaoSocial")?.textContent || "",
-            }
-          : undefined,
-        rps: rps
-          ? {
-              numero: rps.querySelector("Numero")?.textContent || undefined,
-              serie: rps.querySelector("Serie")?.textContent || undefined,
-              tipo: rps.querySelector("Tipo")?.textContent || undefined,
-            }
-          : undefined,
-      } as any;
-    } catch (error) {
-      throw new Error(`Erro ao parsear resposta de autorização: ${error}`);
+function parseMessages(xml: string): MensagemRetorno[] {
+  const msgs: MensagemRetorno[] = [];
+  const blocks = [...xml.matchAll(/<MensagemRetorno[^>]*>([\s\S]*?)<\/MensagemRetorno>/gi)];
+  if (blocks.length === 0) {
+    const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]*)<\/Codigo>/gi)].map(m => m[1]);
+    const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]*)<\/Mensagem>/gi)].map(m => m[1]);
+    for (let i = 0; i < Math.max(codigos.length, mensagens.length); i++) {
+      msgs.push({ codigo: codigos[i] || "ERR", mensagem: mensagens[i] || "Erro desconhecido" });
     }
+    return msgs;
   }
+  for (const [, block] of blocks) {
+    const codigo = extractValue(block, "Codigo") || "";
+    const mensagem = extractValue(block, "Mensagem") || "";
+    const correcao = extractValue(block, "Correcao");
+    msgs.push({ codigo, mensagem: correcao ? `${mensagem} (${correcao})` : mensagem });
+  }
+  return msgs;
+}
 
-  /**
-   * Parseia resposta de consulta
-   */
-  parseRespostaConsulta(xml: string): ConsultaResposta {
-    const resposta = this.parseRespostaAutorizacao(xml);
+function stripNamespaces(xml: string): string {
+  return xml.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+}
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(xml, "text/xml");
+function extractCdata(xml: string): string {
+  const cdata = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
+  if (cdata) return cdata[1];
+  return xml;
+}
 
-    // Verificar mensagens de erro
-    const mensagensRetorno = doc.querySelectorAll("MensagemRetorno");
-    if (mensagensRetorno.length > 0) {
-      const mensagens: MensagemRetorno[] = Array.from(mensagensRetorno).map((msg) => ({
-        codigo: msg.querySelector("Codigo")?.textContent || "",
-        mensagem: msg.querySelector("Mensagem")?.textContent || "",
-      }));
+export function parseNfseResponse(xml: string): NFSeResposta {
+  if (!xml || typeof xml !== "string") {
+    return { sucesso: false, mensagens: [{ codigo: "ERR", mensagem: "XML vazio ou inválido" }] };
+  }
+  let workXml = extractCdata(stripNamespaces(xml));
+  const msgs = parseMessages(workXml);
+  const hasError = msgs.some(m => m.codigo && m.codigo !== "0000");
 
-      return {
-        sucesso: false,
-        mensagens,
-      };
-    }
+  const compNfse = extractBlock(workXml, "CompNfse") || extractBlock(workXml, "ListaNfse");
+  const nfseBlock = compNfse ? (extractBlock(compNfse, "Nfse") || compNfse) : workXml;
+  const infNfse = extractBlock(nfseBlock, "InfNfse") || nfseBlock;
 
-    const infNfse = doc.querySelector("InfNfse");
-    const nfseSubstituida = infNfse?.querySelector("NfseSubstituida")?.textContent;
-    const dataCancelamento = infNfse?.querySelector("DataCancelamento")?.textContent;
+  const numero = extractValue(infNfse, "NumeroNfse") || extractValue(infNfse, "Numero");
+  const codigoVerificacao = extractValue(infNfse, "CodigoVerificacao");
+  const dataEmissao = extractValue(infNfse, "DataEmissaoNfse") || extractValue(infNfse, "DataEmissao");
+  const protocolo = extractValue(workXml, "Protocolo");
 
+  const valoresBlock = extractBlock(infNfse, "ValoresNfse") || extractBlock(infNfse, "Valores");
+
+  const sucesso = !hasError && !!(numero || protocolo);
+
+  return {
+    sucesso,
+    numero,
+    codigoVerificacao,
+    dataEmissao,
+    protocolo,
+    mensagens: msgs.length > 0 ? msgs : sucesso ? [{ codigo: "0000", mensagem: "Operação realizada com sucesso" }] : undefined,
+    valores: valoresBlock
+      ? {
+          valorServicos: parseFloat((extractValue(valoresBlock, "ValorServicos") || "0").replace(",", ".")),
+          valorDeducoes: parseFloat((extractValue(valoresBlock, "ValorDeducoes") || "0").replace(",", ".")),
+          valorPis: parseFloat((extractValue(valoresBlock, "ValorPis") || "0").replace(",", ".")),
+          valorCofins: parseFloat((extractValue(valoresBlock, "ValorCofins") || "0").replace(",", ".")),
+          valorInss: parseFloat((extractValue(valoresBlock, "ValorInss") || "0").replace(",", ".")),
+          valorIr: parseFloat((extractValue(valoresBlock, "ValorIr") || "0").replace(",", ".")),
+          valorCsll: parseFloat((extractValue(valoresBlock, "ValorCsll") || "0").replace(",", ".")),
+          valorIss: parseFloat((extractValue(valoresBlock, "ValorIss") || "0").replace(",", ".")),
+          valorIssRetido: parseFloat((extractValue(valoresBlock, "ValorIssRetido") || "0").replace(",", ".")),
+          outrasRetencoes: parseFloat((extractValue(valoresBlock, "OutrasRetencoes") || "0").replace(",", ".")),
+          baseCalculo: parseFloat((extractValue(valoresBlock, "BaseCalculo") || "0").replace(",", ".")),
+          aliquota: parseFloat((extractValue(valoresBlock, "Aliquota") || "0").replace(",", ".")),
+          valorLiquidoNfse: parseFloat((extractValue(valoresBlock, "ValorLiquidoNfse") || "0").replace(",", ".")),
+        }
+      : undefined,
+  };
+}
+
+export function parseConsultaResponse(xml: string): NFSeResposta {
+  const base = parseNfseResponse(xml);
+  const cleanXml = stripNamespaces(extractCdata(xml));
+  const dataCancelamento = extractValue(cleanXml, "DataCancelamento");
+  const nfseSubstituida = extractValue(cleanXml, "NfseSubstituida");
+  const status = dataCancelamento ? "CANCELADA" : nfseSubstituida === "1" ? "SUBSTITUIDA" : "NORMAL";
+  return { ...base, status };
+}
+
+export function parseCancelamentoResponse(xml: string): NFSeCancelamentoResposta {
+  const msgs = parseMessages(stripNamespaces(extractCdata(xml)));
+  const hasError = msgs.some(m => m.codigo && m.codigo !== "0000");
+  const confirmacao = extractBlock(stripNamespaces(extractCdata(xml)), "Confirmacao");
+  const sucesso = !hasError && (extractValue(confirmacao || xml, "Sucesso") === "true" || extractValue(confirmacao || xml, "sucesso") === "true");
+  const dataHora = extractValue(confirmacao || xml, "DataHoraCancelamento");
+  return {
+    sucesso,
+    dataHoraCancelamento: dataHora,
+    mensagens: msgs.length > 0 ? msgs : sucesso ? [{ codigo: "0000", mensagem: "Cancelamento confirmado" }] : undefined,
+  };
+}
+
+export function parseErroSOAP(xml: string): { tipo: string; mensagem: string; faultCode?: string; faultString?: string; codigo?: string } {
+  const clean = stripNamespaces(xml);
+  const fault = extractBlock(clean, "Fault");
+  if (fault) {
+    const detail = extractBlock(fault, "detail");
+    const errorMessage = extractValue(detail || "", "ErrorMessage");
+    const faultString = extractValue(fault, "faultstring");
     return {
-      ...resposta,
-      status: dataCancelamento ? "CANCELADA" : "NORMAL",
-      cancelada: !!dataCancelamento,
-      substituida: nfseSubstituida === "1",
+      tipo: "SOAP_FAULT",
+      faultCode: extractValue(fault, "faultcode"),
+      faultString,
+      codigo: extractValue(detail || "", "ErrorCode") || extractValue(fault, "faultcode"),
+      mensagem: errorMessage || faultString || "Erro SOAP",
     };
   }
+  return { tipo: "UNKNOWN", mensagem: "Erro desconhecido na resposta" };
+}
 
-  /**
-   * Parseia resposta de cancelamento
-   */
+/** Classe wrapper para compatibilidade com testes existentes */
+export class NFSeParser {
+  parseRespostaAutorizacao(xml: string): NFSeResposta {
+    return parseNfseResponse(xml);
+  }
+  parseRespostaConsulta(xml: string): NFSeResposta {
+    return parseConsultaResponse(xml);
+  }
   parseRespostaCancelamento(xml: string): NFSeCancelamentoResposta {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xml, "text/xml");
-
-      // Verificar mensagens de erro
-      const mensagensRetorno = doc.querySelectorAll("MensagemRetorno");
-      if (mensagensRetorno.length > 0) {
-        const mensagens: MensagemRetorno[] = Array.from(mensagensRetorno).map((msg) => ({
-          codigo: msg.querySelector("Codigo")?.textContent || "",
-          mensagem: msg.querySelector("Mensagem")?.textContent || "",
-        }));
-
-        return {
-          sucesso: false,
-          mensagens,
-        };
-      }
-
-      const confirmacao = doc.querySelector("Confirmacao");
-      const sucesso = confirmacao?.querySelector("Sucesso")?.textContent === "true";
-
-      if (sucesso) {
-        return {
-          sucesso: true,
-          dataHoraCancelamento: confirmacao?.querySelector("DataHoraCancelamento")?.textContent || undefined,
-          inscricaoMunicipalPrestador:
-            confirmacao?.querySelector("InscricaoMunicipalPrestador")?.textContent || undefined,
-        } as any;
-      }
-
-      return {
-        sucesso: false,
-        mensagens: [{ codigo: "UNKNOWN", mensagem: "Cancelamento não confirmado" }],
-      };
-    } catch (error) {
-      return {
-        sucesso: false,
-        mensagens: [{ codigo: "PARSE_ERROR", mensagem: String(error) }],
-      };
-    }
+    return parseCancelamentoResponse(xml);
   }
-
-  /**
-   * Parseia erro SOAP
-   */
-  parseErroSOAP(xml: string): ErroSOAP {
-    try {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(xml, "text/xml");
-
-      // Verificar erro de parse
-      const parseError = doc.querySelector("parsererror");
-      if (parseError) {
-        return {
-          tipo: "PARSE_ERROR",
-          mensagem: "XML mal formatado",
-        };
-      }
-
-      // Buscar Fault em qualquer namespace
-      const fault = doc.getElementsByTagName("Fault")[0];
-      if (fault) {
-        const faultCode = fault.getElementsByTagName("faultcode")[0]?.textContent || "";
-        const faultString = fault.getElementsByTagName("faultstring")[0]?.textContent || "";
-        const detail = fault.getElementsByTagName("detail")[0];
-        const errorCode = detail?.getElementsByTagName("ErrorCode")[0]?.textContent;
-        const errorMessage = detail?.getElementsByTagName("ErrorMessage")[0]?.textContent;
-
-        return {
-          tipo: "SOAP_FAULT",
-          faultCode,
-          faultString,
-          codigo: errorCode || undefined,
-          mensagem: errorMessage || faultString,
-        };
-      }
-
-      return {
-        tipo: "UNKNOWN",
-        mensagem: "Erro desconhecido na resposta",
-      };
-    } catch (error) {
-      return {
-        tipo: "UNKNOWN",
-        mensagem: `Erro ao parsear: ${error}`,
-      };
-    }
-  }
-
-  /**
-   * Converte string para float de forma segura
-   */
-  private parseFloat(value: string | null | undefined): number {
-    if (!value) return 0;
-    const parsed = parseFloat(value.replace(",", "."));
-    return isNaN(parsed) ? 0 : parsed;
+  parseErroSOAP(xml: string): ReturnType<typeof parseErroSOAP> {
+    return parseErroSOAP(xml);
   }
 }

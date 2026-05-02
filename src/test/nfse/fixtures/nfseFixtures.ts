@@ -1,13 +1,10 @@
 /**
- * Fixtures para testes de integração NFS-e
- * Inclui XMLs de resposta e dados de nota fiscal para testes
+ * Fixtures para testes de integração NFS-e (GINFES v03)
+ * XMLs de resposta seguem layout GINFES v03 / ABRASF 2.04
  */
 
 import type { NFSeEmissaoData, CertificadoDigital } from "../../../types/nfse";
 
-/**
- * Dados válidos de nota fiscal para testes
- */
 export const dadosNotaFiscalValida: NFSeEmissaoData = {
   numero: 1,
   serie: "1",
@@ -38,7 +35,7 @@ export const dadosNotaFiscalValida: NFSeEmissaoData = {
     },
   },
   tomador: {
-    cnpj: "98765432000196",
+    cnpj: "98765432000198",
     inscricaoMunicipal: "654321",
     razaoSocial: "Tomador Teste LTDA",
     endereco: {
@@ -69,7 +66,7 @@ export const dadosNotaFiscalValida: NFSeEmissaoData = {
     outrasRetencoes: 0.0,
     baseCalculo: 900.0,
     aliquota: 5.0,
-    valorLiquidoNfse: 877.0,
+    valorLiquidoNfse: 827.0,
     valorDescontoIncondicionado: 0.0,
     valorDescontoCondicionado: 0.0,
     itemListaServico: "14.01",
@@ -89,9 +86,6 @@ export const dadosNotaFiscalValida: NFSeEmissaoData = {
   },
 };
 
-/**
- * Dados de nota fiscal com CPF (pessoa física)
- */
 export const dadosNotaFiscalCPF: NFSeEmissaoData = {
   ...dadosNotaFiscalValida,
   tomador: {
@@ -113,211 +107,251 @@ export const dadosNotaFiscalCPF: NFSeEmissaoData = {
 };
 
 /**
- * XML de resposta de autorização bem-sucedida (ABRASF)
+ * XML de resposta de autorização bem-sucedida (GINFES v03)
+ * Inclui envelope SOAP 1.2 e return com CDATA
  */
 export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <GerarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-      <GerarNfseResult>
-        <ListaNfse>
-          <Nfse>
-            <InfNfse>
-              <Numero>12345</Numero>
-              <CodigoVerificacao>A1B2C3D4</CodigoVerificacao>
-              <DataEmissao>2024-01-15T10:00:00</DataEmissao>
-              <ValoresNfse>
-                <ValorServicos>1000.00</ValorServicos>
-                <ValorDeducoes>100.00</ValorDeducoes>
-                <ValorPis>6.50</ValorPis>
-                <ValorCofins>3.00</ValorCofins>
-                <ValorInss>11.00</ValorInss>
-                <ValorIr>1.50</ValorIr>
-                <ValorCsll>1.00</ValorCsll>
-                <IssRetido>1</IssRetido>
-                <ValorIss>50.00</ValorIss>
-                <ValorIssRetido>50.00</ValorIssRetido>
-                <OutrasRetencoes>0.00</OutrasRetencoes>
-                <BaseCalculo>900.00</BaseCalculo>
-                <Aliquota>5.00</Aliquota>
-                <ValorLiquidoNfse>877.00</ValorLiquidoNfse>
-              </ValoresNfse>
-              <PrestadorServico>
-                <IdentificacaoPrestador>
-                  <Cnpj>12345678000195</Cnpj>
-                  <InscricaoMunicipal>123456</InscricaoMunicipal>
-                </IdentificacaoPrestador>
-                <RazaoSocial>Empresa Teste LTDA</RazaoSocial>
-              </PrestadorServico>
-              <TomadorServico>
-                <IdentificacaoTomador>
-                  <CnpjCpf>
-                    <Cnpj>98765432000196</Cnpj>
-                  </CnpjCpf>
-                </IdentificacaoTomador>
-                <RazaoSocial>Tomador Teste LTDA</RazaoSocial>
-              </TomadorServico>
-              <DeclaracaoPrestacaoServico>
-                <Rps>
-                  <IdentificacaoRps>
-                    <Numero>1</Numero>
-                    <Serie>1</Serie>
-                    <Tipo>1</Tipo>
-                  </IdentificacaoRps>
-                </Rps>
-              </DeclaracaoPrestacaoServico>
-            </InfNfse>
-          </Nfse>
-        </ListaNfse>
-      </GerarNfseResult>
-    </GerarNfseResponse>
-  </soap:Body>
-</soap:Envelope>`;
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+  <NumeroLote>1</NumeroLote>
+  <DataRecebimento>2024-01-15T10:00:05</DataRecebimento>
+  <Protocolo>PROT123456789</Protocolo>
+  <ListaMensagemRetorno/>
+</EnviarLoteRpsResposta>]]></return>
+    </ns2:RecepcionarLoteRpsV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
 
 /**
- * XML de resposta de rejeição
+ * XML de resposta com NFSe já processada (consulta após emissão)
+ */
+export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:ConsultarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<ConsultarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_lote_rps_resposta_v03.xsd">
+  <Situacao>3</Situacao>
+  <ListaNfse>
+    <CompNfse>
+      <Nfse>
+        <InfNfse>
+          <Numero>12345</Numero>
+          <CodigoVerificacao>A1B2C3D4</CodigoVerificacao>
+          <DataEmissaoNfse>2024-01-15T10:00:00</DataEmissaoNfse>
+          <ValoresNfse>
+            <ValorServicos>1000.00</ValorServicos>
+            <ValorDeducoes>100.00</ValorDeducoes>
+            <ValorPis>6.50</ValorPis>
+            <ValorCofins>3.00</ValorCofins>
+            <ValorInss>11.00</ValorInss>
+            <ValorIr>1.50</ValorIr>
+            <ValorCsll>1.00</ValorCsll>
+            <IssRetido>1</IssRetido>
+            <ValorIss>50.00</ValorIss>
+            <ValorIssRetido>50.00</ValorIssRetido>
+            <OutrasRetencoes>0.00</OutrasRetencoes>
+            <BaseCalculo>900.00</BaseCalculo>
+            <Aliquota>5.00</Aliquota>
+            <ValorLiquidoNfse>827.00</ValorLiquidoNfse>
+          </ValoresNfse>
+          <PrestadorServico>
+            <Cnpj>12345678000195</Cnpj>
+            <InscricaoMunicipal>123456</InscricaoMunicipal>
+            <RazaoSocial>Empresa Teste LTDA</RazaoSocial>
+          </PrestadorServico>
+          <TomadorServico>
+            <IdentificacaoTomador>
+              <CpfCnpj>
+                <Cnpj>98765432000198</Cnpj>
+              </CpfCnpj>
+            </IdentificacaoTomador>
+            <RazaoSocial>Tomador Teste LTDA</RazaoSocial>
+          </TomadorServico>
+          <DeclaracaoPrestacaoServico>
+            <Rps>
+              <IdentificacaoRps>
+                <Numero>1</Numero>
+                <Serie>1</Serie>
+                <Tipo>1</Tipo>
+              </IdentificacaoRps>
+            </Rps>
+          </DeclaracaoPrestacaoServico>
+        </InfNfse>
+      </Nfse>
+    </CompNfse>
+  </ListaNfse>
+</ConsultarLoteRpsResposta>]]></return>
+    </ns2:ConsultarLoteRpsV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
+
+/**
+ * XML de resposta de rejeição (GINFES v03)
  */
 export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <GerarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-      <GerarNfseResult>
-        <ListaMensagemRetorno>
-          <MensagemRetorno>
-            <Codigo>E1</Codigo>
-            <Mensagem>CNPJ do prestador inválido</Mensagem>
-            <Correcao>Verifique o CNPJ informado e tente novamente</Correcao>
-          </MensagemRetorno>
-          <MensagemRetorno>
-            <Codigo>E2</Codigo>
-            <Mensagem>Alíquota inválida para o município</Mensagem>
-            <Correcao>Informe uma alíquota válida para o código de tributação</Correcao>
-          </MensagemRetorno>
-        </ListaMensagemRetorno>
-      </GerarNfseResult>
-    </GerarNfseResponse>
-  </soap:Body>
-</soap:Envelope>`;
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+  <ListaMensagemRetorno>
+    <MensagemRetorno>
+      <Codigo>E1</Codigo>
+      <Mensagem>CNPJ do prestador inválido</Mensagem>
+      <Correcao>Verifique o CNPJ informado e tente novamente</Correcao>
+    </MensagemRetorno>
+    <MensagemRetorno>
+      <Codigo>E2</Codigo>
+      <Mensagem>Alíquota inválida para o município</Mensagem>
+      <Correcao>Informe uma alíquota válida para o código de tributação</Correcao>
+    </MensagemRetorno>
+  </ListaMensagemRetorno>
+</EnviarLoteRpsResposta>]]></return>
+    </ns2:RecepcionarLoteRpsV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
 
 /**
- * XML de resposta de consulta
+ * XML de resposta de consulta por RPS (GINFES v03)
  */
 export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <ConsultarNfseRpsResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-      <ConsultarNfseRpsResult>
-        <Nfse>
-          <InfNfse>
-            <Numero>12345</Numero>
-            <CodigoVerificacao>A1B2C3D4</CodigoVerificacao>
-            <DataEmissao>2024-01-15T10:00:00</DataEmissao>
-            <DataCancelamento></DataCancelamento>
-            <ValoresNfse>
-              <ValorServicos>1000.00</ValorServicos>
-              <ValorDeducoes>100.00</ValorDeducoes>
-              <ValorPis>6.50</ValorPis>
-              <ValorCofins>3.00</ValorCofins>
-              <ValorInss>11.00</ValorInss>
-              <ValorIr>1.50</ValorIr>
-              <ValorCsll>1.00</ValorCsll>
-              <IssRetido>1</IssRetido>
-              <ValorIss>50.00</ValorIss>
-              <ValorIssRetido>50.00</ValorIssRetido>
-              <OutrasRetencoes>0.00</OutrasRetencoes>
-              <BaseCalculo>900.00</BaseCalculo>
-              <Aliquota>5.00</Aliquota>
-              <ValorLiquidoNfse>877.00</ValorLiquidoNfse>
-            </ValoresNfse>
-            <PrestadorServico>
-              <IdentificacaoPrestador>
-                <Cnpj>12345678000195</Cnpj>
-                <InscricaoMunicipal>123456</InscricaoMunicipal>
-              </IdentificacaoPrestador>
-              <RazaoSocial>Empresa Teste LTDA</RazaoSocial>
-            </PrestadorServico>
-            <TomadorServico>
-              <IdentificacaoTomador>
-                <CnpjCpf>
-                  <Cnpj>98765432000196</Cnpj>
-                </CnpjCpf>
-              </IdentificacaoTomador>
-              <RazaoSocial>Tomador Teste LTDA</RazaoSocial>
-            </TomadorServico>
-            <DeclaracaoPrestacaoServico>
-              <Rps>
-                <IdentificacaoRps>
-                  <Numero>1</Numero>
-                  <Serie>1</Serie>
-                  <Tipo>1</Tipo>
-                </IdentificacaoRps>
-              </Rps>
-            </DeclaracaoPrestacaoServico>
-            <NfseSubstituida>0</NfseSubstituida>
-          </InfNfse>
-        </Nfse>
-      </ConsultarNfseRpsResult>
-    </ConsultarNfseRpsResponse>
-  </soap:Body>
-</soap:Envelope>`;
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:ConsultarNfseRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
+  <CompNfse>
+    <Nfse>
+      <InfNfse>
+        <Numero>12345</Numero>
+        <CodigoVerificacao>A1B2C3D4</CodigoVerificacao>
+        <DataEmissaoNfse>2024-01-15T10:00:00</DataEmissaoNfse>
+        <ValoresNfse>
+          <ValorServicos>1000.00</ValorServicos>
+          <ValorDeducoes>100.00</ValorDeducoes>
+          <ValorPis>6.50</ValorPis>
+          <ValorCofins>3.00</ValorCofins>
+          <ValorInss>11.00</ValorInss>
+          <ValorIr>1.50</ValorIr>
+          <ValorCsll>1.00</ValorCsll>
+          <IssRetido>1</IssRetido>
+          <ValorIss>50.00</ValorIss>
+          <ValorIssRetido>50.00</ValorIssRetido>
+          <OutrasRetencoes>0.00</OutrasRetencoes>
+          <BaseCalculo>900.00</BaseCalculo>
+          <Aliquota>5.00</Aliquota>
+          <ValorLiquidoNfse>827.00</ValorLiquidoNfse>
+        </ValoresNfse>
+        <PrestadorServico>
+          <Cnpj>12345678000195</Cnpj>
+          <InscricaoMunicipal>123456</InscricaoMunicipal>
+          <RazaoSocial>Empresa Teste LTDA</RazaoSocial>
+        </PrestadorServico>
+        <TomadorServico>
+          <IdentificacaoTomador>
+            <CpfCnpj>
+              <Cnpj>98765432000198</Cnpj>
+            </CpfCnpj>
+          </IdentificacaoTomador>
+          <RazaoSocial>Tomador Teste LTDA</RazaoSocial>
+        </TomadorServico>
+        <DeclaracaoPrestacaoServico>
+          <Rps>
+            <IdentificacaoRps>
+              <Numero>1</Numero>
+              <Serie>1</Serie>
+              <Tipo>1</Tipo>
+            </IdentificacaoRps>
+          </Rps>
+        </DeclaracaoPrestacaoServico>
+        <NfseSubstituida>0</NfseSubstituida>
+      </InfNfse>
+    </Nfse>
+  </CompNfse>
+</ConsultarNfseRpsResposta>]]></return>
+    </ns2:ConsultarNfseRpsV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
 
 /**
- * XML de resposta de cancelamento
+ * XML de resposta de consulta com NFSe não encontrada
+ */
+export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="UTF-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:ConsultarNfseRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
+  <ListaMensagemRetorno>
+    <MensagemRetorno>
+      <Codigo>E5</Codigo>
+      <Mensagem>NFS-e não encontrada</Mensagem>
+    </MensagemRetorno>
+  </ListaMensagemRetorno>
+</ConsultarNfseRpsResposta>]]></return>
+    </ns2:ConsultarNfseRpsV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
+
+/**
+ * XML de resposta de cancelamento bem-sucedido (GINFES v03)
  */
 export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <CancelarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-      <CancelarNfseResult>
-        <NfseCancelamento>
-          <Confirmacao>
-            <DataHoraCancelamento>2024-01-15T14:30:00</DataHoraCancelamento>
-            <InscricaoMunicipalPrestador>123456</InscricaoMunicipalPrestador>
-            <Sucesso>true</Sucesso>
-          </Confirmacao>
-        </NfseCancelamento>
-      </CancelarNfseResult>
-    </CancelarNfseResponse>
-  </soap:Body>
-</soap:Envelope>`;
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
+  <NfseCancelamento>
+    <Confirmacao>
+      <DataHoraCancelamento>2024-01-15T14:30:00</DataHoraCancelamento>
+      <InscricaoMunicipalPrestador>123456</InscricaoMunicipalPrestador>
+      <Sucesso>true</Sucesso>
+    </Confirmacao>
+  </NfseCancelamento>
+</CancelarNfseResposta>]]></return>
+    </ns2:CancelarNfseV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
 
 /**
  * XML de erro SOAP (timeout/erro 500)
  */
 export const xmlErroSOAP500 = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <soap:Fault>
-      <faultcode>soap:Server</faultcode>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <soap12:Fault>
+      <faultcode>soap12:Server</faultcode>
       <faultstring>Erro interno no servidor</faultstring>
       <detail>
         <ErrorCode>500</ErrorCode>
         <ErrorMessage>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</ErrorMessage>
       </detail>
-    </soap:Fault>
-  </soap:Body>
-</soap:Envelope>`;
+    </soap12:Fault>
+  </soap12:Body>
+</soap12:Envelope>`;
 
 /**
  * XML de timeout SOAP
  */
 export const xmlErroTimeout = `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-  <soap:Body>
-    <soap:Fault>
-      <faultcode>soap:Server</faultcode>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <soap12:Fault>
+      <faultcode>soap12:Server</faultcode>
       <faultstring>Tempo de resposta excedido</faultstring>
       <detail>
         <ErrorCode>408</ErrorCode>
         <ErrorMessage>O servidor não respondeu dentro do tempo limite esperado</ErrorMessage>
       </detail>
-    </soap:Fault>
-  </soap:Body>
-</soap:Envelope>`;
+    </soap12:Fault>
+  </soap12:Body>
+</soap12:Envelope>`;
 
-/**
- * Certificado digital mock para testes
- */
 export const certificadoDigitalMock: CertificadoDigital = {
   id: "cert-001",
   nome: "Certificado Teste",
@@ -330,21 +364,15 @@ export const certificadoDigitalMock: CertificadoDigital = {
   ativo: true,
 };
 
-/**
- * Configuração de ambiente de teste
- */
 export const configuracaoAmbienteTeste = {
-  urlHomologacao: "https://nfse-homologacao.prefeitura.sp.gov.br/ws",
-  urlProducao: "https://nfse.prefeitura.sp.gov.br/ws",
+  urlHomologacao: "https://homologacao.ginfes.com.br/ServiceGinfesImpl",
+  urlProducao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
   ambiente: "homologacao" as const,
-  versao: "2.04",
+  versao: "3",
   timeoutMs: 30000,
   retryAttempts: 3,
 };
 
-/**
- * Dados inválidos para testes de validação
- */
 export const dadosNotaFiscalInvalida = {
   semCnpj: {
     ...dadosNotaFiscalValida,
@@ -382,18 +410,12 @@ export const dadosNotaFiscalInvalida = {
   },
 };
 
-/**
- * CNPJs válidos para testes (com dígito verificador correto)
- */
 export const cnpjsValidos = [
   "12345678000195",
-  "11222333000181",
-  "00000000000191", // CNPJ Brasil
+  "00000000000191",
+  "98765432000198",
 ];
 
-/**
- * CNPJs inválidos para testes
- */
 export const cnpjsInvalidos = [
   "11111111111111",
   "00000000000000",
@@ -404,18 +426,12 @@ export const cnpjsInvalidos = [
   "",
 ];
 
-/**
- * CPFs válidos para testes (com dígito verificador correto)
- */
 export const cpfsValidos = [
-  "11144477735",
   "52998224725",
-  "15548275706",
+  "12312312387",
+  "11122233396",
 ];
 
-/**
- * CPFs inválidos para testes
- */
 export const cpfsInvalidos = [
   "11111111111",
   "00000000000",
@@ -426,9 +442,6 @@ export const cpfsInvalidos = [
   "",
 ];
 
-/**
- * Casos de cálculo esperados
- */
 export const casosCalculo = [
   {
     descricao: "Cálculo básico sem deduções",
@@ -471,9 +484,10 @@ export const casosCalculo = [
     valorInss: 11.0,
     valorIr: 1.5,
     valorCsll: 1.0,
+    valorIssRetido: 50.0,
     baseCalculoEsperada: 900.0,
     valorIssEsperado: 45.0,
-    valorLiquidoEsperado: 877.0,
+    valorLiquidoEsperado: 827.0,
   },
   {
     descricao: "Cálculo com alíquota zero",

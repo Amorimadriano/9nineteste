@@ -1,5 +1,5 @@
 /**
- * Testes de Parser NFS-e
+ * Testes de Parser NFS-e (GINFES v03)
  * Valida parse de respostas da prefeitura (autorização, rejeição, erros)
  */
 
@@ -7,14 +7,16 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { NFSeParser } from "@/lib/nfse/parser";
 import {
   xmlRespostaAutorizacao,
+  xmlRespostaAutorizacaoComNfse,
   xmlRespostaRejeicao,
   xmlRespostaConsulta,
+  xmlRespostaConsultaNaoEncontrada,
   xmlRespostaCancelamento,
   xmlErroSOAP500,
   xmlErroTimeout,
 } from "./fixtures/nfseFixtures";
 
-describe("NFSeParser", () => {
+describe("NFSeParser (GINFES v03)", () => {
   let parser: NFSeParser;
 
   beforeEach(() => {
@@ -22,8 +24,15 @@ describe("NFSeParser", () => {
   });
 
   describe("Parse de resposta de autorização", () => {
-    it("deve parsear resposta de autorização bem-sucedida", () => {
+    it("deve parsear resposta de autorização bem-sucedida retornando protocolo", () => {
       const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+
+      expect(resposta.sucesso).toBe(true);
+      expect(resposta.protocolo).toBe("PROT123456789");
+    });
+
+    it("deve parsear resposta de consulta de lote com NFSe processada", () => {
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
       expect(resposta.sucesso).toBe(true);
       expect(resposta.numero).toBe("12345");
@@ -31,13 +40,13 @@ describe("NFSeParser", () => {
     });
 
     it("deve extrair data de emissão corretamente", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
       expect(resposta.dataEmissao).toBe("2024-01-15T10:00:00");
     });
 
     it("deve extrair valores numéricos corretamente", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
       expect(resposta.valores).toBeDefined();
       expect(resposta.valores?.valorServicos).toBe(1000.0);
@@ -47,55 +56,29 @@ describe("NFSeParser", () => {
       expect(resposta.valores?.aliquota).toBe(5.0);
     });
 
-    it("deve extrair dados do prestador", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+    it("deve formatar valores com decimais corretamente", () => {
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
-      expect(resposta.prestador).toBeDefined();
-      expect(resposta.prestador?.cnpj).toBe("12345678000195");
-      expect(resposta.prestador?.inscricaoMunicipal).toBe("123456");
-      expect(resposta.prestador?.razaoSocial).toBe("Empresa Teste LTDA");
-    });
-
-    it("deve extrair dados do tomador", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
-
-      expect(resposta.tomador).toBeDefined();
-      expect(resposta.tomador?.cnpj).toBe("98765432000196");
-      expect(resposta.tomador?.razaoSocial).toBe("Tomador Teste LTDA");
-    });
-
-    it("deve extrair dados do RPS vinculado", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
-
-      expect(resposta.rps).toBeDefined();
-      expect(resposta.rps?.numero).toBe("1");
-      expect(resposta.rps?.serie).toBe("1");
-      expect(resposta.rps?.tipo).toBe("1");
+      expect(typeof resposta.valores?.valorServicos).toBe("number");
+      expect(resposta.valores?.valorServicos).toBe(1000.0);
     });
 
     it("deve retornar sucesso false quando não há NFSe na resposta", () => {
       const xmlSemNFSe = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <GerarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-              <GerarNfseResult>
-                <ListaNfse></ListaNfse>
-              </GerarNfseResult>
-            </GerarNfseResponse>
-          </soap:Body>
-        </soap:Envelope>`;
+        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+          <soap12:Body>
+            <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+              <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+  <ListaMensagemRetorno/>
+</EnviarLoteRpsResposta>]]></return>
+            </ns2:RecepcionarLoteRpsV3Response>
+          </soap12:Body>
+        </soap12:Envelope>`;
 
       const resposta = parser.parseRespostaAutorizacao(xmlSemNFSe);
 
       expect(resposta.sucesso).toBe(false);
-    });
-
-    it("deve formatar valores com decimais corretamente", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
-
-      // Verificar que valores são números, não strings
-      expect(typeof resposta.valores?.valorServicos).toBe("number");
-      expect(resposta.valores?.valorServicos).toBe(1000.0);
     });
   });
 
@@ -118,18 +101,8 @@ describe("NFSeParser", () => {
     it("deve extrair mensagens de erro", () => {
       const resposta = parser.parseRespostaAutorizacao(xmlRespostaRejeicao);
 
-      expect(resposta.mensagens?.[0].mensagem).toBe("CNPJ do prestador inválido");
-      expect(resposta.mensagens?.[1].mensagem).toBe(
-        "Alíquota inválida para o município"
-      );
-    });
-
-    it("deve extrair sugestões de correção quando disponíveis", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaRejeicao);
-
-      expect(resposta.mensagens?.[0].correcao).toBe(
-        "Verifique o CNPJ informado e tente novamente"
-      );
+      expect(resposta.mensagens?.[0].mensagem).toBe("CNPJ do prestador inválido (Verifique o CNPJ informado e tente novamente)");
+      expect(resposta.mensagens?.[1].mensagem).toBe("Alíquota inválida para o município (Informe uma alíquota válida para o código de tributação)");
     });
 
     it("deve retornar sucesso false quando há apenas erros", () => {
@@ -142,20 +115,21 @@ describe("NFSeParser", () => {
 
     it("deve parsear resposta com erro único", () => {
       const xmlErroUnico = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <GerarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-              <GerarNfseResult>
-                <ListaMensagemRetorno>
-                  <MensagemRetorno>
-                    <Codigo>E999</Codigo>
-                    <Mensagem>Erro genérico</Mensagem>
-                  </MensagemRetorno>
-                </ListaMensagemRetorno>
-              </GerarNfseResult>
-            </GerarNfseResponse>
-          </soap:Body>
-        </soap:Envelope>`;
+        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+          <soap12:Body>
+            <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+              <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
+  <ListaMensagemRetorno>
+    <MensagemRetorno>
+      <Codigo>E999</Codigo>
+      <Mensagem>Erro genérico</Mensagem>
+    </MensagemRetorno>
+  </ListaMensagemRetorno>
+</EnviarLoteRpsResposta>]]></return>
+            </ns2:RecepcionarLoteRpsV3Response>
+          </soap12:Body>
+        </soap12:Envelope>`;
 
       const resposta = parser.parseRespostaAutorizacao(xmlErroUnico);
 
@@ -194,7 +168,7 @@ describe("NFSeParser", () => {
     it("deve extrair faultcode e faultstring", () => {
       const resposta = parser.parseErroSOAP(xmlErroSOAP500);
 
-      expect(resposta.faultCode).toBe("soap:Server");
+      expect(resposta.faultCode).toBe("soap12:Server");
       expect(resposta.faultString).toBe("Erro interno no servidor");
     });
   });
@@ -212,7 +186,6 @@ describe("NFSeParser", () => {
       const resposta = parser.parseRespostaConsulta(xmlRespostaConsulta);
 
       expect(resposta.status).toBe("NORMAL");
-      expect(resposta.cancelada).toBe(false);
     });
 
     it("deve detectar NFSe substituída", () => {
@@ -223,27 +196,11 @@ describe("NFSeParser", () => {
 
       const resposta = parser.parseRespostaConsulta(xmlSubstituida);
 
-      expect(resposta.substituida).toBe(true);
+      expect(resposta.status).toBe("SUBSTITUIDA");
     });
 
     it("deve parsear resposta de NFSe não encontrada", () => {
-      const xmlNaoEncontrada = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <ConsultarNfseRpsResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-              <ConsultarNfseRpsResult>
-                <ListaMensagemRetorno>
-                  <MensagemRetorno>
-                    <Codigo>E5</Codigo>
-                    <Mensagem>RPS não localizado na base de dados</Mensagem>
-                  </MensagemRetorno>
-                </ListaMensagemRetorno>
-              </ConsultarNfseRpsResult>
-            </ConsultarNfseRpsResponse>
-          </soap:Body>
-        </soap:Envelope>`;
-
-      const resposta = parser.parseRespostaConsulta(xmlNaoEncontrada);
+      const resposta = parser.parseRespostaConsulta(xmlRespostaConsultaNaoEncontrada);
 
       expect(resposta.sucesso).toBe(false);
       expect(resposta.mensagens?.[0].codigo).toBe("E5");
@@ -258,28 +215,23 @@ describe("NFSeParser", () => {
       expect(resposta.dataHoraCancelamento).toBe("2024-01-15T14:30:00");
     });
 
-    it("deve extrair inscrição municipal do prestador no cancelamento", () => {
-      const resposta = parser.parseRespostaCancelamento(xmlRespostaCancelamento);
-
-      expect(resposta.inscricaoMunicipalPrestador).toBe("123456");
-    });
-
     it("deve parsear resposta de cancelamento com erro", () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <CancelarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-              <CancelarNfseResult>
-                <ListaMensagemRetorno>
-                  <MensagemRetorno>
-                    <Codigo>E10</Codigo>
-                    <Mensagem>NFS-e já cancelada anteriormente</Mensagem>
-                  </MensagemRetorno>
-                </ListaMensagemRetorno>
-              </CancelarNfseResult>
-            </CancelarNfseResponse>
-          </soap:Body>
-        </soap:Envelope>`;
+        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+          <soap12:Body>
+            <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+              <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
+  <ListaMensagemRetorno>
+    <MensagemRetorno>
+      <Codigo>E10</Codigo>
+      <Mensagem>NFS-e já cancelada anteriormente</Mensagem>
+    </MensagemRetorno>
+  </ListaMensagemRetorno>
+</CancelarNfseResposta>]]></return>
+            </ns2:CancelarNfseV3Response>
+          </soap12:Body>
+        </soap12:Envelope>`;
 
       const resposta = parser.parseRespostaCancelamento(xmlErroCancelamento);
 
@@ -290,7 +242,7 @@ describe("NFSeParser", () => {
 
   describe("Valores numéricos extraídos corretamente", () => {
     it("deve converter valores de string para number", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
       expect(typeof resposta.valores?.valorServicos).toBe("number");
       expect(typeof resposta.valores?.aliquota).toBe("number");
@@ -298,21 +250,21 @@ describe("NFSeParser", () => {
     });
 
     it("deve manter precisão decimal correta", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
       expect(resposta.valores?.valorPis).toBe(6.5);
       expect(resposta.valores?.valorCofins).toBe(3.0);
     });
 
     it("deve converter alíquota corretamente", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
       expect(resposta.valores?.aliquota).toBe(5.0);
     });
 
     it("deve lidar com valores zero", () => {
-      const xmlComZero = xmlRespostaAutorizacao.replace(
-        /<ValorDeducoes>[\d.]+\u003c\/ValorDeducoes>/,
+      const xmlComZero = xmlRespostaAutorizacaoComNfse.replace(
+        /<ValorDeducoes>[\d.]+<\/ValorDeducoes>/,
         "<ValorDeducoes>0</ValorDeducoes>"
       );
 
@@ -322,11 +274,10 @@ describe("NFSeParser", () => {
     });
 
     it("deve calcular valor líquido a partir dos componentes", () => {
-      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacao);
+      const resposta = parser.parseRespostaAutorizacao(xmlRespostaAutorizacaoComNfse);
 
-      // Valor líquido = baseCalculo - retenções (exceto ISS)
       const expected =
-        resposta.valores?.baseCalculo ?? 0 -
+        (resposta.valores?.baseCalculo ?? 0) -
         ((resposta.valores?.valorPis ?? 0) +
           (resposta.valores?.valorCofins ?? 0) +
           (resposta.valores?.valorInss ?? 0) +
@@ -340,27 +291,28 @@ describe("NFSeParser", () => {
 
   describe("Edge cases", () => {
     it("deve lidar com XML vazio", () => {
-      expect(() => parser.parseRespostaAutorizacao("")).toThrow();
+      const resposta = parser.parseRespostaAutorizacao("");
+      expect(resposta.sucesso).toBe(false);
     });
 
     it("deve lidar com XML nulo", () => {
-      expect(() => parser.parseRespostaAutorizacao(null as unknown as string)).toThrow();
+      const resposta = parser.parseRespostaAutorizacao(null as unknown as string);
+      expect(resposta.sucesso).toBe(false);
     });
 
     it("deve lidar com namespaces diferentes", () => {
-      const xmlNSDiferente = xmlRespostaAutorizacao.replace(
-        'xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd"',
+      const xmlNSDiferente = xmlRespostaAutorizacaoComNfse.replace(
+        'xmlns="http://www.ginfes.com.br/servico_consultar_lote_rps_resposta_v03.xsd"',
         'xmlns="http://www.prefeitura.sp.gov.br/nfe"'
       );
 
       const resposta = parser.parseRespostaAutorizacao(xmlNSDiferente);
 
-      // Parser deve tentar extrair dados mesmo com namespace diferente
       expect(resposta).toBeDefined();
     });
 
     it("deve lidar com valores ausentes", () => {
-      const xmlSemValores = xmlRespostaAutorizacao.replace(
+      const xmlSemValores = xmlRespostaAutorizacaoComNfse.replace(
         /<ValoresNfse>[\s\S]*?<\/ValoresNfse>/,
         ""
       );

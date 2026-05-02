@@ -102,9 +102,11 @@ export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
       return;
     }
 
-    if (!certificado?.ativo) {
-      toast({ title: "Certificado necessario", description: "E necessario ter um certificado digital ativo para consultar notas em producao", variant: "destructive" });
-      return;
+    const notaSelecionada = notas.find(n => n.id === selectedNotaId);
+    const faltaCertificado = !certificado?.ativo && !notaSelecionada?.certificado_id;
+    if (faltaCertificado) {
+      // Em homologação a consulta funciona sem certificado; em produção o backend retornará erro específico
+      toast({ title: "Aviso: sem certificado ativo", description: "Consulta permitida para homologação. Em produção é obrigatório vínculo com certificado digital.", variant: "default" });
     }
 
     setLoading(true);

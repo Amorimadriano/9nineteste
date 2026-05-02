@@ -1,15 +1,18 @@
 /**
- * Testes de Client NFS-e
- * Valida chamadas SOAP, emissão, consulta, cancelamento e tratamento de erros
+ * Testes de Client NFS-e (GINFES v03)
+ * Valida chamadas SOAP 1.2, emissão, consulta, cancelamento e tratamento de erros
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NFSeClient } from "@/lib/nfse/client";
 import {
   xmlRespostaAutorizacao,
+  xmlRespostaAutorizacaoComNfse,
   xmlRespostaConsulta,
+  xmlRespostaConsultaNaoEncontrada,
   xmlRespostaCancelamento,
   xmlErroSOAP500,
+  xmlErroTimeout,
   xmlRespostaRejeicao,
   dadosNotaFiscalValida,
   certificadoDigitalMock,
@@ -20,7 +23,7 @@ import type {
   NFSeCancelamentoData,
 } from "@/types/nfse";
 
-describe("NFSeClient", () => {
+describe("NFSeClient (GINFES v03)", () => {
   let client: NFSeClient;
   let mockFetch: ReturnType<typeof vi.fn>;
 
@@ -55,7 +58,7 @@ describe("NFSeClient", () => {
       );
     });
 
-    it("deve incluir envelope SOAP GINFES v03 na requisição", async () => {
+    it("deve incluir envelope SOAP 1.2 GINFES v03 na requisição", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -105,7 +108,7 @@ describe("NFSeClient", () => {
   });
 
   describe("Teste de emissão síncrona", () => {
-    it("deve emitir nota fiscal com sucesso", async () => {
+    it("deve emitir lote RPS com sucesso e retornar protocolo", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -118,11 +121,10 @@ describe("NFSeClient", () => {
       );
 
       expect(resposta.sucesso).toBe(true);
-      expect(resposta.numero).toBe("12345");
-      expect(resposta.codigoVerificacao).toBe("A1B2C3D4");
+      expect(resposta.protocolo).toBe("PROT123456789");
     });
 
-    it("deve retornar número da NFSe no formato correto", async () => {
+    it("deve retornar xmlEnvio e xmlRetorno", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -134,25 +136,11 @@ describe("NFSeClient", () => {
         certificadoDigitalMock
       );
 
-      expect(resposta.numero).toMatch(/^\d+$/);
+      expect(resposta.xmlEnvio).toBeDefined();
+      expect(resposta.xmlRetorno).toBeDefined();
     });
 
-    it("deve retornar código de verificação alfanumérico", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: vi.fn().mockResolvedValue(xmlRespostaAutorizacao),
-      } as unknown as Response);
-
-      const resposta = await client.emitir(
-        dadosNotaFiscalValida,
-        certificadoDigitalMock
-      );
-
-      expect(resposta.codigoVerificacao).toMatch(/^[A-Z0-9]+$/);
-    });
-
-    it("deve retornar erro quando NFSe é rejeitada", async () => {
+    it("deve retornar erro quando lote é rejeitado", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -202,6 +190,7 @@ describe("NFSeClient", () => {
 
       expect(resposta.sucesso).toBe(true);
       expect(resposta.numero).toBe("12345");
+      expect(resposta.codigoVerificacao).toBe("A1B2C3D4");
     });
 
     it("deve consultar NFSe por CNPJ do tomador e período", async () => {
@@ -227,27 +216,28 @@ describe("NFSeClient", () => {
       expect(resposta.sucesso).toBe(true);
     });
 
-    it("deve retornar erro quando NFSe não é encontrada", async () => {
-      const xmlNaoEncontrada = `<?xml version="1.0"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <ConsultarNfseRpsResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-              <ConsultarNfseRpsResult>
-                <ListaMensagemRetorno>
-                  <MensagemRetorno>
-                    <Codigo>E5</Codigo>
-                    <Mensagem>NFS-e não encontrada</Mensagem>
-                  </MensagemRetorno>
-                </ListaMensagemRetorno>
-              </ConsultarNfseRpsResult>
-            </ConsultarNfseRpsResponse>
-          </soap:Body>
-        </soap:Envelope>`;
-
+    it("deve usar action ConsultarNfseServicoPrestadoV3 quando há tomador", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
-        text: vi.fn().mockResolvedValue(xmlNaoEncontrada),
+        text: vi.fn().mockResolvedValue(xmlRespostaConsulta),
+      } as unknown as Response);
+
+      await client.consultar({
+        cnpjTomador: "98765432000196",
+        dataInicio: "2024-01-01",
+      });
+
+      const callArgs = mockFetch.mock.calls[0];
+      const body = callArgs[1].body as string;
+      expect(body).toContain("ConsultarNfseServicoPrestadoV3");
+    });
+
+    it("deve retornar erro quando NFSe não é encontrada", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: vi.fn().mockResolvedValue(xmlRespostaConsultaNaoEncontrada),
       } as unknown as Response);
 
       const resposta = await client.consultar({
@@ -283,25 +273,26 @@ describe("NFSeClient", () => {
       );
 
       expect(resposta.sucesso).toBe(true);
-      expect(resposta.dataHoraCancelamento).toBeDefined();
+      expect(resposta.dataHoraCancelamento).toBe("2024-01-15T14:30:00");
     });
 
     it("deve retornar erro quando cancelamento é rejeitado", async () => {
-      const xmlErroCancelamento = `<?xml version="1.0"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <CancelarNfseResponse xmlns="http://www.abrasf.org.br/ABRASF/arquivos/nfse.xsd">
-              <CancelarNfseResult>
-                <ListaMensagemRetorno>
-                  <MensagemRetorno>
-                    <Codigo>E10</Codigo>
-                    <Mensagem>NFS-e não pode ser cancelada</Mensagem>
-                  </MensagemRetorno>
-                </ListaMensagemRetorno>
-              </CancelarNfseResult>
-            </CancelarNfseResponse>
-          </soap:Body>
-        </soap:Envelope>`;
+      const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
+<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+  <soap12:Body>
+    <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+      <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
+<CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
+  <ListaMensagemRetorno>
+    <MensagemRetorno>
+      <Codigo>E10</Codigo>
+      <Mensagem>NFS-e não pode ser cancelada</Mensagem>
+    </MensagemRetorno>
+  </ListaMensagemRetorno>
+</CancelarNfseResposta>]]></return>
+    </ns2:CancelarNfseV3Response>
+  </soap12:Body>
+</soap12:Envelope>`;
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -384,10 +375,8 @@ describe("NFSeClient", () => {
     });
 
     it("deve abortar requisição após timeout", async () => {
-      // The client creates its own AbortController internally.
-      // We mock fetch to listen for the signal the client passes.
       mockFetch.mockImplementationOnce(
-        (url: string, options: RequestInit) =>
+        (_url: string, options: RequestInit) =>
           new Promise((_, reject) => {
             const signal = options.signal as AbortSignal;
             if (signal) {
@@ -443,19 +432,19 @@ describe("NFSeClient", () => {
         client.emitir(dadosNotaFiscalValida, certificadoDigitalMock)
       ).rejects.toThrow(/máximo de tentativas|max retries/i);
 
-      expect(mockFetch).toHaveBeenCalledTimes(3); // tentativa inicial + 2 retries
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
     it("deve não tentar novamente em erro 4xx", async () => {
       const xmlErro400 = `<?xml version="1.0"?>
-        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
-          <soap:Body>
-            <soap:Fault>
-              <faultcode>soap:Client</faultcode>
+        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
+          <soap12:Body>
+            <soap12:Fault>
+              <faultcode>soap12:Client</faultcode>
               <faultstring>Requisição inválida</faultstring>
-            </soap:Fault>
-          </soap:Body>
-        </soap:Envelope>`;
+            </soap12:Fault>
+          </soap12:Body>
+        </soap12:Envelope>`;
 
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -476,7 +465,6 @@ describe("NFSeClient", () => {
 
       vi.spyOn(global, "setTimeout").mockImplementation((callback, delay) => {
         if (typeof delay === "number" && delay < 30000) {
-          // Only capture retry backoff delays (1s, 2s), not AbortController timeout (30s)
           retryDelays.push(delay);
         }
         return originalSetTimeout(callback as TimerHandler, 0);
@@ -494,7 +482,6 @@ describe("NFSeClient", () => {
         // esperado
       }
 
-      // Verificar que os delays aumentam (exponential backoff)
       expect(retryDelays.length).toBeGreaterThan(1);
       expect(retryDelays[1]).toBeGreaterThanOrEqual(retryDelays[0]);
     });

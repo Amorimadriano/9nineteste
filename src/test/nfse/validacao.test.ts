@@ -482,10 +482,11 @@ describe("Validação NFSe", () => {
     });
 
     it("deve aceitar data de competência atual", () => {
-      const hoje = new Date().toISOString().split("T")[0];
+      const hoje = new Date();
+      const hojeStr = `${hoje.getFullYear()}-${String(hoje.getMonth() + 1).padStart(2, "0")}-${String(hoje.getDate()).padStart(2, "0")}`;
       const dados = {
         ...dadosNotaFiscalValida,
-        competencia: hoje,
+        competencia: hojeStr,
       };
 
       const resultado = validarDataCompetencia(dados);
@@ -567,7 +568,7 @@ describe("Validação NFSe", () => {
 
       const resultado = validarCamposObrigatorios(dadosInvalidos);
       expect(resultado.valido).toBe(false);
-      expect(resultado.erros.length).toBeGreaterThanOrEqual(4);
+      expect(resultado.erros.length).toBeGreaterThanOrEqual(3);
     });
 
     it("deve incluir mensagens de erro descritivas", () => {

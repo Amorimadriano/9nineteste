@@ -214,6 +214,8 @@ export function validarCamposObrigatorios(data: NFSeEmissaoData): ValidacaoCampo
 
   if (!data.servico?.itemListaServico) {
     erros.push({ campo: "servico.itemListaServico", mensagem: "Item da lista de serviço é obrigatório" });
+  } else if (!/^\d{2}\.\d{2}$/.test(data.servico.itemListaServico)) {
+    erros.push({ campo: "servico.itemListaServico", mensagem: "Item da lista de serviço deve estar no formato XX.XX" });
   }
 
   if (!data.servico?.codigoTributacaoMunicipio) {
@@ -292,10 +294,16 @@ export function validarDataCompetencia(data: NFSeEmissaoData): ValidacaoCamposRe
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
+  function parseDateLocal(dateStr: string): Date | null {
+    const match = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (!match) return null;
+    return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
+  }
+
   // Validar competência
   if (data.competencia) {
-    const competencia = new Date(data.competencia);
-    if (isNaN(competencia.getTime())) {
+    const competencia = parseDateLocal(data.competencia);
+    if (!competencia || isNaN(competencia.getTime())) {
       erros.push({ campo: "competencia", mensagem: "Data de competência inválida" });
     } else if (competencia > hoje) {
       erros.push({ campo: "competencia", mensagem: "Data de competência não pode ser futura" });
