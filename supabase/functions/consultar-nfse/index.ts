@@ -300,7 +300,7 @@ async function enviarRequisicaoSOAP(
 
   // Producao: via proxy mTLS
   if (!certificado) throw new Error("Certificado obrigatorio em producao");
-  const proxyUrl = Deno.env.get("MTLS_PROXY_URL");
+  const proxyUrl = (Deno.env.get("MTLS_PROXY_URL") || "").replace(/\/+$/g, "");
   if (!proxyUrl) throw new Error("MTLS_PROXY_URL nao configurada");
   const proxyApiKey = Deno.env.get("MTLS_PROXY_API_KEY") || "";
   const headers: Record<string, string> = { "Content-Type": "application/json" };

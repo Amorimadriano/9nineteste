@@ -293,7 +293,7 @@ async function enviarRequisicaoSOAP(
     throw new Error("Certificado digital é obrigatório para cancelamento em produção.");
   }
 
-  const proxyUrl = Deno.env.get("MTLS_PROXY_URL");
+  const proxyUrl = (Deno.env.get("MTLS_PROXY_URL") || "").replace(/\/+$/g, "");
   const proxyApiKey = Deno.env.get("MTLS_PROXY_API_KEY") || "";
 
   if (!proxyUrl) {
