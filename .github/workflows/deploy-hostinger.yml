@@ -52,10 +52,11 @@ jobs:
           protocol: ftps
           port: 21
           security: loose
-          timeout: 60000
+          timeout: 300000
           local-dir: ./dist/
           server-dir: ${{ secrets.HOSTINGER_FTP_PATH || './' }}
           dangerous-clean-slate: true
+          state-name: .ftp-deploy-sync-state-new
           exclude: |
             **/.git*
             **/.git*/**
