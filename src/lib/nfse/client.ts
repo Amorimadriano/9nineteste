@@ -70,10 +70,10 @@ function buildEnvelope(soapAction: string, dadosXml: string, ambiente?: "homolog
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="${namespace}">
+    <ns1:${soapAction} xmlns:ns1="${namespace}">
       <arg0>${cabecalho}</arg0>
-      <arg1><![CDATA[${dadosXml}]]></arg1>
-    </${soapAction}>
+      <arg1>${dadosXml}</arg1>
+    </ns1:${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
 }

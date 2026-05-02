@@ -132,14 +132,15 @@ function criarEnvelopeSOAPGinfes(
   // GINFES usa SOAP 1.1 (schemas.xmlsoap.org), não SOAP 1.2
   // Divergência documentada: homologação usa http://www.ginfes.com.br/
   // mas produção exige http://producao.ginfes.com.br no namespace da operação
+  // arg0 e arg1 devem conter XML inline (sem CDATA) — o parser do servidor deserializa como DOM
   const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="${namespace}">
+    <ns1:${soapAction} xmlns:ns1="${namespace}">
       <arg0>${cabecalhoXml}</arg0>
-      <arg1><![CDATA[${dadosXml}]]></arg1>
-    </${soapAction}>
+      <arg1>${dadosXml}</arg1>
+    </ns1:${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
 }
