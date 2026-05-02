@@ -65,16 +65,16 @@ describe("NFSeParser (GINFES v03)", () => {
 
     it("deve retornar sucesso false quando não há NFSe na resposta", () => {
       const xmlSemNFSe = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-          <soap12:Body>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
             <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
   <ListaMensagemRetorno/>
 </EnviarLoteRpsResposta>]]></return>
             </ns2:RecepcionarLoteRpsV3Response>
-          </soap12:Body>
-        </soap12:Envelope>`;
+          </soap:Body>
+        </soap:Envelope>`;
 
       const resposta = parser.parseRespostaAutorizacao(xmlSemNFSe);
 
@@ -115,8 +115,8 @@ describe("NFSeParser (GINFES v03)", () => {
 
     it("deve parsear resposta com erro único", () => {
       const xmlErroUnico = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-          <soap12:Body>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
             <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
@@ -128,8 +128,8 @@ describe("NFSeParser (GINFES v03)", () => {
   </ListaMensagemRetorno>
 </EnviarLoteRpsResposta>]]></return>
             </ns2:RecepcionarLoteRpsV3Response>
-          </soap12:Body>
-        </soap12:Envelope>`;
+          </soap:Body>
+        </soap:Envelope>`;
 
       const resposta = parser.parseRespostaAutorizacao(xmlErroUnico);
 
@@ -168,7 +168,7 @@ describe("NFSeParser (GINFES v03)", () => {
     it("deve extrair faultcode e faultstring", () => {
       const resposta = parser.parseErroSOAP(xmlErroSOAP500);
 
-      expect(resposta.faultCode).toBe("soap12:Server");
+      expect(resposta.faultCode).toBe("soap:Server");
       expect(resposta.faultString).toBe("Erro interno no servidor");
     });
   });
@@ -217,8 +217,8 @@ describe("NFSeParser (GINFES v03)", () => {
 
     it("deve parsear resposta de cancelamento com erro", () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
-        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-          <soap12:Body>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
             <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
@@ -230,8 +230,8 @@ describe("NFSeParser (GINFES v03)", () => {
   </ListaMensagemRetorno>
 </CancelarNfseResposta>]]></return>
             </ns2:CancelarNfseV3Response>
-          </soap12:Body>
-        </soap12:Envelope>`;
+          </soap:Body>
+        </soap:Envelope>`;
 
       const resposta = parser.parseRespostaCancelamento(xmlErroCancelamento);
 

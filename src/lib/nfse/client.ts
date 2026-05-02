@@ -64,17 +64,18 @@ function buildCabecalhoGinfes(): string {
 
 function buildEnvelope(soapAction: string, dadosXml: string, ambiente?: "homologacao" | "producao"): string {
   const cabecalho = buildCabecalhoGinfes();
-  // GINFES: produção usa namespace http://producao.ginfes.com.br, homologação usa http://www.ginfes.com.br/
+  // GINFES usa SOAP 1.1 (schemas.xmlsoap.org)
+  // Divergência: produção usa namespace http://producao.ginfes.com.br, homologação usa http://www.ginfes.com.br/
   const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
     <${soapAction} xmlns="${namespace}">
       <arg0>${cabecalho}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 }
 
 function buildLoteRpsXml(data: NFSeEmissaoData): string {
@@ -341,7 +342,7 @@ export class NFSeClient {
       const response = await fetch(this.url, {
         method: "POST",
         headers: {
-          "Content-Type": "application/soap+xml; charset=utf-8",
+          "Content-Type": "text/xml; charset=utf-8",
           "SOAPAction": `"${soapAction}"`,
         },
         body: envelope,

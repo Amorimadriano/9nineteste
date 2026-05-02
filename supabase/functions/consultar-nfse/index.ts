@@ -129,19 +129,19 @@ function criarEnvelopeSOAPGinfes(
   dadosXml: string,
   ambiente?: "homologacao" | "producao"
 ): string {
-  // GINFES v03 exige SOAP 1.2 (http://www.w3.org/2003/05/soap-envelope)
+  // GINFES usa SOAP 1.1 (schemas.xmlsoap.org), não SOAP 1.2
   // Divergência documentada: homologação usa http://www.ginfes.com.br/
   // mas produção exige http://producao.ginfes.com.br no namespace da operação
   const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
     <${soapAction} xmlns="${namespace}">
       <arg0>${cabecalhoXml}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 }
 
 function criarCabecalhoGinfes(): string {
@@ -167,7 +167,7 @@ async function enviarRequisicaoSOAP(
 ): Promise<string> {
   const env = getAmbiente();
   const baseHeaders: Record<string, string> = {
-    "Content-Type": "application/soap+xml; charset=utf-8",
+    "Content-Type": "text/xml; charset=utf-8",
     "SOAPAction": `"${soapAction}"`,
   };
 

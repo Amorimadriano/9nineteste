@@ -52,7 +52,7 @@ describe("NFSeClient (GINFES v03)", () => {
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
-            "Content-Type": "application/soap+xml; charset=utf-8",
+            "Content-Type": "text/xml; charset=utf-8",
           }),
         })
       );
@@ -70,7 +70,7 @@ describe("NFSeClient (GINFES v03)", () => {
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = callArgs[1].body as string;
 
-      expect(requestBody).toContain("soap12:Envelope");
+      expect(requestBody).toContain("soap:Envelope");
       expect(requestBody).toContain("RecepcionarLoteRpsV3");
       expect(requestBody).toContain("cabecalho");
       expect(requestBody).toContain("versaoDados");
@@ -278,8 +278,8 @@ describe("NFSeClient (GINFES v03)", () => {
 
     it("deve retornar erro quando cancelamento é rejeitado", async () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
@@ -291,8 +291,8 @@ describe("NFSeClient (GINFES v03)", () => {
   </ListaMensagemRetorno>
 </CancelarNfseResposta>]]></return>
     </ns2:CancelarNfseV3Response>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
       mockFetch.mockResolvedValueOnce({
         ok: true,
@@ -437,14 +437,14 @@ describe("NFSeClient (GINFES v03)", () => {
 
     it("deve não tentar novamente em erro 4xx", async () => {
       const xmlErro400 = `<?xml version="1.0"?>
-        <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-          <soap12:Body>
-            <soap12:Fault>
-              <faultcode>soap12:Client</faultcode>
+        <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+          <soap:Body>
+            <soap:Fault>
+              <faultcode>soap:Client</faultcode>
               <faultstring>Requisição inválida</faultstring>
-            </soap12:Fault>
-          </soap12:Body>
-        </soap12:Envelope>`;
+            </soap:Fault>
+          </soap:Body>
+        </soap:Envelope>`;
 
       mockFetch.mockResolvedValueOnce({
         ok: false,

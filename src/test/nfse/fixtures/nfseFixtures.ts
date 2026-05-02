@@ -111,8 +111,8 @@ export const dadosNotaFiscalCPF: NFSeEmissaoData = {
  * Inclui envelope SOAP 1.2 e return com CDATA
  */
 export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
@@ -122,15 +122,15 @@ export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
   <ListaMensagemRetorno/>
 </EnviarLoteRpsResposta>]]></return>
     </ns2:RecepcionarLoteRpsV3Response>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de resposta com NFSe já processada (consulta após emissão)
  */
 export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:ConsultarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <ConsultarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_lote_rps_resposta_v03.xsd">
@@ -186,15 +186,15 @@ export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-
   </ListaNfse>
 </ConsultarLoteRpsResposta>]]></return>
     </ns2:ConsultarLoteRpsResponse>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de resposta de rejeição (GINFES v03)
  */
 export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
@@ -212,15 +212,15 @@ export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
   </ListaMensagemRetorno>
 </EnviarLoteRpsResposta>]]></return>
     </ns2:RecepcionarLoteRpsV3Response>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de resposta de consulta por RPS (GINFES v03)
  */
 export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:ConsultarNfsePorRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
@@ -274,15 +274,15 @@ export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
   </CompNfse>
 </ConsultarNfseRpsResposta>]]></return>
     </ns2:ConsultarNfsePorRpsV3Response>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de resposta de consulta com NFSe não encontrada
  */
 export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:ConsultarNfsePorRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
@@ -294,15 +294,15 @@ export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="U
   </ListaMensagemRetorno>
 </ConsultarNfseRpsResposta>]]></return>
     </ns2:ConsultarNfsePorRpsV3Response>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de resposta de cancelamento bem-sucedido (GINFES v03)
  */
 export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
     <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
@@ -315,42 +315,42 @@ export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
   </NfseCancelamento>
 </CancelarNfseResposta>]]></return>
     </ns2:CancelarNfseV3Response>
-  </soap12:Body>
-</soap12:Envelope>`;
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de erro SOAP (timeout/erro 500)
  */
 export const xmlErroSOAP500 = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
-    <soap12:Fault>
-      <faultcode>soap12:Server</faultcode>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <soap:Fault>
+      <faultcode>soap:Server</faultcode>
       <faultstring>Erro interno no servidor</faultstring>
       <detail>
         <ErrorCode>500</ErrorCode>
         <ErrorMessage>Serviço temporariamente indisponível. Tente novamente em alguns instantes.</ErrorMessage>
       </detail>
-    </soap12:Fault>
-  </soap12:Body>
-</soap12:Envelope>`;
+    </soap:Fault>
+  </soap:Body>
+</soap:Envelope>`;
 
 /**
  * XML de timeout SOAP
  */
 export const xmlErroTimeout = `<?xml version="1.0" encoding="UTF-8"?>
-<soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
-  <soap12:Body>
-    <soap12:Fault>
-      <faultcode>soap12:Server</faultcode>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <soap:Fault>
+      <faultcode>soap:Server</faultcode>
       <faultstring>Tempo de resposta excedido</faultstring>
       <detail>
         <ErrorCode>408</ErrorCode>
         <ErrorMessage>O servidor não respondeu dentro do tempo limite esperado</ErrorMessage>
       </detail>
-    </soap12:Fault>
-  </soap12:Body>
-</soap12:Envelope>`;
+    </soap:Fault>
+  </soap:Body>
+</soap:Envelope>`;
 
 export const certificadoDigitalMock: CertificadoDigital = {
   id: "cert-001",
