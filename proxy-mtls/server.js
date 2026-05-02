@@ -106,7 +106,8 @@ app.post("/proxy-nfse", authenticate, (req, res) => {
     }
 
     console.log(`[proxy] Enviando com mTLS para ${targetUrl} action=${action}`);
-    console.log(`[proxy] Envelope preview: ${soapEnvelope.substring(0, 200)}...`);
+    console.log(`[proxy] Envelope preview: ${soapEnvelope.substring(0, 300)}...`);
+    console.log(`[proxy] Cert PEM length: ${(certPem || "").length}, Key PEM length: ${(keyPem || "").length}`);
     sendWithMTLS(targetUrl, soapEnvelope, action, certPem, keyPem, res);
   } catch (err) {
     console.error("[proxy] Erro no handler /proxy-nfse:", err);
@@ -215,7 +216,8 @@ function sendWithMTLS(targetUrl, soapEnvelope, soapAction, certPem, keyPem, res)
     let data = "";
     response.on("data", (chunk) => { data += chunk; });
     response.on("end", () => {
-      console.log(`[proxy] Resposta mTLS: ${response.statusCode} ${data.length} bytes`);
+      const isError = response.statusCode >= 300;
+      console.log(`[proxy] Resposta mTLS: ${response.statusCode} ${data.length} bytes` + (isError ? ` BODY: ${data.substring(0, 2000)}` : ""));
       res.setHeader("Content-Type", response.headers["content-type"] || "text/xml");
       res.status(response.statusCode || 200).send(data);
     });
