@@ -8,11 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Search, Building2, User } from "lucide-react";
+import { Loader2, Search, Building2, User, Brain } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { TomadorFormData } from "@/types/nfse-ui";
 import { formatCNPJ, formatCPF, formatCEP, isValidCNPJ, isValidCPF } from "@/lib/nfse-utils";
 import { supabase } from "@/integrations/supabase/client";
+import { useAnalisarTomador } from "@/hooks/useAiNFSe";
+import { Badge } from "@/components/ui/badge";
 
 interface TomadorFormProps {
   value: TomadorFormData;
@@ -47,6 +49,23 @@ export function TomadorForm({ value, onChange, errors = {} }: TomadorFormProps) 
   const { toast } = useToast();
   const [loadingCNPJ, setLoadingCNPJ] = useState(false);
   const [loadingCEP, setLoadingCEP] = useState(false);
+  const { analisar, analise, isLoading: iaLoading, clear } = useAnalisarTomador();
+
+  const handleValidarIA = () => {
+    analisar({
+      documento: value.documento,
+      razaoSocial: value.razao_social,
+      endereco: `${value.endereco}, ${value.numero} - ${value.bairro}`,
+      cidade: value.cidade,
+      estado: value.estado,
+      email: value.email,
+    });
+  };
+
+  // Limpa análise quando dados mudam significativamente
+  useEffect(() => {
+    clear();
+  }, [value.documento, value.razao_social, clear]);
 
   // Busca CNPJ via edge function (sem problema de CORS)
   const buscarCNPJ = async () => {
@@ -391,6 +410,60 @@ export function TomadorForm({ value, onChange, errors = {} }: TomadorFormProps) 
               className={errors.estado ? "border-red-500" : ""}
             />
           </div>
+        </div>
+
+        {/* Validação IA */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Validação Inteligente</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleValidarIA}
+              disabled={iaLoading || !value.documento}
+              className="gap-1"
+            >
+              {iaLoading ? (
+                <><Loader2 className="h-3 w-3 animate-spin" /> Analisando...</>
+              ) : (
+                <><Brain className="h-3 w-3" /> Validar com IA</>
+              )}
+            </Button>
+          </div>
+          {analise && analise.alertas.length > 0 && (
+            <div className="space-y-2">
+              {analise.alertas.map((alerta, idx) => (
+                <div
+                  key={idx}
+                  className={`text-sm px-3 py-2 rounded-md ${
+                    alerta.tipo === "divergencia"
+                      ? "bg-red-50 text-red-700 border border-red-200"
+                      : alerta.tipo === "incompleto"
+                      ? "bg-amber-50 text-amber-700 border border-amber-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-200"
+                  }`}
+                >
+                  {alerta.mensagem}
+                </div>
+              ))}
+            </div>
+          )}
+          {analise && analise.sugestoes.length > 0 && (
+            <div className="bg-emerald-50 rounded-md p-3 border border-emerald-200">
+              <p className="text-sm font-medium text-emerald-800 mb-1">Sugestões:</p>
+              <ul className="list-disc list-inside text-sm text-emerald-700 space-y-1">
+                {analise.sugestoes.map((s, i) => (
+                  <li key={i}>{s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {analise && analise.alertas.length === 0 && analise.sugestoes.length === 0 && (
+            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+              Dados do tomador validados com sucesso
+            </Badge>
+          )}
         </div>
       </CardContent>
     </Card>

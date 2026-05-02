@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Bypass typing for tables not present in generated types
 const db: any = supabase;
 import { toast } from "@/hooks/use-toast";
+import { traduzirErroGinfes } from "@/lib/nfse/ai";
 
 /** Status possíveis de uma NFS-e */
 export type NFSeStatus =
@@ -114,9 +115,19 @@ export function useNFSeSync() {
       } catch (err: any) {
         const msg = err.message || "Erro ao consultar status da nota";
         setError(msg);
+
+        // Tenta traduzir erro automaticamente via IA
+        let mensagemTraduzida = msg;
+        try {
+          const traducao = await traduzirErroGinfes("SYNC_ERROR", msg);
+          mensagemTraduzida = `${traducao.explicacao}\n\nAção sugerida: ${traducao.acaoSugerida}`;
+        } catch {
+          // Falha silenciosa na tradução — mantém mensagem original
+        }
+
         return {
           success: false,
-          mensagemErro: msg,
+          mensagemErro: mensagemTraduzida,
         };
       } finally {
         setLoading(false);
@@ -316,9 +327,19 @@ export function useNFSeSync() {
       } catch (err: any) {
         const msg = err.message || "Erro ao cancelar nota";
         setError(msg);
+
+        // Tenta traduzir erro automaticamente via IA
+        let mensagemTraduzida = msg;
+        try {
+          const traducao = await traduzirErroGinfes("CANCEL_ERROR", msg);
+          mensagemTraduzida = `${traducao.explicacao}\n\nAção sugerida: ${traducao.acaoSugerida}`;
+        } catch {
+          // Falha silenciosa na tradução — mantém mensagem original
+        }
+
         toast({
           title: "Erro ao cancelar",
-          description: msg,
+          description: mensagemTraduzida,
           variant: "destructive",
         });
         return false;

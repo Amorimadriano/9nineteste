@@ -98,7 +98,7 @@ serve(async (req) => {
         "Authorization": `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        taskType: "multimodal",
         messages,
         temperature: 0.1,
       }),

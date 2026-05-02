@@ -57,11 +57,12 @@ Elabore um parecer executivo sobre a fase econômica desta empresa com base nos 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        taskType: "reasoning",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
+        temperature: 0.3,
       }),
     });
 
@@ -88,6 +89,9 @@ Elabore um parecer executivo sobre a fase econômica desta empresa com base nos 
 
     const data = await response.json();
     const commentary = data.choices?.[0]?.message?.content || "";
+
+    // Log do modelo usado (pode ser visualizado nos logs do Supabase)
+    console.log("[financial-commentary] Modelo usado:", data._meta?.modelUsed || "unknown", "- Motivo:", data._meta?.routingReason || "n/a");
 
     return new Response(JSON.stringify({ commentary }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

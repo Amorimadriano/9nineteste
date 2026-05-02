@@ -477,11 +477,9 @@ serve(async (req) => {
     const tentativas: any[] = [];
     let resultado: any = null;
 
-    // A lista de operacoes pode variar. Vamos tentar as mais comuns
     const operacoes = [operacao, "ConsultarNfsePorRps", "ConsultarNfseRps", "ConsultarNfsePorRpsV3"];
     const uniqueOps = [...new Set(operacoes)];
 
-    // Formatos de envelope para testar
     const formatos = [
       { nome: "padrao", fn: (op: string) => criarEnvelopeSOAPGinfes(op, cabecalho, dados, ambiente) },
       { nome: "sem_arg0", fn: (op: string) => criarEnvelopeSOAPGinfesSemArg0(op, dados, ambiente) },
@@ -496,13 +494,11 @@ serve(async (req) => {
       for (const formato of formatos) {
         const envelope = formato.fn(op);
         console.log(`[consultar-nfse] Tentando operacao: ${op} | formato: ${formato.nome}`);
-        console.log(`[consultar-nfse] Envelope:\n${envelope}`);
 
         try {
           const soapResponse = await retry(() => enviarRequisicaoSOAP(envelope, op, certDigital || undefined));
-          console.log(`[consultar-nfse] Resposta (${op}/${formato.nome}):\n${soapResponse.substring(0, 2000)}`);
 
-          tentativas.push({ operacao: op, formato: formato.nome, envelope: envelope.substring(0, 500), response: soapResponse.substring(0, 500) });
+          tentativas.push({ operacao: op, formato: formato.nome, response: soapResponse.substring(0, 500) });
 
           const parsed = parsearRespostaConsulta(soapResponse);
           if (parsed.sucesso) {
@@ -510,7 +506,6 @@ serve(async (req) => {
             break;
           }
 
-          // Se nao for erro de operacao nao encontrada, usar esse resultado
           const isOpError = soapResponse.includes("Endpoint does not contain operation") ||
             soapResponse.includes("Cannot find child element");
           if (!isOpError) {
@@ -525,13 +520,48 @@ serve(async (req) => {
       if (resultado) break;
     }
 
+    // --- Análise IA da resposta ambígua via ai-orchestrator ---
+    let analiseIA = null;
+    if (!resultado || !resultado.sucesso) {
+      try {
+        const ultimaResposta = tentativas[tentativas.length - 1]?.response || "";
+        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") || ""}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            taskType: "code",
+            messages: [
+              { role: "system", content: "Você é um especialista em integração SOAP com a Prefeitura de São Paulo (GINFES). Analise a resposta XML e sugira: 1) Qual o erro provável, 2) Qual formato de envelope SOAP é mais adequado, 3) Qual operação usar. Retorne APENAS um JSON com { erroProvavel: string, formatoSugerido: string, operacaoSugerida: string, acao: string }." },
+              { role: "user", content: `Resposta SOAP:\n${ultimaResposta.substring(0, 3000)}\n\nFormatos tentados: ${tentativas.map((t) => t.formato).join(", ")}\nOperações tentadas: ${tentativas.map((t) => t.operacao).join(", ")}` },
+            ],
+            temperature: 0.1,
+          }),
+        });
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          const content = aiData.choices?.[0]?.message?.content || "";
+          try {
+            analiseIA = JSON.parse(content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+          } catch { /* ignora */ }
+        }
+      } catch (e) {
+        console.log("[consultar-nfse] Análise IA indisponível:", e);
+      }
+    }
+
     if (!resultado) {
       resultado = {
         sucesso: false,
         mensagens: [{ codigo: "ALL_FAILED", mensagem: "Nenhuma operacao funcionou", tipo: "Erro" }],
         tentativas,
+        analiseIA,
         xmlEnvio: dados,
       };
+    } else {
+      resultado = { ...resultado, analiseIA };
     }
 
     // Atualizar banco se veio de notaId

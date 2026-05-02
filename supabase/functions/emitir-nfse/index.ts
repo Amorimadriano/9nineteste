@@ -358,8 +358,34 @@ function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; ti
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
   const ERROS_GINFES: Record<string, string> = {
     E1: "CNPJ invalido", E2: "Inscricao Municipal invalida", E3: "RPS ja informado",
-    E28: "Certificado invalido", E29: "Assinatura invalida", E30: "XML mal formatado",
-    E50: "Erro interno", E60: "Requisicao mal formada",
+    E4: "Serie invalida", E5: "Tipo invalido", E6: "Data de emissao invalida",
+    E7: "Natureza da operacao invalida", E8: "Regime especial de tributacao invalido",
+    E9: "Optante pelo Simples Nacional invalido", E10: "Tomador nao informado",
+    E11: "Cidade do tomador invalida", E12: "UF do tomador invalida",
+    E13: "CEP do tomador invalido", E14: "Email do tomador invalido",
+    E15: "Telefone do tomador invalido", E16: "Servico nao informado",
+    E17: "Item da lista de servicos invalido", E18: "Codigo CNAE invalido",
+    E19: "Codigo de tributacao invalido", E20: "Discriminacao do servico invalida",
+    E21: "Valor dos servicos invalido", E22: "Valor das deducoes invalido",
+    E23: "Base de calculo invalida", E24: "Aliquota ISS invalida",
+    E25: "Valor do ISS invalido", E26: "NFS-e nao encontrada",
+    E27: "NFS-e ja cancelada", E28: "Certificado invalido",
+    E29: "Assinatura invalida", E30: "XML mal formatado",
+    E31: "Lote ja processado", E32: "Quantidade de RPS invalida",
+    E33: "RPS nao encontrado", E34: "Inscricao Municipal do prestador invalida",
+    E35: "Razao Social do prestador invalida", E36: "Endereco do prestador invalido",
+    E37: "Codigo do municipio do prestador invalido", E38: "Valor do PIS invalido",
+    E39: "Valor do COFINS invalido", E40: "Valor do INSS invalido",
+    E41: "Valor do IR invalido", E42: "Valor do CSLL invalido",
+    E43: "ISS retido invalido", E44: "Valor do ISS retido invalido",
+    E45: "Outras retencoes invalidas", E46: "Valor liquido invalido",
+    E47: "Desconto incondicionado invalido", E48: "Desconto condicionado invalido",
+    E49: "Responsavel pelo recolhimento invalido", E50: "Erro interno",
+    E51: "Timeout na prefeitura", E52: "Prefeitura indisponivel",
+    E53: "Limite de requisicoes excedido", E54: "IP bloqueado",
+    E55: "Manutencao na prefeitura", E56: "Versao do schema invalida",
+    E57: "Namespace invalido", E58: "Encoding invalido",
+    E59: "Elemento obrigatorio ausente", E60: "Requisicao mal formada",
   };
   const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]+)<\/Mensagem>/gi)].map(m => m[1]);
   const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]+)<\/Codigo>/gi)].map(m => m[1]);
@@ -489,6 +515,35 @@ serve(async (req) => {
       },
     };
 
+    // --- Pré-validação com IA via ai-orchestrator ---
+    let preValidacaoIA = null;
+    try {
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") || ""}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          taskType: "code",
+          messages: [
+            { role: "system", content: "Você é um validador de XML NFSe ABRASF 2.04. Analise o JSON da nota e retorne um JSON com { valido: boolean, problemas: string[], sugestoes: string[] }. Retorne SOMENTE o JSON." },
+            { role: "user", content: JSON.stringify(dadosNota, null, 2) },
+          ],
+          temperature: 0.1,
+        }),
+      });
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        const content = aiData.choices?.[0]?.message?.content || "";
+        try {
+          preValidacaoIA = JSON.parse(content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+        } catch { /* ignora erro de parse */ }
+      }
+    } catch (e) {
+      console.log("[emitir-nfse] Pré-validação IA indisponível:", e);
+    }
+
     const ambiente = getAmbiente();
     let resultado;
     if (ambiente === "homologacao") {
@@ -526,7 +581,7 @@ serve(async (req) => {
     };
     await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
 
-    return new Response(JSON.stringify(resultado), { status: resultado.sucesso ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ ...resultado, preValidacaoIA }), { status: resultado.sucesso ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
     console.error("Erro ao emitir NFS-e:", err);

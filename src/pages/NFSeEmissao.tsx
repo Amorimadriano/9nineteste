@@ -50,7 +50,9 @@ import {
   Loader2,
   RotateCcw,
   Search,
+  Brain,
 } from "lucide-react";
+import { useValidarPreEmissao } from "@/hooks/useAiNFSe";
 
 // Interface para rascunho salvo
 interface RascunhoNFS {
@@ -101,6 +103,13 @@ export default function NFSeEmissao() {
   const [numeroNota, setNumeroNota] = useState(gerarNumeroNota());
   const [modalCertificadoAberto, setModalCertificadoAberto] = useState(false);
   const [notaId, setNotaId] = useState<string | null>(null);
+
+  const { validar: validarPreEmissao, resultado: iaResultado, isLoading: iaValidando, clear: clearValidacao } = useValidarPreEmissao();
+
+  // Limpa validação IA quando dados mudam
+  useEffect(() => {
+    clearValidacao();
+  }, [tomador, servico, retencoes, clearValidacao]);
 
   // Carrega rascunhos salvos
   const carregarRascunhos = useCallback(async () => {
@@ -344,6 +353,17 @@ export default function NFSeEmissao() {
     }
   };
 
+  const handleValidarPreEmissao = () => {
+    const dados = {
+      tomador,
+      servico,
+      retencoes,
+      numeroNota,
+      certificado: certificado?.nome,
+    };
+    validarPreEmissao(dados);
+  };
+
   // Limpa formulário
   const limparFormulario = () => {
     setTomador(TOMADOR_INICIAL);
@@ -379,6 +399,29 @@ export default function NFSeEmissao() {
       return;
     }
     setValidationErrors({});
+
+    // Verifica validação IA pré-emissão
+    if (iaResultado) {
+      const errosCriticos = iaResultado.problemas.filter((p) => p.severidade === "erro");
+      if (errosCriticos.length > 0) {
+        toast({
+          title: "Validação IA: erros críticos encontrados",
+          description: errosCriticos.map((e) => `${e.campo}: ${e.mensagem}`).join("; "),
+          variant: "destructive",
+        });
+        return;
+      }
+      const avisos = iaResultado.problemas.filter((p) => p.severidade === "aviso");
+      if (avisos.length > 0) {
+        toast({
+          title: "Validação IA: avisos",
+          description: avisos.map((a) => `${a.campo}: ${a.mensagem}`).join("; ") + ". Clique em Emitir novamente para prosseguir.",
+          variant: "default",
+        });
+        clearValidacao();
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -609,6 +652,64 @@ export default function NFSeEmissao() {
               status="rascunho"
               certificadoNome={certificado?.nome}
             />
+
+            {/* Validação IA Pré-Emissão */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium">Validação Inteligente</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleValidarPreEmissao}
+                  disabled={iaValidando}
+                  className="gap-1"
+                >
+                  {iaValidando ? (
+                    <><Loader2 className="h-3 w-3 animate-spin" /> Validando...</>
+                  ) : (
+                    <><Brain className="h-3 w-3" /> Validar com IA</>
+                  )}
+                </Button>
+              </div>
+
+              {iaResultado && (
+                <div className="space-y-2">
+                  {!iaResultado.valido && iaResultado.problemas.length > 0 && (
+                    <div className="space-y-2">
+                      {iaResultado.problemas.map((p, i) => (
+                        <div
+                          key={i}
+                          className={`text-sm px-3 py-2 rounded-md border ${
+                            p.severidade === "erro"
+                              ? "bg-red-50 text-red-700 border-red-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                          }`}
+                        >
+                          <strong>{p.campo}:</strong> {p.mensagem}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {iaResultado.sugestoes.length > 0 && (
+                    <div className="bg-blue-50 rounded-md p-3 border border-blue-200">
+                      <p className="text-sm font-medium text-blue-800 mb-1">Sugestões da IA:</p>
+                      <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
+                        {iaResultado.sugestoes.map((s, i) => (
+                          <li key={i}>{s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {iaResultado.valido && iaResultado.problemas.length === 0 && (
+                    <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 p-2 rounded-md border border-green-200">
+                      <Check className="h-4 w-4" />
+                      Dados validados com sucesso pela IA
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         );
       default:

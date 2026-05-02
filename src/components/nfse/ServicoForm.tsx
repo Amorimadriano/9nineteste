@@ -11,6 +11,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ITENS_LISTA_SERVICO, CNAES_PADRAO, ServicoFormData } from "@/types/nfse-ui";
 import { formatCurrency } from "@/lib/nfse-utils";
+import { useSugerirServico } from "@/hooks/useAiNFSe";
+import { Button } from "@/components/ui/button";
+import { Wand2, Sparkles, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface MoneyInputProps {
   value: number;
@@ -74,6 +78,36 @@ interface ServicoFormProps {
 }
 
 export function ServicoForm({ value, onChange, errors = {} }: ServicoFormProps) {
+  const { toast } = useToast();
+  const { sugerir, sugestao, isLoading: iaLoading, clear } = useSugerirServico();
+  const [descricaoNatural, setDescricaoNatural] = useState("");
+
+  const handleAnalisarIA = () => {
+    if (!descricaoNatural.trim() || descricaoNatural.length < 10) {
+      toast({ title: "Descrição muito curta", description: "Digite pelo menos 10 caracteres descrevendo o serviço.", variant: "destructive" });
+      return;
+    }
+    sugerir(descricaoNatural);
+  };
+
+  // Aplica sugestão da IA quando disponível
+  useEffect(() => {
+    if (sugestao) {
+      onChange({
+        ...value,
+        descricao: sugestao.sugestaoDescricao || value.descricao,
+        item_lista_servico: sugestao.itemListaServico || value.item_lista_servico,
+        cnae: sugestao.cnae || value.cnae,
+        aliquota_iss: sugestao.aliquotaSugerida || value.aliquota_iss,
+      });
+      toast({
+        title: `Sugestão aplicada (${sugestao.confianca === "alta" ? "Alta confiança" : sugestao.confianca === "media" ? "Média confiança" : "Baixa confiança"})`,
+        description: `Item: ${sugestao.itemListaServico || "não identificado"} | CNAE: ${sugestao.cnae || "não identificado"}`,
+      });
+      clear();
+    }
+  }, [sugestao, onChange, value, toast, clear]);
+
   // Calcula valores automaticamente
   const calcularValores = useCallback(() => {
     const baseCalculo = Math.max(0, value.valor_bruto - value.deducoes);
@@ -120,6 +154,37 @@ export function ServicoForm({ value, onChange, errors = {} }: ServicoFormProps) 
   return (
     <Card>
       <CardContent className="pt-6 space-y-6">
+        {/* Descrição Natural + Análise IA */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="descricao_natural">Descrição do Serviço (linguagem natural)</Label>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleAnalisarIA}
+              disabled={iaLoading || descricaoNatural.length < 10}
+              className="gap-1"
+            >
+              {iaLoading ? (
+                <><Loader2 className="h-3 w-3 animate-spin" /> Analisando...</>
+              ) : (
+                <><Wand2 className="h-3 w-3" /> Analisar com IA</>
+              )}
+            </Button>
+          </div>
+          <Textarea
+            id="descricao_natural"
+            value={descricaoNatural}
+            onChange={(e) => setDescricaoNatural(e.target.value)}
+            placeholder="Ex: 'Desenvolvi um site de e-commerce para cliente com checkout integrado'"
+            rows={2}
+          />
+          <p className="text-xs text-muted-foreground">
+            💡 Descreva o serviço em linguagem natural e clique em "Analisar com IA" para sugerir códigos automaticamente.
+          </p>
+        </div>
+
         {/* Descrição do Serviço */}
         <div className="space-y-2">
           <Label htmlFor="descricao">Descrição do Serviço *</Label>

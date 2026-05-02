@@ -60,52 +60,127 @@ interface PrefeituraResponse {
 }
 
 /**
- * Simula consulta na prefeitura de São Paulo
- * Em produção, isso seria substituído pela integração real com a API da prefeitura
+ * Consulta real na prefeitura via edge function consultar-nfse
  */
 async function consultarPrefeituraSP(
   nota: NotaFiscal,
-  certificado: any
+  certificado: any,
+  supabaseUrl: string,
+  authHeader: string
 ): Promise<PrefeituraResponse> {
-  // Simulação: 80% de chance de sucesso para notas em processamento
-  const random = Math.random();
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/consultar-nfse`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({ notaId: nota.id }),
+    });
 
-  if (nota.status === "autorizada") {
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`consultar-nfse retornou ${res.status}: ${text}`);
+    }
+
+    const data = await res.json();
+
+    // Mapeia resposta para formato interno
+    if (data.sucesso) {
+      const statusMap: Record<string, PrefeituraResponse["status"]> = {
+        autorizada: "autorizada",
+        cancelada: "autorizada",
+        rejeitada: "rejeitada",
+        enviando: "processando",
+        rascunho: "processando",
+      };
+      const mappedStatus = statusMap[data.status || "autorizada"] || "autorizada";
+
+      return {
+        status: mappedStatus,
+        numeroNota: data.numeroNfse || nota.numero_nota || undefined,
+        codigoVerificacao: data.codigoVerificacao || nota.codigo_verificacao || undefined,
+        linkPDF: data.linkPdf || nota.link_pdf || undefined,
+        linkXML: data.linkXml || nota.link_xml || undefined,
+        dataAutorizacao: data.dataAutorizacao || nota.data_autorizacao || undefined,
+      };
+    }
+
+    // Se não teve sucesso mas tem mensagens, pode ser rejeição
+    if (data.mensagens && data.mensagens.length > 0) {
+      return {
+        status: "rejeitada",
+        mensagemErro: data.mensagens.map((m: any) => m.mensagem).join("; "),
+      };
+    }
+
+    // Resposta ambígua — tenta análise de IA via orquestrador
+    if (data.xmlBruto) {
+      const analise = await analisarRespostaAmbiguaComIA(data.xmlBruto, authHeader, supabaseUrl);
+      if (analise) return analise;
+    }
+
+    return { status: "processando" };
+  } catch (err) {
+    console.error("Erro ao consultar prefeitura via consultar-nfse:", err);
     return {
-      status: "autorizada",
-      numeroNota: nota.numero_nota || "12345",
-      codigoVerificacao: nota.codigo_verificacao || "ABC123456",
-      linkPDF: nota.link_pdf || `https://nfe.prefeitura.sp.gov.br/pdf/${nota.id}.pdf`,
-      linkXML: nota.link_xml || `https://nfe.prefeitura.sp.gov.br/xml/${nota.id}.xml`,
-      dataAutorizacao: nota.data_autorizacao || new Date().toISOString(),
+      status: "erro",
+      mensagemErro: (err as Error).message,
     };
   }
+}
 
-  if (nota.status === "rejeitada") {
-    return {
-      status: "rejeitada",
-      mensagemErro: nota.mensagem_erro || "Rejeição simulada",
-    };
+/**
+ * Analisa resposta ambígua da prefeitura via Orquestrador Multi-LLM
+ */
+async function analisarRespostaAmbiguaComIA(
+  xml: string,
+  authHeader: string,
+  supabaseUrl: string
+): Promise<PrefeituraResponse | null> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/ai-orchestrator`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({
+        taskType: "code",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um especialista em parsing de XML de resposta da Prefeitura de São Paulo (GINFES). Analise o XML e determine o status real da nota. Retorne APENAS um JSON válido com: { status: 'autorizada' | 'rejeitada' | 'processando' | 'erro', numeroNota?: string, codigoVerificacao?: string, mensagemErro?: string }.",
+          },
+          {
+            role: "user",
+            content: `XML de resposta da prefeitura:\n${xml.substring(0, 3000)}`,
+          },
+        ],
+        temperature: 0.1,
+      }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || data.content || "";
+    const clean = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    const parsed = JSON.parse(clean);
+
+    if (parsed.status) {
+      return {
+        status: parsed.status,
+        numeroNota: parsed.numeroNota,
+        codigoVerificacao: parsed.codigoVerificacao,
+        mensagemErro: parsed.mensagemErro,
+      };
+    }
+    return null;
+  } catch {
+    return null;
   }
-
-  // Para notas "enviando", simular processamento
-  if (random > 0.8) {
-    return {
-      status: "autorizada",
-      numeroNota: String(Math.floor(10000 + Math.random() * 90000)),
-      codigoVerificacao: Math.random().toString(36).substring(2, 10).toUpperCase(),
-      linkPDF: `https://nfe.prefeitura.sp.gov.br/pdf/${nota.id}.pdf`,
-      linkXML: `https://nfe.prefeitura.sp.gov.br/xml/${nota.id}.xml`,
-      dataAutorizacao: new Date().toISOString(),
-    };
-  } else if (random > 0.95) {
-    return {
-      status: "rejeitada",
-      mensagemErro: "Dados do tomador inconsistentes. Verifique o CNPJ/CPF.",
-    };
-  }
-
-  return { status: "processando" };
 }
 
 /**
@@ -113,7 +188,9 @@ async function consultarPrefeituraSP(
  */
 async function processarBatch(
   notas: NotaFiscal[],
-  supabaseAdmin: any
+  supabaseAdmin: any,
+  supabaseUrl: string,
+  authHeader: string
 ): Promise<{
   processadas: number;
   autorizadas: number;
@@ -143,7 +220,7 @@ async function processarBatch(
       }
 
       // Consultar prefeitura
-      const resposta = await consultarPrefeituraSP(nota, certificado);
+      const resposta = await consultarPrefeituraSP(nota, certificado, supabaseUrl, authHeader);
 
       // Atualizar nota se houver mudança de status
       if (resposta.status !== nota.status && resposta.status !== "processando") {
@@ -256,7 +333,7 @@ serve(async (req) => {
           .single();
 
         // Consultar prefeitura
-        const resposta = await consultarPrefeituraSP(nota, certificado);
+        const resposta = await consultarPrefeituraSP(nota, certificado, SUPABASE_URL, authHeader);
 
         // Se mudou de status, atualizar
         if (resposta.status !== nota.status && resposta.status !== "processando") {
@@ -336,7 +413,7 @@ serve(async (req) => {
           throw new Error(notasError.message);
         }
 
-        const resultados = await processarBatch(notas || [], supabaseAdmin);
+        const resultados = await processarBatch(notas || [], supabaseAdmin, SUPABASE_URL, authHeader);
 
         return new Response(
           JSON.stringify({
@@ -359,7 +436,7 @@ serve(async (req) => {
           throw new Error(notasError.message);
         }
 
-        const resultados = await processarBatch(notas || [], supabaseAdmin);
+        const resultados = await processarBatch(notas || [], supabaseAdmin, SUPABASE_URL, authHeader);
 
         // Registrar execução do cron
         await supabaseAdmin.from("nfse_cron_logs").insert({

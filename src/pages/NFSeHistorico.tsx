@@ -46,6 +46,7 @@ import {
 } from "@/types/nfse-ui";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/nfse-utils";
 import { useNFSeSync } from "@/hooks/useNFSeSync";
+import { useAnalisarLoteNotas } from "@/hooks/useAiNFSe";
 import {
   ArrowLeft,
   FileText,
@@ -58,6 +59,7 @@ import {
   FileDown,
   Loader2,
   X,
+  Brain,
 } from "lucide-react";
 
 export default function NFSeHistorico() {
@@ -66,6 +68,8 @@ export default function NFSeHistorico() {
   const { user } = useAuth();
   const { consultarStatusNota, podeCancelar, cancelarNota, loading: loadingSync } =
     useNFSeSync();
+  const { analisar: analisarLote, resumo: iaResumo, isLoading: iaAnalisando, clear: clearAnalise } =
+    useAnalisarLoteNotas();
 
   // Estados
   const [notas, setNotas] = useState<NFSeHistoricoItem[]>([]);
@@ -257,6 +261,25 @@ export default function NFSeHistorico() {
     }
   };
 
+  // Analisa notas visíveis com IA
+  const handleAnalisarLote = () => {
+    if (notas.length === 0) {
+      toast({
+        title: "Nenhuma nota para analisar",
+        description: "Aplique filtros ou aguarde o carregamento das notas.",
+        variant: "destructive",
+      });
+      return;
+    }
+    analisarLote(notas.map((n) => ({
+      numero_nota: n.numero_nota,
+      status: n.status,
+      tomador: n.tomador_nome,
+      valor: n.valor_total,
+      data: n.data_emissao,
+    })));
+  };
+
   // Limpa filtros
   const limparFiltros = () => {
     setFiltros({
@@ -291,6 +314,13 @@ export default function NFSeHistorico() {
           <Button variant="outline" onClick={() => setShowFiltros(!showFiltros)}>
             <Filter className="mr-2 h-4 w-4" />
             Filtros
+          </Button>
+          <Button variant="outline" onClick={handleAnalisarLote} disabled={iaAnalisando || notas.length === 0}>
+            {iaAnalisando ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analisando...</>
+            ) : (
+              <><Brain className="mr-2 h-4 w-4" /> Analisar com IA</>
+            )}
           </Button>
         </div>
       </div>
@@ -372,6 +402,23 @@ export default function NFSeHistorico() {
                   }
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Resumo da Análise IA */}
+      {iaResumo && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Brain className="h-4 w-4 text-primary" />
+              Análise Inteligente do Lote
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
+              {iaResumo}
             </div>
           </CardContent>
         </Card>

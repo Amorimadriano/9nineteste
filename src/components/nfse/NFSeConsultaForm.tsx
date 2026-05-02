@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { statusCores } from "@/types/nfse-ui";
 import { formatCurrency, formatDate } from "@/lib/nfse-utils";
+import { useTraduzirErroGinfes } from "@/hooks/useAiNFSe";
 import {
   Search,
   Download,
@@ -17,6 +18,7 @@ import {
   CheckCircle,
   XCircle,
   FileText,
+  Brain,
 } from "lucide-react";
 
 const db: any = supabase;
@@ -63,6 +65,7 @@ interface NFSeConsultaFormProps {
 export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { traduzir, traducao, isLoading: traduzindoErro } = useTraduzirErroGinfes();
 
   const [notas, setNotas] = useState<NotaSimples[]>([]);
   const [selectedNotaId, setSelectedNotaId] = useState<string>("");
@@ -302,19 +305,46 @@ export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
           </CardHeader>
           <CardContent className="space-y-4">
             {resultado.mensagens && resultado.mensagens.length > 0 && (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {resultado.mensagens.map((msg, i) => (
-                  <div
-                    key={i}
-                    className={`text-sm p-2 rounded ${
-                      msg.tipo === "Erro"
-                        ? "bg-red-50 text-red-700"
-                        : "bg-green-50 text-green-700"
-                    }`}
-                  >
-                    {msg.mensagem}
+                  <div key={i} className="space-y-1">
+                    <div
+                      className={`text-sm p-2 rounded ${
+                        msg.tipo === "Erro"
+                          ? "bg-red-50 text-red-700"
+                          : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      <strong>{msg.codigo}:</strong> {msg.mensagem}
+                    </div>
+                    {msg.tipo === "Erro" && msg.codigo !== "0000" && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="gap-1 text-xs h-7"
+                        onClick={() => traduzir({ codigo: msg.codigo, mensagem: msg.mensagem, xmlContexto: resultado.xmlBruto })}
+                        disabled={traduzindoErro}
+                      >
+                        {traduzindoErro ? (
+                          <><Loader2 className="h-3 w-3 animate-spin" /> Traduzindo...</>
+                        ) : (
+                          <><Brain className="h-3 w-3" /> Traduzir com IA</>
+                        )}
+                      </Button>
+                    )}
                   </div>
                 ))}
+                {traducao && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 space-y-2">
+                    <p className="text-sm font-medium text-blue-800">Explicação (IA):</p>
+                    <p className="text-sm text-blue-700">{traducao.explicacao}</p>
+                    <div className="bg-white rounded p-2">
+                      <p className="text-xs font-medium text-blue-800 mb-1">O que fazer:</p>
+                      <p className="text-xs text-blue-700">{traducao.acaoSugerida}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 

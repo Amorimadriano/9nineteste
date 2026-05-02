@@ -365,6 +365,52 @@ function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; ti
   return erros;
 }
 
+/**
+ * Analisa erro de cancelamento via Orquestrador Multi-LLM
+ */
+async function analisarErroCancelamentoComIA(
+  xmlRetorno: string,
+  motivo: string,
+  authHeader: string
+): Promise<{ explicacao: string; acaoSugerida: string } | null> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    if (!supabaseUrl) return null;
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/ai-orchestrator`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeader,
+      },
+      body: JSON.stringify({
+        taskType: "reasoning",
+        messages: [
+          {
+            role: "system",
+            content:
+              "Você é um especialista em NFS-e GINFES e legislação tributária de São Paulo. Analise o erro de cancelamento e forneça explicação clara + ação sugerida. Retorne APENAS um JSON válido com: { explicacao: string, acaoSugerida: string }.",
+          },
+          {
+            role: "user",
+            content: `Motivo informado para cancelamento: "${motivo}"\n\nXML de resposta da prefeitura:\n${xmlRetorno.substring(0, 3000)}`,
+          },
+        ],
+        temperature: 0.2,
+      }),
+    });
+
+    if (!res.ok) return null;
+
+    const data = await res.json();
+    const content = data.choices?.[0]?.message?.content || data.content || "";
+    const clean = content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+    return JSON.parse(clean);
+  } catch {
+    return null;
+  }
+}
+
 function parsearRespostaCancelamento(xml: string) {
   try {
     const sucessoMatch = xml.match(/<Sucesso>true<\/Sucesso>/i);
@@ -480,6 +526,14 @@ serve(async (req) => {
       resultado = await cancelarProducao(nota, certDigital, motivoCancelamento);
     }
 
+    // Se falhou, enriquece com análise de IA via orquestrador
+    if (!resultado.sucesso && resultado.xmlRetorno) {
+      const analiseIA = await analisarErroCancelamentoComIA(resultado.xmlRetorno, motivoCancelamento, authHeader);
+      if (analiseIA) {
+        (resultado as any).analiseIA = analiseIA;
+      }
+    }
+
     const updateData: any = {
       status: resultado.sucesso ? "cancelada" : "erro",
       motivo_cancelamento: motivoCancelamento,
@@ -490,6 +544,9 @@ serve(async (req) => {
     }
     if (!resultado.sucesso) {
       updateData.mensagem_erro = resultado.mensagens?.map((m: any) => m.mensagem).join("; ");
+      if ((resultado as any).analiseIA) {
+        updateData.mensagem_erro += ` | IA: ${(resultado as any).analiseIA.acaoSugerida}`;
+      }
     }
 
     await supabase
