@@ -181,6 +181,42 @@ function criarEnvelopeSOAPGinfesCabecalhoDentro(soapAction: string, cabecalhoXml
 </soap:Envelope>`;
 }
 
+function criarEnvelopeSOAPGinfesApenasArg1(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${namespace}">
+      <arg1 xmlns="">${cabecalhoXml}${dadosXml}</arg1>
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function criarEnvelopeSOAPGinfesSemCabecalho(soapAction: string, dadosXml: string, ambiente?: string): string {
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${namespace}">
+      <arg1 xmlns="">${dadosXml}</arg1>
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function criarEnvelopeSOAPGinfesArg0Cabecalho(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${namespace}">
+      <arg0 xmlns="">${cabecalhoXml}${dadosXml}</arg0>
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
 function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
 }
@@ -451,6 +487,9 @@ serve(async (req) => {
       { nome: "sem_arg0", fn: (op: string) => criarEnvelopeSOAPGinfesSemArg0(op, dados, ambiente) },
       { nome: "arg0_vazio", fn: (op: string) => criarEnvelopeSOAPGinfesArg0Vazio(op, dados, ambiente) },
       { nome: "cabecalho_dentro_arg1", fn: (op: string) => criarEnvelopeSOAPGinfesCabecalhoDentro(op, cabecalho, dados, ambiente) },
+      { nome: "apenas_arg1", fn: (op: string) => criarEnvelopeSOAPGinfesApenasArg1(op, cabecalho, dados, ambiente) },
+      { nome: "sem_cabecalho", fn: (op: string) => criarEnvelopeSOAPGinfesSemCabecalho(op, dados, ambiente) },
+      { nome: "arg0_cabecalho", fn: (op: string) => criarEnvelopeSOAPGinfesArg0Cabecalho(op, cabecalho, dados, ambiente) },
     ];
 
     for (const op of uniqueOps) {
