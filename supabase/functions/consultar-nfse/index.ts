@@ -91,36 +91,37 @@ async function carregarCertificado(pfxBase64: string, senha: string): Promise<Ce
   return { cnpj, inscricaoMunicipal: "", certPem, keyPem };
 }
 
-// --- XML builders ---
-function xmlConsultaRps(numeroRps: string, serie: string, tipo: string, cnpj: string, im: string): string {
+// --- XML builders (ABRASF v3) ---
+
+function xmlConsultaPorRps(numeroRps: string, serie: string, tipo: string, cnpj: string, im: string): string {
   const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "2" ? "2" : tipo === "3" ? "3" : "1";
   return `<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
-<IdentificacaoRps>
-<Numero>${numeroRps}</Numero>
-<Serie>${serie}</Serie>
-<Tipo>${tipoCodigo}</Tipo>
-</IdentificacaoRps>
-<Prestador>
-<Cnpj>${cnpj}</Cnpj>
-<InscricaoMunicipal>${im}</InscricaoMunicipal>
-</Prestador>
+  <IdentificacaoRps>
+    <Numero>${numeroRps}</Numero>
+    <Serie>${serie}</Serie>
+    <Tipo>${tipoCodigo}</Tipo>
+  </IdentificacaoRps>
+  <Prestador>
+    <Cnpj>${cnpj}</Cnpj>
+    <InscricaoMunicipal>${im}</InscricaoMunicipal>
+  </Prestador>
 </ConsultarNfseRpsEnvio>`;
 }
 
 function xmlConsultaServicoPrestado(cnpj: string, im: string, dataInicio?: string, dataFim?: string, cnpjTomador?: string, cpfTomador?: string): string {
   let xml = `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_servico_prestado_envio_v03.xsd">
-<Prestador>
-<Cnpj>${cnpj}</Cnpj>
-<InscricaoMunicipal>${im}</InscricaoMunicipal>
-</Prestador>`;
+  <Prestador>
+    <Cnpj>${cnpj}</Cnpj>
+    <InscricaoMunicipal>${im}</InscricaoMunicipal>
+  </Prestador>`;
   if (cnpjTomador || cpfTomador) {
-    xml += `\n<Tomador>\n<CpfCnpj>`;
-    if (cnpjTomador) xml += `\n<Cnpj>${cnpjTomador}</Cnpj>`;
-    if (cpfTomador) xml += `\n<Cpf>${cpfTomador}</Cpf>`;
-    xml += `\n</CpfCnpj>\n</Tomador>`;
+    xml += `\n  <Tomador>\n    <CpfCnpj>`;
+    if (cnpjTomador) xml += `\n      <Cnpj>${cnpjTomador}</Cnpj>`;
+    if (cpfTomador) xml += `\n      <Cpf>${cpfTomador}</Cpf>`;
+    xml += `\n    </CpfCnpj>\n  </Tomador>`;
   }
   if (dataInicio) {
-    xml += `\n<Periodo>\n<DataInicial>${dataInicio}</DataInicial>\n<DataFinal>${dataFim || dataInicio}</DataFinal>\n</Periodo>`;
+    xml += `\n  <Periodo>\n    <DataInicial>${dataInicio}</DataInicial>\n    <DataFinal>${dataFim || dataInicio}</DataFinal>\n  </Periodo>`;
   }
   xml += `\n</ConsultarNfseServicoPrestadoEnvio>`;
   return xml;
@@ -130,92 +131,128 @@ function criarCabecalhoGinfes(): string {
   return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 }
 
-function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+// Envelope SOAP 1.1 padrao GINFES (exatamente como a documentacao)
+function criarEnvelopeSOAP11(soapAction: string, xmlDados: string, xmlAssinado?: string): string {
+  const xmlPayload = xmlAssinado || xmlDados;
+  const cabecalho = criarCabecalhoGinfes();
+
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns="">${cabecalhoXml}</arg0>
-      <arg1 xmlns="">${dadosXml}</arg1>
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <soapenv:Body>
+    <${soapAction} xmlns="http://ws.opus.com.br">
+      <arg0><![CDATA[${cabecalho}]]></arg0>
+      <arg1><![CDATA[${xmlPayload}]]></arg1>
     </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
+  </soapenv:Body>
+</soapenv:Envelope>`;
 }
 
-function criarEnvelopeSOAPGinfesSemArg0(soapAction: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
+// --- Assinatura digital XMLDSig ---
+
+function canonicalizeXml(xml: string): string {
+  let result = xml;
+  result = result.replace(/<\?xml[^?]*\?>\s*/g, "");
+  result = result.replace(/<\?[^?]*\?>\s*/g, "");
+  result = result.replace(/<(\w+)([^>]*)\/>/g, (_match: string, tagName: string, attrs: string) => {
+    if (attrs.trim()) return `<${tagName}${attrs}></${tagName}>`;
+    return `<${tagName}></${tagName}>`;
+  });
+  result = result.replace(/>\s+</g, "><");
+  result = result.replace(/\s+=\s+/g, "=");
+  result = result.replace(/\n\s+/g, "\n");
+  result = result.trim();
+  return result;
 }
 
-function criarEnvelopeSOAPGinfesArg0Vazio(soapAction: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns=""></cabecalho></arg0>
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
+function extractElementById(xml: string, id: string): string | null {
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const openRegex = new RegExp(`<([\\w]+)([^>]*?)Id="${escapedId}"([^>]*?)>`, "i");
+  const openMatch = xml.match(openRegex);
+  if (!openMatch) return null;
+
+  const tagName = openMatch[1];
+  const fullOpenMatch = openMatch[0];
+  const startIndex = xml.indexOf(fullOpenMatch);
+  if (startIndex === -1) return null;
+
+  let depth = 0;
+  let pos = startIndex;
+
+  while (pos < xml.length) {
+    const nextOpen = xml.indexOf(`<${tagName}`, pos + 1);
+    const nextClose = xml.indexOf(`</${tagName}>`, pos + 1);
+    if (nextClose === -1) break;
+    depth++;
+    if (nextOpen === -1 || nextOpen > nextClose) {
+      return xml.substring(startIndex, nextClose + `</${tagName}>`.length);
+    }
+    let searchPos = nextClose + `</${tagName}>`.length;
+    while (depth > 0 && searchPos < xml.length) {
+      const innerOpen = xml.indexOf(`<${tagName}`, searchPos);
+      const innerClose = xml.indexOf(`</${tagName}>`, searchPos);
+      if (innerClose === -1) break;
+      if (innerOpen !== -1 && innerOpen < innerClose) {
+        depth++;
+      } else {
+        depth--;
+      }
+      if (depth === 0) {
+        searchPos = innerClose + `</${tagName}>`.length;
+        break;
+      }
+      searchPos = innerClose + `</${tagName}>`.length;
+    }
+    return xml.substring(startIndex, searchPos);
+  }
+  return null;
 }
 
-function criarEnvelopeSOAPGinfesCabecalhoDentro(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns=""></cabecalho></arg0>
-      <arg1 xmlns="">${cabecalhoXml}${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
+function getElementName(xml: string, id: string): string {
+  const escapedId = id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const regex = new RegExp(`<(\\w+)[^>]*Id="${escapedId}"`, "i");
+  const match = xml.match(regex);
+  return match ? match[1] : "Pedido";
 }
 
-function criarEnvelopeSOAPGinfesApenasArg1(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg1 xmlns="">${cabecalhoXml}${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
+function assinarXml(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
+  const forge = (globalThis as any).forge;
+  if (!forge) throw new Error("node-forge nao disponivel");
+
+  try {
+    const privateKey = forge.pki.privateKeyFromPem(certificado.keyPem);
+    const certificate = forge.pki.certificateFromPem(certificado.certPem);
+    const referencedXml = extractElementById(xml, idReferencia);
+    if (!referencedXml) throw new Error(`Elemento Id="${idReferencia}" nao encontrado`);
+
+    const canonReferenced = canonicalizeXml(referencedXml);
+    const digest = forge.md.sha1.create();
+    digest.update(canonReferenced, "utf8");
+    const digestBase64 = forge.util.encode64(digest.digest().bytes());
+
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
+
+    const canonSignedInfo = canonicalizeXml(signedInfoXml);
+    const signatureMd = forge.md.sha1.create();
+    signatureMd.update(canonSignedInfo, "utf8");
+    const signatureBytes = privateKey.sign(signatureMd);
+    const signatureBase64 = forge.util.encode64(signatureBytes);
+    const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
+    const certBase64 = forge.util.encode64(certDer);
+
+    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+
+    const elementName = getElementName(xml, idReferencia);
+    const closingTag = `</${elementName}>`;
+    const insertionPoint = xml.lastIndexOf(closingTag);
+    if (insertionPoint === -1) throw new Error(`Tag de fechamento </${elementName}> nao encontrada`);
+
+    return xml.substring(0, insertionPoint) + signatureBlock + xml.substring(insertionPoint);
+  } catch (error) {
+    throw new Error(`Erro na assinatura digital: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
-function criarEnvelopeSOAPGinfesSemCabecalho(soapAction: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
-}
-
-function criarEnvelopeSOAPGinfesArg0Cabecalho(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
-  <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns="">${cabecalhoXml}${dadosXml}</arg0>
-    </${soapAction}>
-  </soap:Body>
-</soap:Envelope>`;
-}
+// --- Envio SOAP ---
 
 function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
@@ -228,14 +265,14 @@ const GINFES_URLS = {
 
 async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, certificado?: { certPem: string; keyPem: string }): Promise<string> {
   const env = getAmbiente();
-  const baseHeaders: Record<string, string> = {
-    "Content-Type": "text/xml; charset=utf-8",
-    "SOAPAction": `"${soapAction}"`,
-  };
+
   if (env === "homologacao") {
     const response = await fetch(GINFES_URLS[env], {
       method: "POST",
-      headers: baseHeaders,
+      headers: {
+        "Content-Type": "text/xml; charset=UTF-8",
+        "SOAPAction": `"${soapAction}"`,
+      },
       body: soapEnvelope,
     });
     if (!response.ok) {
@@ -244,12 +281,15 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
     }
     return await response.text();
   }
+
+  // Producao: via proxy mTLS
   if (!certificado) throw new Error("Certificado obrigatorio em producao");
   const proxyUrl = Deno.env.get("MTLS_PROXY_URL");
   if (!proxyUrl) throw new Error("MTLS_PROXY_URL nao configurada");
   const proxyApiKey = Deno.env.get("MTLS_PROXY_API_KEY") || "";
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (proxyApiKey) headers["X-API-Key"] = proxyApiKey;
+
   const proxyResponse = await fetch(`${proxyUrl}/proxy-ginfes`, {
     method: "POST",
     headers,
@@ -261,6 +301,8 @@ async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, ce
   }
   return await proxyResponse.text();
 }
+
+// --- Parser de resposta ---
 
 function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
@@ -463,68 +505,38 @@ serve(async (req) => {
       throw new Error("CNPJ e Inscricao Municipal sao obrigatorios para consulta");
     }
 
-    // Construir XML
-    const cabecalho = criarCabecalhoGinfes();
-    let dados = "";
+    // Construir XML ABRASF
+    let xmlDados = "";
     if (operacao === "ConsultarNfseServicoPrestadoV3") {
-      dados = xmlConsultaServicoPrestado(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
+      xmlDados = xmlConsultaServicoPrestado(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
     } else {
-      dados = xmlConsultaRps(numeroRps, serie, tipo, cnpj, im);
+      xmlDados = xmlConsultaPorRps(numeroRps, serie, tipo, cnpj, im);
       operacao = "ConsultarNfsePorRpsV3";
     }
 
-    // Tentativas com diferentes operacoes e formatos
-    const tentativas: any[] = [];
-    let resultado: any = null;
-
-    const operacoes = [operacao, "ConsultarNfsePorRps", "ConsultarNfseRps", "ConsultarNfsePorRpsV3"];
-    const uniqueOps = [...new Set(operacoes)];
-
-    const formatos = [
-      { nome: "padrao", fn: (op: string) => criarEnvelopeSOAPGinfes(op, cabecalho, dados, ambiente) },
-      { nome: "sem_arg0", fn: (op: string) => criarEnvelopeSOAPGinfesSemArg0(op, dados, ambiente) },
-      { nome: "arg0_vazio", fn: (op: string) => criarEnvelopeSOAPGinfesArg0Vazio(op, dados, ambiente) },
-      { nome: "cabecalho_dentro_arg1", fn: (op: string) => criarEnvelopeSOAPGinfesCabecalhoDentro(op, cabecalho, dados, ambiente) },
-      { nome: "apenas_arg1", fn: (op: string) => criarEnvelopeSOAPGinfesApenasArg1(op, cabecalho, dados, ambiente) },
-      { nome: "sem_cabecalho", fn: (op: string) => criarEnvelopeSOAPGinfesSemCabecalho(op, dados, ambiente) },
-      { nome: "arg0_cabecalho", fn: (op: string) => criarEnvelopeSOAPGinfesArg0Cabecalho(op, cabecalho, dados, ambiente) },
-    ];
-
-    for (const op of uniqueOps) {
-      for (const formato of formatos) {
-        const envelope = formato.fn(op);
-        console.log(`[consultar-nfse] Tentando operacao: ${op} | formato: ${formato.nome}`);
-
-        try {
-          const soapResponse = await retry(() => enviarRequisicaoSOAP(envelope, op, certDigital || undefined));
-
-          tentativas.push({ operacao: op, formato: formato.nome, response: soapResponse.substring(0, 500) });
-
-          const parsed = parsearRespostaConsulta(soapResponse);
-          if (parsed.sucesso) {
-            resultado = { ...parsed, xmlEnvio: dados, xmlBruto: soapResponse.substring(0, 8000), operacaoUsada: op, formatoUsado: formato.nome };
-            break;
-          }
-
-          const isOpError = soapResponse.includes("Endpoint does not contain operation") ||
-            soapResponse.includes("Cannot find child element");
-          if (!isOpError) {
-            resultado = { ...parsed, xmlEnvio: dados, xmlBruto: soapResponse.substring(0, 8000), operacaoUsada: op, formatoUsado: formato.nome };
-            break;
-          }
-        } catch (err: any) {
-          console.error(`[consultar-nfse] Erro operacao ${op} formato ${formato.nome}:`, err.message);
-          tentativas.push({ operacao: op, formato: formato.nome, erro: err.message });
-        }
-      }
-      if (resultado) break;
+    // Assinar XML (obrigatorio em producao, opcional em homologacao)
+    let xmlAssinado = xmlDados;
+    if (certDigital && ambiente === "producao") {
+      const idRef = `RPS${numeroRps}`;
+      xmlAssinado = assinarXml(xmlDados, certDigital, idRef);
     }
 
-    // --- Análise IA da resposta ambígua via ai-orchestrator ---
-    let analiseIA = null;
-    if (!resultado || !resultado.sucesso) {
+    // Construir envelope SOAP 1.1 padrao GINFES
+    const soapEnvelope = criarEnvelopeSOAP11(operacao, xmlDados, xmlAssinado);
+
+    console.log(`[consultar-nfse] Operacao: ${operacao} | Ambiente: ${ambiente}`);
+    console.log("[consultar-nfse] Envelope SOAP (primeiros 500 chars):", soapEnvelope.substring(0, 500));
+
+    // Enviar requisicao
+    let soapResponse: string;
+    try {
+      soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, operacao, certDigital || undefined));
+    } catch (err: any) {
+      console.error("[consultar-nfse] Erro ao enviar SOAP:", err.message);
+
+      // Analise IA do erro via orquestrador
+      let analiseIA = null;
       try {
-        const ultimaResposta = tentativas[tentativas.length - 1]?.response || "";
         const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
           method: "POST",
           headers: {
@@ -534,8 +546,8 @@ serve(async (req) => {
           body: JSON.stringify({
             taskType: "code",
             messages: [
-              { role: "system", content: "Você é um especialista em integração SOAP com a Prefeitura de São Paulo (GINFES). Analise a resposta XML e sugira: 1) Qual o erro provável, 2) Qual formato de envelope SOAP é mais adequado, 3) Qual operação usar. Retorne APENAS um JSON com { erroProvavel: string, formatoSugerido: string, operacaoSugerida: string, acao: string }." },
-              { role: "user", content: `Resposta SOAP:\n${ultimaResposta.substring(0, 3000)}\n\nFormatos tentados: ${tentativas.map((t) => t.formato).join(", ")}\nOperações tentadas: ${tentativas.map((t) => t.operacao).join(", ")}` },
+              { role: "system", content: "Voce e um especialista em integracao SOAP GINFES. Analise o erro e sugira: 1) Causa provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
+              { role: "user", content: `Erro: ${err.message}\n\nOperacao: ${operacao}\nAmbiente: ${ambiente}` },
             ],
             temperature: 0.1,
           }),
@@ -547,21 +559,54 @@ serve(async (req) => {
             analiseIA = JSON.parse(content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
           } catch { /* ignora */ }
         }
-      } catch (e) {
-        console.log("[consultar-nfse] Análise IA indisponível:", e);
-      }
+      } catch { /* ignora */ }
+
+      return new Response(JSON.stringify({
+        sucesso: false,
+        mensagens: [{ codigo: "SOAP_ERROR", mensagem: err.message, tipo: "Erro" }],
+        analiseIA,
+        xmlEnvio: xmlDados,
+        xmlBruto: soapEnvelope.substring(0, 3000),
+      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!resultado) {
-      resultado = {
-        sucesso: false,
-        mensagens: [{ codigo: "ALL_FAILED", mensagem: "Nenhuma operacao funcionou", tipo: "Erro" }],
-        tentativas,
-        analiseIA,
-        xmlEnvio: dados,
-      };
-    } else {
-      resultado = { ...resultado, analiseIA };
+    console.log("[consultar-nfse] Resposta (primeiros 500 chars):", soapResponse.substring(0, 500));
+
+    const resultado = parsearRespostaConsulta(soapResponse);
+    const resultadoFinal = {
+      ...resultado,
+      xmlEnvio: xmlDados,
+      xmlBruto: soapResponse.substring(0, 8000),
+      operacaoUsada: operacao,
+      formatoUsado: "SOAP11_GINFES_PADRAO",
+    };
+
+    // Analise IA para erros ambiguos
+    if (!resultado.sucesso) {
+      try {
+        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") || ""}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            taskType: "code",
+            messages: [
+              { role: "system", content: "Voce e um especialista em parsing XML GINFES. Analise a resposta e sugira: 1) Erro provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
+              { role: "user", content: `Resposta:\n${soapResponse.substring(0, 3000)}` },
+            ],
+            temperature: 0.1,
+          }),
+        });
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          const content = aiData.choices?.[0]?.message?.content || "";
+          try {
+            (resultadoFinal as any).analiseIA = JSON.parse(content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
+          } catch { /* ignora */ }
+        }
+      } catch { /* ignora */ }
     }
 
     // Atualizar banco se veio de notaId
@@ -577,7 +622,7 @@ serve(async (req) => {
       await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
     }
 
-    return new Response(JSON.stringify(resultado), { status: resultado.sucesso ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify(resultadoFinal), { status: resultado.sucesso ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
     console.error("[consultar-nfse] Erro geral:", err);
