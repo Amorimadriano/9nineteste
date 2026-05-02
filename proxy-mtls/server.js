@@ -219,9 +219,10 @@ function sendWithMTLS(targetUrl, soapEnvelope, soapAction, certPem, keyPem, res)
       const isError = response.statusCode >= 300;
       if (isError) {
         console.log(`[proxy] === ENVELOPE ENVIADO ===`);
-        console.log(soapEnvelope.substring(0, 5000));
+        console.log(soapEnvelope);
         console.log(`[proxy] === RESPOSTA ${response.statusCode} ===`);
-        console.log(data.substring(0, 2000));
+        console.log(data);
+        console.log(`[proxy] === FIM RESPOSTA ===`);
       }
       res.setHeader("Content-Type", response.headers["content-type"] || "text/xml");
       res.status(response.statusCode || 200).send(data);
