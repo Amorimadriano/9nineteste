@@ -67,12 +67,12 @@ describe("NFSeParser (GINFES v03)", () => {
       const xmlSemNFSe = `<?xml version="1.0" encoding="UTF-8"?>
         <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
           <soap12:Body>
-            <ns2:RecepcionarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
+            <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
   <ListaMensagemRetorno/>
 </EnviarLoteRpsResposta>]]></return>
-            </ns2:RecepcionarLoteRpsResponse>
+            </ns2:RecepcionarLoteRpsV3Response>
           </soap12:Body>
         </soap12:Envelope>`;
 
@@ -117,7 +117,7 @@ describe("NFSeParser (GINFES v03)", () => {
       const xmlErroUnico = `<?xml version="1.0" encoding="UTF-8"?>
         <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
           <soap12:Body>
-            <ns2:RecepcionarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
+            <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
   <ListaMensagemRetorno>
@@ -127,7 +127,7 @@ describe("NFSeParser (GINFES v03)", () => {
     </MensagemRetorno>
   </ListaMensagemRetorno>
 </EnviarLoteRpsResposta>]]></return>
-            </ns2:RecepcionarLoteRpsResponse>
+            </ns2:RecepcionarLoteRpsV3Response>
           </soap12:Body>
         </soap12:Envelope>`;
 
@@ -219,7 +219,7 @@ describe("NFSeParser (GINFES v03)", () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
         <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
           <soap12:Body>
-            <ns2:CancelarNfseResponse xmlns:ns2="http://www.ginfes.com.br/">
+            <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
               <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
   <ListaMensagemRetorno>
@@ -229,7 +229,7 @@ describe("NFSeParser (GINFES v03)", () => {
     </MensagemRetorno>
   </ListaMensagemRetorno>
 </CancelarNfseResposta>]]></return>
-            </ns2:CancelarNfseResponse>
+            </ns2:CancelarNfseV3Response>
           </soap12:Body>
         </soap12:Envelope>`;
 

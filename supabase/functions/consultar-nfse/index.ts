@@ -417,7 +417,7 @@ serve(async (req) => {
         certDigital.inscricaoMunicipal
       );
       const cabecalho = criarCabecalhoGinfes();
-      const soapAction = "ConsultarNfseRps";
+      const soapAction = "ConsultarNfsePorRpsV3";
       const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, xmlConsulta, ambiente);
       const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
       resultado = { ...parsearRespostaConsulta(soapResponse), xmlEnvio: xmlConsulta, xmlBruto: soapResponse.substring(0, 8000) };
