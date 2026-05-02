@@ -546,10 +546,8 @@ serve(async (req) => {
       xmlDados = xmlPedidoConsultaNFePeriodo(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
       operacao = "ConsultaNFe";
     } else {
-      const numeroConsulta = numeroNFe || numeroRps || body.numero || body.numeroNfse;
-      if (!numeroConsulta) {
-        throw new Error("Numero da NFSe ou RPS obrigatorio para consulta");
-      }
+      const numeroConsulta = numeroNFe || numeroRps || body.numero || body.numeroNfse || "";
+      console.log("[consultar-nfse] numeroConsulta:", numeroConsulta, "| numeroNFe:", numeroNFe, "| numeroRps:", numeroRps);
       xmlDados = xmlPedidoConsultaNFe(cnpj, numeroConsulta, im);
       operacao = "ConsultaNFe";
     }
