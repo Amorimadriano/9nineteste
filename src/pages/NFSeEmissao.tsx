@@ -99,6 +99,8 @@ export default function NFSeEmissao() {
     valido_ate: string;
     ativo: boolean;
     arquivo_path?: string;
+    cnpj?: string;
+    inscricao_municipal?: string;
   } | null>(null);
   const [numeroNota, setNumeroNota] = useState(gerarNumeroNota());
   const [modalCertificadoAberto, setModalCertificadoAberto] = useState(false);
@@ -178,7 +180,7 @@ export default function NFSeEmissao() {
     try {
       const { data, error } = await supabase
         .from("certificados_nfse")
-        .select("id, nome, valido_ate, ativo, arquivo_path")
+        .select("id, nome, valido_ate, ativo, arquivo_path, cnpj, inscricao_municipal")
         .eq("user_id", user.id)
         .eq("ativo", true)
         .single();
@@ -475,6 +477,8 @@ export default function NFSeEmissao() {
           tipo_rps: "RPS",
           serie: "1",
           certificado_id: certificado.id,
+          cnpj_prestador: certificado.cnpj || "",
+          inscricao_municipal: certificado.inscricao_municipal || "",
         })
         .select()
         .single();

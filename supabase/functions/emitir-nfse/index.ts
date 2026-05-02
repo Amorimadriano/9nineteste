@@ -681,6 +681,8 @@ serve(async (req) => {
       link_nfse: (resultado as any).linkNfse || null,
       data_autorizacao: resultado.sucesso ? new Date().toISOString() : null,
       mensagem_erro: resultado.sucesso ? null : resultado.mensagens?.map((m: any) => m.mensagem).join("; "),
+      cnpj_prestador: certDigital.cnpj || nota.cnpj_prestador || "",
+      inscricao_municipal: certDigital.inscricaoMunicipal || nota.inscricao_municipal || "",
     };
     await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
 
