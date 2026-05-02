@@ -55,7 +55,7 @@ jobs:
           timeout: 60000
           local-dir: ./dist/
           server-dir: ${{ secrets.HOSTINGER_FTP_PATH || './' }}
-          dangerous-clean-slate: false
+          dangerous-clean-slate: true
           exclude: |
             **/.git*
             **/.git*/**
