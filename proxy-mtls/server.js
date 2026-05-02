@@ -15,6 +15,13 @@ const http = require("http");
 const express = require("express");
 
 const app = express();
+
+// Middleware de log detalhado
+app.use((req, res, next) => {
+  console.log(`[proxy] ${req.method} ${req.path} - Content-Type: ${req.headers['content-type'] || 'none'}`);
+  next();
+});
+
 app.use(express.json({ limit: "5mb" }));
 app.use(express.text({ limit: "5mb", type: "text/*" }));
 app.use(express.urlencoded({ extended: true, limit: "5mb" }));
