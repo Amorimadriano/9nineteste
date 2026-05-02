@@ -74,7 +74,11 @@
       "Bash(bunx tsc *)",
       "Bash(bunx supabase *)",
       "Bash(npm supabase *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "PowerShell(Get-Command *)",
+      "PowerShell(npx vitest run src/test/nfse/client.test.ts)",
+      "PowerShell(npx vitest run src/test/nfse/)",
+      "Bash(Select-String -Pattern 'FAIL|×|expected' -Context 2,2)"
     ]
   }
 }
