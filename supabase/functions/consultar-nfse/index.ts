@@ -131,7 +131,7 @@ function xmlCabecalho(): string {
 }
 
 // --- Envelope factory ---
-type EnvelopeVariant = "unqualified" | "qualified" | "cdata" | "escaped" | "raw";
+type EnvelopeVariant = "unqualified" | "qualified" | "cdata" | "escaped" | "raw" | "noheader" | "single" | "direct";
 
 function buildEnvelope(action: string, cabecalho: string, dados: string, ambiente: "homologacao" | "producao", variant: EnvelopeVariant): string {
   const ns = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
@@ -178,6 +178,34 @@ function buildEnvelope(action: string, cabecalho: string, dados: string, ambient
       <arg0>${cabecalho}</arg0>
       <arg1>${dados}</arg1>
     </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+
+    case "noheader":
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${action} xmlns="${ns}">
+      <arg1 xmlns="">${dados}</arg1>
+    </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+
+    case "single":
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${action} xmlns="${ns}">
+      <arg0 xmlns="">${cabecalho}${dados}</arg0>
+    </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+
+    case "direct":
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    ${dados}
   </soap:Body>
 </soap:Envelope>`;
 
@@ -322,7 +350,7 @@ serve(async (req) => {
       const dados = xmlConsultaRps(body.numeroRps || "1", body.serie || "1", body.tipo || "1", body.cnpj || "12345678000195", body.im || "123456");
       const action = body.operacao || "ConsultarNfsePorRpsV3";
       const ambiente = getAmbiente();
-      const variants: EnvelopeVariant[] = ["unqualified", "qualified", "cdata", "escaped", "raw"];
+      const variants: EnvelopeVariant[] = ["unqualified", "qualified", "cdata", "escaped", "raw", "noheader", "single", "direct"];
       const envelopes = variants.map(v => ({ variant: v, envelope: buildEnvelope(action, cabecalho, dados, ambiente, v) }));
       return new Response(JSON.stringify({ modo: "diagnostico", action, ambiente, envelopes }, null, 2), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -394,7 +422,7 @@ serve(async (req) => {
     }
 
     // --- Tentativa com multiplos formatos ---
-    const variants: EnvelopeVariant[] = ["unqualified", "qualified", "cdata", "escaped", "raw"];
+    const variants: EnvelopeVariant[] = ["unqualified", "qualified", "cdata", "escaped", "raw", "noheader", "single", "direct"];
     const tentativas: any[] = [];
     let resultado: any = null;
 
