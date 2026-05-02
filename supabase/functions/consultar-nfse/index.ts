@@ -496,6 +496,9 @@ serve(async (req) => {
       if (notaError || !nota) throw new Error("Nota nao encontrada");
       numeroNFe = nota.numero_nota || nota.numero_rps || "";
       numeroRps = nota.numero_rps || "";
+      // Dados do prestador da propria nota (fallback se nao houver certificado)
+      cnpj = nota.cnpj_prestador || nota.cnpj || "";
+      im = nota.inscricao_municipal || nota.inscricao_municipal_prestador || "";
 
       if (nota.certificado_id) {
         const { data: cert, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
@@ -503,8 +506,11 @@ serve(async (req) => {
           certDigital = await carregarCertificado(cert.arquivo_pfx, cert.senha || "");
           certDigital.inscricaoMunicipal = cert.inscricao_municipal || "";
           certDigital.cnpj = cert.cnpj || certDigital.cnpj || "";
-          cnpj = certDigital.cnpj;
-          im = certDigital.inscricaoMunicipal;
+          // Sobrescreve com dados do certificado se existirem
+          if (certDigital.cnpj) cnpj = certDigital.cnpj;
+          if (certDigital.inscricaoMunicipal) im = certDigital.inscricaoMunicipal;
+        } else if (certError) {
+          console.log("[consultar-nfse] Certificado", nota.certificado_id, "nao encontrado, usando dados da nota");
         }
       }
     } else if (body.certificadoId) {
