@@ -230,7 +230,8 @@ function sendWithMTLS(targetUrl, soapEnvelope, soapAction, certPem, keyPem, res)
 
   clientReq.on("error", (err) => {
     console.error("[proxy] Erro mTLS:", err.message);
-    res.status(502).json({ error: `Erro mTLS: ${err.message}` });
+    console.error("[proxy] Erro mTLS detalhes:", err.code, err.syscall, err.address, err.port);
+    res.status(502).json({ error: `Erro mTLS: ${err.message}`, code: err.code });
   });
 
   clientReq.on("timeout", () => {
