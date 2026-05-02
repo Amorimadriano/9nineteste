@@ -113,7 +113,7 @@ export const dadosNotaFiscalCPF: NFSeEmissaoData = {
 export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:RecepcionarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
   <NumeroLote>1</NumeroLote>
@@ -121,7 +121,7 @@ export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
   <Protocolo>PROT123456789</Protocolo>
   <ListaMensagemRetorno/>
 </EnviarLoteRpsResposta>]]></return>
-    </ns2:RecepcionarLoteRpsV3Response>
+    </ns2:RecepcionarLoteRpsResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 
@@ -131,7 +131,7 @@ export const xmlRespostaAutorizacao = `<?xml version="1.0" encoding="UTF-8"?>
 export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:ConsultarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:ConsultarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <ConsultarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_lote_rps_resposta_v03.xsd">
   <Situacao>3</Situacao>
@@ -185,7 +185,7 @@ export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-
     </CompNfse>
   </ListaNfse>
 </ConsultarLoteRpsResposta>]]></return>
-    </ns2:ConsultarLoteRpsV3Response>
+    </ns2:ConsultarLoteRpsResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 
@@ -195,7 +195,7 @@ export const xmlRespostaAutorizacaoComNfse = `<?xml version="1.0" encoding="UTF-
 export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:RecepcionarLoteRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:RecepcionarLoteRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <EnviarLoteRpsResposta xmlns="http://www.ginfes.com.br/servico_enviar_lote_rps_resposta_v03.xsd">
   <ListaMensagemRetorno>
@@ -211,7 +211,7 @@ export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
     </MensagemRetorno>
   </ListaMensagemRetorno>
 </EnviarLoteRpsResposta>]]></return>
-    </ns2:RecepcionarLoteRpsV3Response>
+    </ns2:RecepcionarLoteRpsResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 
@@ -221,7 +221,7 @@ export const xmlRespostaRejeicao = `<?xml version="1.0" encoding="UTF-8"?>
 export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:ConsultarNfseRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:ConsultarNfseRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
   <CompNfse>
@@ -273,7 +273,7 @@ export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
     </Nfse>
   </CompNfse>
 </ConsultarNfseRpsResposta>]]></return>
-    </ns2:ConsultarNfseRpsV3Response>
+    </ns2:ConsultarNfseRpsResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 
@@ -283,7 +283,7 @@ export const xmlRespostaConsulta = `<?xml version="1.0" encoding="UTF-8"?>
 export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:ConsultarNfseRpsV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:ConsultarNfseRpsResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <ConsultarNfseRpsResposta xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_resposta_v03.xsd">
   <ListaMensagemRetorno>
@@ -293,7 +293,7 @@ export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="U
     </MensagemRetorno>
   </ListaMensagemRetorno>
 </ConsultarNfseRpsResposta>]]></return>
-    </ns2:ConsultarNfseRpsV3Response>
+    </ns2:ConsultarNfseRpsResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 
@@ -303,7 +303,7 @@ export const xmlRespostaConsultaNaoEncontrada = `<?xml version="1.0" encoding="U
 export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:CancelarNfseResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
   <NfseCancelamento>
@@ -314,7 +314,7 @@ export const xmlRespostaCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
     </Confirmacao>
   </NfseCancelamento>
 </CancelarNfseResposta>]]></return>
-    </ns2:CancelarNfseV3Response>
+    </ns2:CancelarNfseResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 

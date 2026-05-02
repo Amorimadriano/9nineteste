@@ -395,14 +395,14 @@ export class NFSeClient {
     const xmlEnvio = buildLoteRpsXml(data);
 
     return this.withRetry(async () => {
-      const xmlRetorno = await this.request("RecepcionarLoteRpsV3", xmlEnvio);
+      const xmlRetorno = await this.request("RecepcionarLoteRps", xmlEnvio);
       return { ...parseNfseResponse(xmlRetorno), xmlEnvio, xmlRetorno };
     });
   }
 
   async consultar(data: NFSeConsultaData): Promise<NFSeResposta> {
     const xmlConsulta = buildConsultaXml(data);
-    const action = data.cnpjTomador || data.cpfTomador ? "ConsultarNfseServicoPrestadoV3" : "ConsultarNfseRpsV3";
+    const action = data.cnpjTomador || data.cpfTomador ? "ConsultarNfseServicoPrestado" : "ConsultarNfseRps";
     const xmlRetorno = await this.request(action, xmlConsulta);
     return parseConsultaResponse(xmlRetorno);
   }
@@ -414,7 +414,7 @@ export class NFSeClient {
     this.validarCertificado(certificado);
     const xmlCancelamento = buildCancelamentoXml(data);
     return this.withRetry(async () => {
-      const xmlRetorno = await this.request("CancelarNfseV3", xmlCancelamento);
+      const xmlRetorno = await this.request("CancelarNfse", xmlCancelamento);
       return parseCancelamentoResponse(xmlRetorno);
     });
   }

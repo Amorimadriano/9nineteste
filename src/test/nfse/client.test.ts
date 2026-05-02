@@ -71,7 +71,7 @@ describe("NFSeClient (GINFES v03)", () => {
       const requestBody = callArgs[1].body as string;
 
       expect(requestBody).toContain("soap12:Envelope");
-      expect(requestBody).toContain("RecepcionarLoteRpsV3");
+      expect(requestBody).toContain("RecepcionarLoteRps");
       expect(requestBody).toContain("cabecalho");
       expect(requestBody).toContain("versaoDados");
     });
@@ -216,7 +216,7 @@ describe("NFSeClient (GINFES v03)", () => {
       expect(resposta.sucesso).toBe(true);
     });
 
-    it("deve usar action ConsultarNfseServicoPrestadoV3 quando há tomador", async () => {
+    it("deve usar action ConsultarNfseServicoPrestado quando há tomador", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         status: 200,
@@ -230,7 +230,7 @@ describe("NFSeClient (GINFES v03)", () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const body = callArgs[1].body as string;
-      expect(body).toContain("ConsultarNfseServicoPrestadoV3");
+      expect(body).toContain("ConsultarNfseServicoPrestado");
     });
 
     it("deve retornar erro quando NFSe não é encontrada", async () => {
@@ -280,7 +280,7 @@ describe("NFSeClient (GINFES v03)", () => {
       const xmlErroCancelamento = `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope">
   <soap12:Body>
-    <ns2:CancelarNfseV3Response xmlns:ns2="http://www.ginfes.com.br/">
+    <ns2:CancelarNfseResponse xmlns:ns2="http://www.ginfes.com.br/">
       <return><![CDATA[<?xml version="1.0" encoding="UTF-8"?>
 <CancelarNfseResposta xmlns="http://www.ginfes.com.br/servico_cancelar_nfse_resposta_v03.xsd">
   <ListaMensagemRetorno>
@@ -290,7 +290,7 @@ describe("NFSeClient (GINFES v03)", () => {
     </MensagemRetorno>
   </ListaMensagemRetorno>
 </CancelarNfseResposta>]]></return>
-    </ns2:CancelarNfseV3Response>
+    </ns2:CancelarNfseResponse>
   </soap12:Body>
 </soap12:Envelope>`;
 
