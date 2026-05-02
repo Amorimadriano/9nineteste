@@ -35,12 +35,24 @@ jobs:
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: bun run build
 
+      - name: Check DNS resolution
+        run: |
+          echo "Resolving FTP server..."
+          nslookup ${{ secrets.HOSTINGER_FTP_SERVER }} || true
+          echo "Checking connectivity..."
+          curl -v --connect-timeout 10 ftp://${{ secrets.HOSTINGER_FTP_SERVER }}:21/ 2>&1 | head -20 || true
+        shell: bash
+
       - name: Deploy to Hostinger via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          protocol: ftps
+          port: 21
+          security: loose
+          timeout: 60000
           local-dir: ./dist/
           server-dir: ${{ secrets.HOSTINGER_FTP_PATH || './' }}
           dangerous-clean-slate: false
