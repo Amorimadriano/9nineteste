@@ -71,8 +71,8 @@ function buildEnvelope(soapAction: string, dadosXml: string, ambiente?: "homolog
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
     <ns1:${soapAction} xmlns:ns1="${namespace}">
-      <arg0>${cabecalho}</arg0>
-      <arg1>${dadosXml}</arg1>
+      <ns1:arg0>${cabecalho}</ns1:arg0>
+      <ns1:arg1>${dadosXml}</ns1:arg1>
     </ns1:${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
