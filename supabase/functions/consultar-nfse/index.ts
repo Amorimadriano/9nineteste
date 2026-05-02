@@ -546,14 +546,20 @@ serve(async (req) => {
       xmlDados = xmlPedidoConsultaNFePeriodo(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
       operacao = "ConsultaNFe";
     } else {
-      xmlDados = xmlPedidoConsultaNFe(cnpj, numeroNFe || numeroRps, im);
+      const numeroConsulta = numeroNFe || numeroRps || body.numero || body.numeroNfse;
+      if (!numeroConsulta) {
+        throw new Error("Numero da NFSe ou RPS obrigatorio para consulta");
+      }
+      xmlDados = xmlPedidoConsultaNFe(cnpj, numeroConsulta, im);
       operacao = "ConsultaNFe";
     }
+    console.log("[consultar-nfse] XML dados:", xmlDados);
 
     // Assinar XML (SHA-256)
     let xmlAssinado = xmlDados;
     if (certDigital && ambiente === "producao") {
       xmlAssinado = assinarXmlSHA256(xmlDados, certDigital, "Lote1");
+      console.log("[consultar-nfse] XML assinado (primeiros 1000 chars):", xmlAssinado.substring(0, 1000));
     }
 
     // Construir envelope SOAP 1.1 Paulistana
