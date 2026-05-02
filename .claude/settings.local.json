@@ -83,7 +83,10 @@
       "Bash(nslookup 9nineteste.9ninebusinesscontrol.com.br)",
       "Bash(nc -vz -w 5 ftp.9nineteste.9ninebusinesscontrol.com.br 21)",
       "Bash(nc -vz -w 5 ftp.9nineteste.9ninebusinesscontrol.com.br 22)",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "PowerShell(npx vitest run src/test/nfse)",
+      "PowerShell(npx supabase --version)",
+      "PowerShell(npx supabase functions deploy consultar-nfse emitir-nfse)"
     ]
   }
 }
