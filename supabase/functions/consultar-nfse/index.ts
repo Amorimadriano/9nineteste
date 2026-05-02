@@ -127,13 +127,16 @@ function criarEnvelopeSOAPGinfes(
   soapAction: string,
   cabecalhoXml: string,
   dadosXml: string,
+  ambiente?: "homologacao" | "producao"
 ): string {
   // GINFES v03 exige SOAP 1.2 (http://www.w3.org/2003/05/soap-envelope)
-  // e namespace fixo http://www.ginfes.com.br/ para as operações
+  // Divergência documentada: homologação usa http://www.ginfes.com.br/
+  // mas produção exige http://producao.ginfes.com.br no namespace da operação
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap12:Body>
-    <${soapAction} xmlns="http://www.ginfes.com.br/">
+    <${soapAction} xmlns="${namespace}">
       <arg0>${cabecalhoXml}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
@@ -415,7 +418,7 @@ serve(async (req) => {
       );
       const cabecalho = criarCabecalhoGinfes();
       const soapAction = "ConsultarNfseRpsV3";
-      const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, xmlConsulta);
+      const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, xmlConsulta, ambiente);
       const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
       resultado = { ...parsearRespostaConsulta(soapResponse), xmlEnvio: xmlConsulta, xmlBruto: soapResponse.substring(0, 8000) };
     }

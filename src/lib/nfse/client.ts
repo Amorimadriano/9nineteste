@@ -62,12 +62,14 @@ function buildCabecalhoGinfes(): string {
   return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
 }
 
-function buildEnvelope(soapAction: string, dadosXml: string): string {
+function buildEnvelope(soapAction: string, dadosXml: string, ambiente?: "homologacao" | "producao"): string {
   const cabecalho = buildCabecalhoGinfes();
+  // GINFES: produção usa namespace http://producao.ginfes.com.br, homologação usa http://www.ginfes.com.br/
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
 <soap12:Envelope xmlns:soap12="http://www.w3.org/2003/05/soap-envelope" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap12:Body>
-    <${soapAction} xmlns="http://www.ginfes.com.br/">
+    <${soapAction} xmlns="${namespace}">
       <arg0>${cabecalho}</arg0>
       <arg1><![CDATA[${dadosXml}]]></arg1>
     </${soapAction}>
@@ -331,7 +333,7 @@ export class NFSeClient {
   }
 
   private async request(soapAction: string, dadosXml: string): Promise<string> {
-    const envelope = buildEnvelope(soapAction, dadosXml);
+    const envelope = buildEnvelope(soapAction, dadosXml, this.config.ambiente);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
