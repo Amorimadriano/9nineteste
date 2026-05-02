@@ -21,95 +21,79 @@ function getCorsHeaders(req: Request) {
   };
 }
 
-// --- node-forge Cache ---
+// --- node-forge ---
 let forgeCache: any = null;
 async function getForge() {
   if (forgeCache) return forgeCache;
-  const forgeModule = await import("https://esm.sh/node-forge@1.3.1");
-  forgeCache = forgeModule.default?.util ? forgeModule.default
-    : forgeModule.util ? forgeModule
-    : (forgeModule as any).default?.default?.util ? (forgeModule as any).default.default
-    : forgeModule;
+  const m = await import("https://esm.sh/node-forge@1.3.1");
+  forgeCache = m.default?.util ? m.default : m.util ? m : (m as any).default?.default?.util ? (m as any).default.default : m;
   (globalThis as any).forge = forgeCache;
   return forgeCache;
 }
 
-interface CertificadoDigital {
-  pfxBase64: string; senha: string; cnpj: string; inscricaoMunicipal: string;
-  razaoSocial: string; certPem: string; keyPem: string; validoAte: Date;
+interface CertDigital {
+  cnpj: string;
+  inscricaoMunicipal: string;
+  certPem: string;
+  keyPem: string;
 }
 
-async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertificadoDigital> {
+async function carregarCertificado(pfxBase64: string, senha: string): Promise<CertDigital> {
   const forge = await getForge();
   const pfxDer = forge.util.decode64(pfxBase64);
   const p12Asn1 = forge.asn1.fromDer(pfxDer);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, senha);
 
   const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-  let certPem = "", keyPem = "", cnpj = "", razaoSocial = "", validoAte = new Date();
+  let certPem = "", keyPem = "", cnpj = "";
 
   if (certBags[forge.pki.oids.certBag]) {
     const cert = certBags[forge.pki.oids.certBag]![0];
     certPem = forge.pki.certificateToPem(cert.cert!);
-    validoAte = cert.cert!.validity.notAfter;
     const subject = cert.cert!.subject;
-    for (const attr of subject.attributes) {
-      if (attr.shortName === "CN") razaoSocial = attr.value;
-    }
-    // OID ICP-Brasil para CNPJ do responsável: 2.16.76.1.3.3
-    const icpCnpjAttr = subject.attributes.find((a: any) => a.oid === "2.16.76.1.3.3");
-    if (icpCnpjAttr) {
-      const digits = icpCnpjAttr.value.replace(/\D/g, "");
-      if (digits.length >= 14) cnpj = digits.substring(digits.length - 14);
+    const icpCnpj = subject.attributes.find((a: any) => a.oid === "2.16.76.1.3.3");
+    if (icpCnpj) {
+      const d = icpCnpj.value.replace(/\D/g, "");
+      if (d.length >= 14) cnpj = d.substring(d.length - 14);
     }
     if (!cnpj) {
-      const ouAttr = subject.attributes.find((a: any) => a.oid === "2.5.4.11" && /CNPJ/i.test(a.value));
-      if (ouAttr) {
-        const cnpjMatch = ouAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
-        if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+      const ou = subject.attributes.find((a: any) => a.oid === "2.5.4.11" && /CNPJ/i.test(a.value));
+      if (ou) {
+        const m = ou.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+        if (m) cnpj = m[0].replace(/\D/g, "");
       }
     }
     if (!cnpj) {
-      const cnAttr = subject.attributes.find((a: any) => a.shortName === "CN");
-      if (cnAttr) {
-        const cnpjMatch = cnAttr.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
-        if (cnpjMatch) cnpj = cnpjMatch[0].replace(/\D/g, "");
+      const cn = subject.attributes.find((a: any) => a.shortName === "CN");
+      if (cn) {
+        const m = cn.value.match(/\d{2}\.?\d{3}\.?\d{3}\/?\d{4}-?\d{2}/);
+        if (m) cnpj = m[0].replace(/\D/g, "");
       }
     }
   }
 
   const keyBagsShrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag });
-  if (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag] && keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]!.length > 0) {
+  if (keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]?.length > 0) {
     keyPem = forge.pki.privateKeyToPem(keyBagsShrouded[forge.pki.oids.pkcs8ShroudedKeyBag]![0].key!);
   } else {
     const keyBagsShorthand = p12.getBags({ bagType: forge.pki.oids.pkcs8ShorthandKeyBag });
-    if (keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag] && keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]!.length > 0) {
+    if (keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]?.length > 0) {
       keyPem = forge.pki.privateKeyToPem(keyBagsShorthand[forge.pki.oids.pkcs8ShorthandKeyBag]![0].key!);
     } else {
       const keyBagsPlain = p12.getBags({ bagType: forge.pki.oids.keyBag });
-      if (keyBagsPlain[forge.pki.oids.keyBag] && keyBagsPlain[forge.pki.oids.keyBag]!.length > 0) {
+      if (keyBagsPlain[forge.pki.oids.keyBag]?.length > 0) {
         keyPem = forge.pki.privateKeyToPem(keyBagsPlain[forge.pki.oids.keyBag]![0].key!);
       }
     }
-  } 
+  }
 
-  if (!certPem || !keyPem) throw new Error("Nao foi possivel extrair certificado ou chave privada do PFX");
-  return { pfxBase64, senha, cnpj, inscricaoMunicipal: "", razaoSocial, certPem, keyPem, validoAte };
+  if (!certPem || !keyPem) throw new Error("Nao foi possivel extrair certificado ou chave do PFX");
+  return { cnpj, inscricaoMunicipal: "", certPem, keyPem };
 }
 
-function construirXmlConsultaRps(
-  numeroRps: string,
-  serie: string,
-  tipo: string,
-  cnpj: string,
-  inscricaoMunicipal: string
-): string {
-  const tipoCodigo =
-    tipo === "RPS" || tipo === "1" ? "1" :
-    tipo === "2" ? "2" :
-    tipo === "3" ? "3" : "1";
-
-  // ✅ FIX PRINCIPAL: SEM tipos: E SEM XML HEADER
+// --- XML builders ---
+function xmlConsultaRps(numeroRps: string, serie: string, tipo: string, cnpj: string, im: string): string {
+  const tipoCodigo = tipo === "RPS" || tipo === "1" ? "1" : tipo === "2" ? "2" : tipo === "3" ? "3" : "1";
   return `<ConsultarNfseRpsEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_rps_envio_v03.xsd">
 <IdentificacaoRps>
 <Numero>${numeroRps}</Numero>
@@ -118,40 +102,100 @@ function construirXmlConsultaRps(
 </IdentificacaoRps>
 <Prestador>
 <Cnpj>${cnpj}</Cnpj>
-<InscricaoMunicipal>${inscricaoMunicipal}</InscricaoMunicipal>
+<InscricaoMunicipal>${im}</InscricaoMunicipal>
 </Prestador>
 </ConsultarNfseRpsEnvio>`;
 }
 
-function criarEnvelopeSOAPGinfes(
-  soapAction: string,
-  cabecalhoXml: string,
-  dadosXml: string,
-  ambiente?: "homologacao" | "producao"
-): string {
-  // GINFES usa SOAP 1.1 (schemas.xmlsoap.org), não SOAP 1.2
-  // Divergência documentada: homologação usa http://www.ginfes.com.br/
-  // mas produção exige http://producao.ginfes.com.br no namespace da operação
-  // arg0 e arg1 devem ser unqualified (xmlns="") — o schema GINFES usa elementFormDefault="unqualified"
-  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
-  return `<?xml version="1.0" encoding="UTF-8"?>
+function xmlConsultaServicoPrestado(cnpj: string, im: string, dataInicio?: string, dataFim?: string, cnpjTomador?: string, cpfTomador?: string): string {
+  let xml = `<ConsultarNfseServicoPrestadoEnvio xmlns="http://www.ginfes.com.br/servico_consultar_nfse_servico_prestado_envio_v03.xsd">
+<Prestador>
+<Cnpj>${cnpj}</Cnpj>
+<InscricaoMunicipal>${im}</InscricaoMunicipal>
+</Prestador>`;
+  if (cnpjTomador || cpfTomador) {
+    xml += `\n<Tomador>\n<CpfCnpj>`;
+    if (cnpjTomador) xml += `\n<Cnpj>${cnpjTomador}</Cnpj>`;
+    if (cpfTomador) xml += `\n<Cpf>${cpfTomador}</Cpf>`;
+    xml += `\n</CpfCnpj>\n</Tomador>`;
+  }
+  if (dataInicio) {
+    xml += `\n<Periodo>\n<DataInicial>${dataInicio}</DataInicial>\n<DataFinal>${dataFim || dataInicio}</DataFinal>\n</Periodo>`;
+  }
+  xml += `\n</ConsultarNfseServicoPrestadoEnvio>`;
+  return xml;
+}
+
+function xmlCabecalho(): string {
+  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3"><versaoDados>3</versaoDados></cabecalho>`;
+}
+
+// --- Envelope factory ---
+type EnvelopeVariant = "unqualified" | "qualified" | "cdata" | "escaped" | "raw";
+
+function buildEnvelope(action: string, cabecalho: string, dados: string, ambiente: "homologacao" | "producao", variant: EnvelopeVariant): string {
+  const ns = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+
+  switch (variant) {
+    case "qualified":
+      return `<?xml version="1.0" encoding="UTF-8"?>
 <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="${namespace}">
-      <arg0 xmlns="">${cabecalhoXml}</arg0>
-      <arg1 xmlns="">${dadosXml}</arg1>
-    </${soapAction}>
+    <ns1:${action} xmlns:ns1="${ns}">
+      <ns1:arg0>${cabecalho}</ns1:arg0>
+      <ns1:arg1>${dados}</ns1:arg1>
+    </ns1:${action}>
   </soap:Body>
 </soap:Envelope>`;
+
+    case "cdata":
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${action} xmlns="${ns}">
+      <arg0 xmlns=""><![CDATA[${cabecalho}]]></arg0>
+      <arg1 xmlns=""><![CDATA[${dados}]]></arg1>
+    </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+
+    case "escaped":
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${action} xmlns="${ns}">
+      <arg0 xmlns="">${cabecalho.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</arg0>
+      <arg1 xmlns="">${dados.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</arg1>
+    </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+
+    case "raw":
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+  <soap:Body>
+    <${action} xmlns="${ns}">
+      <arg0>${cabecalho}</arg0>
+      <arg1>${dados}</arg1>
+    </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+
+    case "unqualified":
+    default:
+      return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${action} xmlns="${ns}">
+      <arg0 xmlns="">${cabecalho}</arg0>
+      <arg1 xmlns="">${dados}</arg1>
+    </${action}>
+  </soap:Body>
+</soap:Envelope>`;
+  }
 }
 
-function criarCabecalhoGinfes(): string {
-  // ✅ Mantido, apenas padronizado
-  return `<cabecalho xmlns="http://www.ginfes.com.br/cabecalho_v03.xsd" versao="3">
-<versaoDados>3</versaoDados>
-</cabecalho>`;
-}
-
+// --- HTTP ---
 function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
 }
@@ -161,198 +205,104 @@ const GINFES_URLS = {
   producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
 };
 
-async function enviarRequisicaoSOAP(
-  soapEnvelope: string,
-  soapAction: string,
-  certificado?: { certPem: string; keyPem: string }
-): Promise<string> {
+async function sendSoap(
+  envelope: string,
+  action: string,
+  cert?: { certPem: string; keyPem: string }
+): Promise<{ status: number; body: string; headers: Record<string, string> }> {
   const env = getAmbiente();
-  const baseHeaders: Record<string, string> = {
+  const headers: Record<string, string> = {
     "Content-Type": "text/xml; charset=utf-8",
-    "SOAPAction": `"${soapAction}"`,
+    "SOAPAction": `"${action}"`,
   };
 
   if (env === "homologacao") {
-    const response = await fetch(GINFES_URLS[env], {
-      method: "POST",
-      headers: baseHeaders,
-      body: soapEnvelope,
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(`Erro HTTP ${response.status}: ${text.substring(0, 500)}`);
-    }
-    return await response.text();
+    const res = await fetch(GINFES_URLS[env], { method: "POST", headers, body: envelope });
+    const body = await res.text();
+    return { status: res.status, body, headers: Object.fromEntries(res.headers.entries()) };
   }
 
-  // Produção: requer mTLS via proxy
-  if (!certificado) throw new Error("Certificado obrigatorio em producao");
+  if (!cert) throw new Error("Certificado obrigatorio em producao");
   const proxyUrl = Deno.env.get("MTLS_PROXY_URL");
   if (!proxyUrl) throw new Error("MTLS_PROXY_URL nao configurada");
   const proxyApiKey = Deno.env.get("MTLS_PROXY_API_KEY") || "";
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (proxyApiKey) headers["X-API-Key"] = proxyApiKey;
-  const proxyResponse = await fetch(`${proxyUrl}/proxy-ginfes`, {
+  const proxyHeaders: Record<string, string> = { "Content-Type": "application/json" };
+  if (proxyApiKey) proxyHeaders["X-API-Key"] = proxyApiKey;
+
+  const proxyRes = await fetch(`${proxyUrl}/proxy-ginfes`, {
     method: "POST",
-    headers,
-    body: JSON.stringify({ soapEnvelope, certPem: certificado.certPem, keyPem: certificado.keyPem, ambiente: env }),
+    headers: proxyHeaders,
+    body: JSON.stringify({ soapEnvelope: envelope, certPem: cert.certPem, keyPem: cert.keyPem, ambiente: env }),
   });
-  if (!proxyResponse.ok) {
-    const text = await proxyResponse.text();
-    throw new Error(`Erro proxy mTLS (${proxyResponse.status}): ${text.substring(0, 500)}`);
-  }
-  return await proxyResponse.text();
+  const body = await proxyRes.text();
+  return { status: proxyRes.status, body, headers: Object.fromEntries(proxyRes.headers.entries()) };
 }
 
-function parsearErros(xml: string): Array<{ codigo: string; mensagem: string; tipo: string }> {
+// --- Parser ---
+function parseResposta(xml: string): any {
+  let work = xml;
+
+  // CDATA
+  const cdata = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
+  if (cdata) work = cdata[1];
+
+  // Escaped
+  if (!cdata && work.includes("&lt;")) {
+    work = work.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+  }
+
+  // Remove namespaces
+  const clean = work.replace(/<\/?[a-zA-Z0-9_]+:/g, m => (m.startsWith("</") ? "</" : "<"));
+
+  // Erros
   const erros: Array<{ codigo: string; mensagem: string; tipo: string }> = [];
-  const ERROS_GINFES: Record<string, string> = {
-    E1: "CNPJ invalido", E2: "Inscricao Municipal invalida", E26: "NFS-e nao encontrada",
-    E28: "Certificado invalido", E29: "Assinatura invalida", E30: "XML mal formatado",
-    E50: "Erro interno", E60: "Requisicao mal formada",
-  };
-  const mensagens = [...xml.matchAll(/<Mensagem[^>]*>([^<]+)<\/Mensagem>/gi)].map(m => m[1]);
-  const codigos = [...xml.matchAll(/<Codigo[^>]*>([^<]+)<\/Codigo>/gi)].map(m => m[1]);
-  for (let i = 0; i < Math.max(mensagens.length, codigos.length); i++) {
-    erros.push({ codigo: codigos[i] || "ERR_UNKNOWN", mensagem: ERROS_GINFES[codigos[i] || ""] || mensagens[i] || "Erro desconhecido", tipo: "Erro" });
+  const msgBlocks = [...clean.matchAll(/<MensagemRetorno[^>]*>([\s\S]*?)<\/MensagemRetorno>/gi)];
+  for (const [, block] of msgBlocks) {
+    const cod = block.match(/<Codigo[^>]*>([^<]+)<\/Codigo>/i)?.[1] || "";
+    const msg = block.match(/<Mensagem[^>]*>([^<]+)<\/Mensagem>/i)?.[1] || "";
+    const cor = block.match(/<Correcao[^>]*>([^<]+)<\/Correcao>/i)?.[1];
+    erros.push({ codigo: cod || "ERR", mensagem: cor ? `${msg} (${cor})` : msg, tipo: "Erro" });
   }
-  const faultMatch = xml.match(/<faultstring>([^<]+)<\/faultstring>/i);
-  if (faultMatch && erros.length === 0) erros.push({ codigo: "SOAP_FAULT", mensagem: faultMatch[1], tipo: "Erro" });
-  return erros;
-}
 
-function decodeHtmlEntities(str: string): string {
-  return str.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
-}
+  const fault = clean.match(/<faultstring>([^<]+)<\/faultstring>/i);
+  if (fault && erros.length === 0) erros.push({ codigo: "SOAP_FAULT", mensagem: fault[1], tipo: "Erro" });
 
-function parsearRespostaConsulta(xml: string) {
-  try {
-    let workXml = xml;
-    let returnContent: string | null = null;
+  const hasError = erros.some(e => e.tipo === "Erro") || clean.includes("<ListaMensagemRetorno>");
 
-    const cdataMatch = xml.match(/<return[^>]*><!\[CDATA\[([\s\S]*?)\]\]><\/return>/i);
-    if (cdataMatch) returnContent = cdataMatch[1];
-
-    if (!returnContent) {
-      const escapedMatch = xml.match(/<return[^>]*>([\s\S]*?)<\/return>/i);
-      if (escapedMatch) {
-        let content = escapedMatch[1].trim();
-        content = decodeHtmlEntities(content);
-        if (content.length > 10) returnContent = content;
-      }
-    }
-
-    if (!returnContent) {
-      const anyCdata = xml.match(/<!\[CDATA\[([\s\S]*?)\]\]>/i);
-      if (anyCdata) returnContent = anyCdata[1];
-    }
-
-    if (returnContent && returnContent.length > 10) workXml = returnContent;
-
-    const cleanXml = workXml.replace(/<\/?[a-zA-Z0-9_]+:/g, (match) => match.startsWith("</") ? "</" : "<");
-
-    const erros = parsearErros(cleanXml);
-    if (erros.length > 0 && !cleanXml.includes("<CompNfse") && !cleanXml.includes("<InfNfse") && !cleanXml.includes("<Numero")) {
-      return { sucesso: false, xmlRetorno: xml, mensagens: erros };
-    }
-
-    const infNfseMatch = cleanXml.match(/<InfNfse[^>]*>([\s\S]*?)<\/InfNfse>/i);
-    const infNfse = infNfseMatch ? infNfseMatch[1] : cleanXml;
-
-    const numeroNfseMatch = infNfse.match(/<NumeroNfse>([^<]+)<\/NumeroNfse>/i);
-    let numeroNfse: string | undefined;
-    if (numeroNfseMatch) {
-      numeroNfse = numeroNfseMatch[1];
-    } else {
-      const beforeRps = infNfse.split(/<IdentificacaoRps/i)[0];
-      const numeroMatch = beforeRps.match(/<Numero>([^<]+)<\/Numero>/i);
-      numeroNfse = numeroMatch?.[1];
-    }
-
-    const codigoVerificacaoMatch = infNfse.match(/<CodigoVerificacao>([^<]+)<\/CodigoVerificacao>/i);
-    const dataEmissaoMatch = infNfse.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i) || infNfse.match(/<DataEmissao>([^<]+)<\/DataEmissao>/i);
-    const dataAutorizacaoMatch = infNfse.match(/<DataAutorizacao>([^<]+)<\/DataAutorizacao>/i) || infNfse.match(/<DataEmissaoNfse>([^<]+)<\/DataEmissaoNfse>/i);
-    const situacaoMatch = infNfse.match(/<SituacaoNfse>([^<]+)<\/SituacaoNfse>/i) || infNfse.match(/<Situacao>([^<]+)<\/Situacao>/i);
-    const situacao = situacaoMatch?.[1];
-    let status: string;
-    if (situacao === "2") status = "cancelada";
-    else if (situacao === "3") status = "substituida";
-    else status = "autorizada";
-
-    const valorServicosMatch = infNfse.match(/<ValorServicos>([^<]+)<\/ValorServicos>/i);
-    const valorIssMatch = infNfse.match(/<ValorIss>([^<]+)<\/ValorIss>/i);
-    const baseCalculoMatch = infNfse.match(/<BaseCalculo>([^<]+)<\/BaseCalculo>/i);
-    const aliquotaMatch = infNfse.match(/<Aliquota>([^<]+)<\/Aliquota>/i);
-    const issRetidoMatch = infNfse.match(/<IssRetido>([^<]+)<\/IssRetido>/i);
-    const issRetido = issRetidoMatch?.[1] === "1" || issRetidoMatch?.[1]?.toLowerCase() === "sim";
-
-    const tomadorRazaoMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i) || cleanXml.match(/<Tomador>[\s\S]*?<RazaoSocial>([^<]+)<\/RazaoSocial>/i);
-    const tomadorCnpjMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i) || cleanXml.match(/<Tomador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
-    const tomadorCpfMatch = cleanXml.match(/<TomadorServico>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i) || cleanXml.match(/<Tomador>[\s\S]*?<Cpf>([^<]+)<\/Cpf>/i);
-
-    const prestadorCnpjMatch = cleanXml.match(/<PrestadorServico>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i) || cleanXml.match(/<Prestador>[\s\S]*?<Cnpj>([^<]+)<\/Cnpj>/i);
-    const prestadorIMMatch = cleanXml.match(/<PrestadorServico>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i) || cleanXml.match(/<Prestador>[\s\S]*?<InscricaoMunicipal>([^<]+)<\/InscricaoMunicipal>/i);
-
-    let linkNfse = (cleanXml.match(/<LinkNfse>([^<]+)<\/LinkNfse>/i) || cleanXml.match(/<linkNfse>([^<]+)<\/linkNfse>/i))?.[1];
-    if (!linkNfse && numeroNfse && codigoVerificacaoMatch?.[1]) {
-      const baseUrl = getAmbiente() === "producao" ? "https://producao.ginfes.com.br" : "https://homologacao.ginfes.com.br";
-      linkNfse = `${baseUrl}/VisualizarNfse?num=${numeroNfse}&cod=${codigoVerificacaoMatch[1]}`;
-    }
-
-    const discriminacaoMatch = cleanXml.match(/<Discriminacao>([^<]+)<\/Discriminacao>/i);
-    const itemListaServicoMatch = cleanXml.match(/<ItemListaServico>([^<]+)<\/ItemListaServico>/i);
-
-    return {
-      sucesso: true,
-      numeroNfse,
-      codigoVerificacao: codigoVerificacaoMatch?.[1],
-      dataEmissao: dataEmissaoMatch?.[1],
-      dataAutorizacao: dataAutorizacaoMatch?.[1],
-      status,
-      valorServicos: valorServicosMatch?.[1],
-      valorIss: valorIssMatch?.[1],
-      baseCalculo: baseCalculoMatch?.[1],
-      aliquotaIss: aliquotaMatch?.[1],
-      issRetido,
-      tomador: { razaoSocial: tomadorRazaoMatch?.[1] || "", cnpjCpf: tomadorCnpjMatch?.[1] || tomadorCpfMatch?.[1] || "" },
-      prestador: { cnpj: prestadorCnpjMatch?.[1] || "", inscricaoMunicipal: prestadorIMMatch?.[1] || "" },
-      linkPdf: (cleanXml.match(/<LinkPdf>([^<]+)<\/LinkPdf>/i) || cleanXml.match(/<linkPdf>([^<]+)<\/linkPdf>/i))?.[1],
-      linkXml: (cleanXml.match(/<LinkXml>([^<]+)<\/LinkXml>/i) || cleanXml.match(/<linkXml>([^<]+)<\/linkXml>/i))?.[1],
-      linkNfse,
-      discriminacao: discriminacaoMatch?.[1],
-      itemListaServico: itemListaServicoMatch?.[1],
-      xmlRetorno: xml,
-      mensagens: [{ codigo: "0000", mensagem: "Consulta realizada com sucesso", tipo: "Sucesso" }],
+  // Valores
+  const infNfse = clean.match(/<InfNfse[^>]*>([\s\S]*?)<\/InfNfse>/i)?.[1];
+  const valores: Record<string, any> = {};
+  if (infNfse) {
+    const map: Record<string, string> = {
+      NumeroNfse: "numeroNfse", CodigoVerificacao: "codigoVerificacao",
+      DataEmissaoNfse: "dataEmissao", DataEmissao: "dataEmissao",
+      ValorServicos: "valorServicos", ValorIss: "valorIss",
+      BaseCalculo: "baseCalculo", Aliquota: "aliquotaIss",
     };
-  } catch (error) {
-    return { sucesso: false, xmlRetorno: xml, mensagens: [{ codigo: "ERR_PARSE", mensagem: `Erro: ${(error as Error).message}`, tipo: "Erro" }] };
-  }
-}
-
-async function retry<T>(fn: () => Promise<T>, options = { tentativas: 3, delay: 1000, fator: 2 }): Promise<T> {
-  let tentativa = 0;
-  let erro: any;
-  while (tentativa < options.tentativas) {
-    try {
-      return await fn();
-    } catch (err: any) {
-      erro = err;
-      const isTemp = err.message?.includes("timeout") || err.message?.includes("500") || err.message?.includes("503") || err.message?.includes("FETCH");
-      if (!isTemp) throw err;
-      const wait = options.delay * Math.pow(options.fator, tentativa);
-      await new Promise(r => setTimeout(r, wait));
-      tentativa++;
+    for (const [tag, key] of Object.entries(map)) {
+      const m = infNfse.match(new RegExp(`<${tag}>([^<]+)<\/${tag}>`, "i"));
+      if (m) valores[key] = m[1];
     }
+    const issRet = infNfse.match(/<IssRetido>([^<]+)<\/IssRetido>/i);
+    valores.issRetido = issRet?.[1] === "1" || issRet?.[1]?.toLowerCase() === "sim";
   }
-  throw erro;
+
+  const sucesso = !hasError && !!valores.numeroNfse;
+
+  return {
+    sucesso,
+    ...valores,
+    status: clean.match(/<DataCancelamento>/i) ? "cancelada" : clean.match(/<NfseSubstituida>1<\/NfseSubstituida>/i) ? "substituida" : "autorizada",
+    mensagens: erros.length > 0 ? erros : sucesso ? [{ codigo: "0000", mensagem: "Consulta realizada com sucesso", tipo: "Sucesso" }] : undefined,
+    xmlBruto: xml.substring(0, 8000),
+  };
 }
 
-// --- Main handler ---
+// --- Handler ---
 serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
-  let notaId: string | undefined;
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -364,92 +314,133 @@ serve(async (req) => {
     if (authError || !user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const body = await req.json();
-    notaId = body.notaId;
-    if (!notaId) return new Response(JSON.stringify({ error: "notaId obrigatorio" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { data: nota, error: notaError } = await supabase.from("notas_fiscais_servico").select("*").eq("id", notaId).eq("user_id", user.id).single();
-    if (notaError || !nota) throw new Error("Nota nao encontrada");
+
+    // --- Modo diagnostico: retorna envelopes sem enviar ---
+    if (body.modo === "diagnostico") {
+      const cabecalho = xmlCabecalho();
+      const dados = xmlConsultaRps(body.numeroRps || "1", body.serie || "1", body.tipo || "1", body.cnpj || "12345678000195", body.im || "123456");
+      const action = body.operacao || "ConsultarNfsePorRpsV3";
+      const ambiente = getAmbiente();
+      const variants: EnvelopeVariant[] = ["unqualified", "qualified", "cdata", "escaped", "raw"];
+      const envelopes = variants.map(v => ({ variant: v, envelope: buildEnvelope(action, cabecalho, dados, ambiente, v) }));
+      return new Response(JSON.stringify({ modo: "diagnostico", action, ambiente, envelopes }, null, 2), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // --- Carrega nota ou parametros diretos ---
+    let certDigital: CertDigital | null = null;
+    let numeroRps = body.numeroRps || "";
+    let serie = body.serie || "1";
+    let tipo = body.tipo || "RPS";
+    let cnpj = body.cnpj || "";
+    let im = body.inscricaoMunicipal || "";
+    let operacao = body.operacao || "ConsultarNfsePorRpsV3";
+
+    if (body.notaId) {
+      const { data: nota, error: notaError } = await supabase.from("notas_fiscais_servico").select("*").eq("id", body.notaId).eq("user_id", user.id).single();
+      if (notaError || !nota) throw new Error("Nota nao encontrada");
+      numeroRps = nota.numero_rps || nota.numero_nota || "";
+      serie = nota.serie || "1";
+      tipo = nota.tipo_rps || "RPS";
+
+      if (nota.certificado_id) {
+        const { data: cert, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
+        if (!certError && cert && cert.arquivo_pfx) {
+          certDigital = await carregarCertificado(cert.arquivo_pfx, cert.senha || "");
+          certDigital.inscricaoMunicipal = cert.inscricao_municipal || "";
+          certDigital.cnpj = cert.cnpj || certDigital.cnpj || "";
+        }
+      }
+      if (certDigital) {
+        cnpj = certDigital.cnpj;
+        im = certDigital.inscricaoMunicipal;
+      }
+    } else if (body.certificadoId) {
+      const { data: cert, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", body.certificadoId).single();
+      if (certError || !cert || !cert.arquivo_pfx) throw new Error("Certificado nao encontrado");
+      certDigital = await carregarCertificado(cert.arquivo_pfx, cert.senha || "");
+      certDigital.inscricaoMunicipal = cert.inscricao_municipal || "";
+      certDigital.cnpj = cert.cnpj || certDigital.cnpj || "";
+      cnpj = certDigital.cnpj;
+      im = certDigital.inscricaoMunicipal;
+    } else {
+      cnpj = body.cnpj || "";
+      im = body.inscricaoMunicipal || "";
+    }
+
     const ambiente = getAmbiente();
 
-    let certDigital: any = null;
-    if (nota.certificado_id) {
-      const { data: certificado, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
-      if (!certError && certificado && certificado.arquivo_pfx) {
-        certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
-        certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
-        certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
+    // --- Homologacao: mock ---
+    if (ambiente === "homologacao" && body.modo !== "real") {
+      return new Response(JSON.stringify({
+        sucesso: true,
+        numeroNfse: numeroRps || "99999",
+        codigoVerificacao: "HOM-VERIF-12345",
+        dataEmissao: new Date().toISOString(),
+        status: "autorizada",
+        valorServicos: "0",
+        mensagens: [{ codigo: "H001", mensagem: "Homologacao mock", tipo: "Sucesso" }],
+      }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // --- Construir XML ---
+    const cabecalho = xmlCabecalho();
+    let dados = "";
+    if (operacao === "ConsultarNfseServicoPrestadoV3") {
+      dados = xmlConsultaServicoPrestado(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
+    } else {
+      dados = xmlConsultaRps(numeroRps, serie, tipo, cnpj, im);
+      operacao = "ConsultarNfsePorRpsV3";
+    }
+
+    // --- Tentativa com multiplos formatos ---
+    const variants: EnvelopeVariant[] = ["unqualified", "qualified", "cdata", "escaped", "raw"];
+    const tentativas: any[] = [];
+    let resultado: any = null;
+
+    for (const variant of variants) {
+      const envelope = buildEnvelope(operacao, cabecalho, dados, ambiente, variant);
+      console.log(`[consultar-nfse] Tentando formato: ${variant}`);
+      console.log(`[consultar-nfse] Envelope:\n${envelope}`);
+
+      try {
+        const { status, body: responseBody } = await sendSoap(envelope, operacao, certDigital || undefined);
+        console.log(`[consultar-nfse] Resposta (${variant}) HTTP ${status}:\n${responseBody.substring(0, 2000)}`);
+
+        tentativas.push({ variant, status, envelope: envelope.substring(0, 500), response: responseBody.substring(0, 500) });
+
+        const parsed = parseResposta(responseBody);
+        if (parsed.sucesso) {
+          resultado = { ...parsed, xmlEnvio: dados, xmlBruto: responseBody.substring(0, 8000), formatoUsado: variant };
+          break;
+        }
+
+        // Se nao for erro de parsing do envelope (ex: operation not found), parar
+        const hasRealError = responseBody.includes("Endpoint does not contain operation") ||
+          responseBody.includes("Cannot find child element");
+        if (!hasRealError && !parsed.sucesso) {
+          resultado = { ...parsed, xmlEnvio: dados, xmlBruto: responseBody.substring(0, 8000), formatoUsado: variant };
+          break;
+        }
+      } catch (err: any) {
+        console.error(`[consultar-nfse] Erro formato ${variant}:`, err.message);
+        tentativas.push({ variant, erro: err.message });
       }
     }
 
-    let resultado;
-    if (ambiente === "homologacao") {
+    if (!resultado) {
       resultado = {
-        sucesso: true,
-        numeroNfse: nota.numero_nota || nota.numero_rps || "99999",
-        codigoVerificacao: nota.codigo_verificacao || "HOM-VERIF-12345",
-        dataEmissao: nota.data_emissao || new Date().toISOString(),
-        dataAutorizacao: nota.data_autorizacao || new Date().toISOString(),
-        status: nota.status || "autorizada",
-        valorServicos: nota.valor_servico?.toString() || "0",
-        valorIss: nota.valor_iss?.toString() || "0",
-        baseCalculo: nota.base_calculo?.toString() || "0",
-        aliquotaIss: nota.aliquota_iss?.toString() || "0",
-        issRetido: false,
-        tomador: { razaoSocial: nota.cliente_razao_social || nota.cliente_nome || "", cnpjCpf: nota.cliente_cnpj_cpf || "" },
-        prestador: { cnpj: certDigital?.cnpj || "", inscricaoMunicipal: certDigital?.inscricaoMunicipal || "" },
-        linkPdf: nota.link_pdf || undefined,
-        linkXml: nota.link_xml || undefined,
-        linkNfse: nota.link_nfse || undefined,
-        discriminacao: nota.servico_descricao || "",
-        itemListaServico: nota.servico_item_lista_servico || "",
-        xmlRetorno: "<Consulta>true</Consulta>",
-        xmlBruto: "<Consulta>true</Consulta>",
-        mensagens: [{ codigo: "E001", mensagem: "Consulta realizada com sucesso - ambiente de homologacao", tipo: "Sucesso" }],
+        sucesso: false,
+        mensagens: [{ codigo: "ALL_FAILED", mensagem: "Nenhum formato de envelope funcionou", tipo: "Erro" }],
+        tentativas,
+        xmlEnvio: dados,
       };
-    } else {
-      if (!certDigital) throw new Error("Certificado nao vinculado ou nao carregado");
-
-      const numeroRps = nota.numero_rps || nota.numero_nota || "";
-      const serie = nota.serie || "1";
-      const tipo = nota.tipo_rps || "RPS";
-      const xmlConsulta = construirXmlConsultaRps(
-        numeroRps,
-        serie,
-        tipo,
-        certDigital.cnpj,
-        certDigital.inscricaoMunicipal
-      );
-      const cabecalho = criarCabecalhoGinfes();
-      const soapAction = "ConsultarNfsePorRpsV3";
-      const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, xmlConsulta, ambiente);
-      const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
-      resultado = { ...parsearRespostaConsulta(soapResponse), xmlEnvio: xmlConsulta, xmlBruto: soapResponse.substring(0, 8000) };
-    }
-
-    if (resultado.sucesso) {
-      const updateData: Record<string, any> = { updated_at: new Date().toISOString() };
-      if (resultado.numeroNfse) updateData.numero_nota = resultado.numeroNfse;
-      if (resultado.codigoVerificacao) updateData.codigo_verificacao = resultado.codigoVerificacao;
-      if (resultado.dataAutorizacao) updateData.data_autorizacao = resultado.dataAutorizacao;
-      if (resultado.linkPdf) updateData.link_pdf = resultado.linkPdf;
-      if (resultado.linkXml) updateData.link_xml = resultado.linkXml;
-      if (resultado.linkNfse) updateData.link_nfse = resultado.linkNfse;
-      if (resultado.xmlRetorno) updateData.xml_retorno = resultado.xmlRetorno;
-      if (resultado.status) updateData.status = resultado.status === "substituida" ? "cancelada" : resultado.status;
-      await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
     }
 
     return new Response(JSON.stringify(resultado), { status: resultado.sucesso ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (err) {
-    console.error("Erro ao consultar NFS-e:", err);
-    if (notaId) {
-      try {
-        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-        await supabase.from("notas_fiscais_servico").update({ status: "erro", mensagem_erro: (err as Error).message }).eq("id", notaId);
-      } catch (dbErr) { console.error("Falha ao atualizar status de erro:", dbErr); }
-    }
+    console.error("[consultar-nfse] Erro geral:", err);
     return new Response(JSON.stringify({ sucesso: false, mensagens: [{ codigo: "ERROR", mensagem: (err as Error).message, tipo: "Erro" }] }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
