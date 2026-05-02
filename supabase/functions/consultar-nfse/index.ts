@@ -371,6 +371,17 @@ serve(async (req) => {
     const { data: nota, error: notaError } = await supabase.from("notas_fiscais_servico").select("*").eq("id", notaId).eq("user_id", user.id).single();
     if (notaError || !nota) throw new Error("Nota nao encontrada");
     const ambiente = getAmbiente();
+
+    let certDigital: any = null;
+    if (nota.certificado_id) {
+      const { data: certificado, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
+      if (!certError && certificado && certificado.arquivo_pfx) {
+        certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
+        certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
+        certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
+      }
+    }
+
     let resultado;
     if (ambiente === "homologacao") {
       resultado = {
@@ -386,7 +397,7 @@ serve(async (req) => {
         aliquotaIss: nota.aliquota_iss?.toString() || "0",
         issRetido: false,
         tomador: { razaoSocial: nota.cliente_razao_social || nota.cliente_nome || "", cnpjCpf: nota.cliente_cnpj_cpf || "" },
-        prestador: { cnpj: nota.prestador_cnpj || "", inscricaoMunicipal: nota.prestador_inscricao_municipal || "" },
+        prestador: { cnpj: certDigital?.cnpj || "", inscricaoMunicipal: certDigital?.inscricaoMunicipal || "" },
         linkPdf: nota.link_pdf || undefined,
         linkXml: nota.link_xml || undefined,
         linkNfse: nota.link_nfse || undefined,
@@ -397,15 +408,7 @@ serve(async (req) => {
         mensagens: [{ codigo: "E001", mensagem: "Consulta realizada com sucesso - ambiente de homologacao", tipo: "Sucesso" }],
       };
     } else {
-      if (!nota.certificado_id) throw new Error("Certificado nao vinculado");
-
-      const { data: certificado, error: certError } = await supabase.from("certificados_nfse").select("*").eq("id", nota.certificado_id).single();
-      if (certError || !certificado) throw new Error("Certificado nao encontrado");
-      if (!certificado.arquivo_pfx) throw new Error("Certificado sem arquivo PFX");
-
-      const certDigital = await carregarCertificado(certificado.arquivo_pfx, certificado.senha || "");
-      certDigital.inscricaoMunicipal = certificado.inscricao_municipal || "";
-      certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
+      if (!certDigital) throw new Error("Certificado nao vinculado ou nao carregado");
 
       const numeroRps = nota.numero_rps || nota.numero_nota || "";
       const serie = nota.serie || "1";

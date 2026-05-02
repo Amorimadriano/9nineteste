@@ -292,16 +292,14 @@ function assinarLoteCompleto(xmlLote: string, certificado: CertificadoDigital): 
 }
 
 function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
-  const ginfesNs = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://homologacao.ginfes.com.br";
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
   return `<?xml version="1.0" encoding="UTF-8"?>
-<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"
-                xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
   <soap:Body>
-    <${soapAction} xmlns="${ginfesNs}">
-      <arg0 xmlns=""><![CDATA[${cabecalhoXml}]]></arg0>
-      <arg1 xmlns=""><![CDATA[${dadosXml}]]></arg1>
-    </${soapAction}>
+    <ns1:${soapAction} xmlns:ns1="${namespace}">
+      <ns1:arg0>${cabecalhoXml}</ns1:arg0>
+      <ns1:arg1>${dadosXml}</ns1:arg1>
+    </ns1:${soapAction}>
   </soap:Body>
 </soap:Envelope>`;
 }
@@ -319,12 +317,16 @@ const GINFES_URLS = {
   producao: "https://producao.ginfes.com.br/ServiceGinfesImpl",
 };
 
-async function enviarRequisicaoSOAP(soapEnvelope: string, certificado?: { certPem: string; keyPem: string }): Promise<string> {
+async function enviarRequisicaoSOAP(soapEnvelope: string, soapAction: string, certificado?: { certPem: string; keyPem: string }): Promise<string> {
   const env = getAmbiente();
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": "text/xml; charset=utf-8",
+    "SOAPAction": `"${soapAction}"`,
+  };
   if (env === "homologacao") {
     const response = await fetch(GINFES_URLS[env], {
       method: "POST",
-      headers: { "Content-Type": "text/xml; charset=utf-8", "SOAPAction": "" },
+      headers: baseHeaders,
       body: soapEnvelope,
     });
     if (!response.ok) {
@@ -504,8 +506,9 @@ serve(async (req) => {
       const { xml: xmlLote } = construirXmlLoteRps(dadosNota, xmlRps);
       const signedLote = assinarLoteCompleto(xmlLote, certDigital);
       const cabecalho = criarCabecalhoGinfes();
-      const soapEnvelope = criarEnvelopeSOAPGinfes("RecepcionarLoteRpsV3", cabecalho, signedLote, "producao");
-      const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
+      const soapAction = "RecepcionarLoteRpsV3";
+      const soapEnvelope = criarEnvelopeSOAPGinfes(soapAction, cabecalho, signedLote, "producao");
+      const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
       resultado = { ...parsearRespostaEmissao(soapResponse), xmlEnvio: signedLote };
     }
 
