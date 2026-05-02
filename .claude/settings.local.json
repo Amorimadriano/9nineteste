@@ -78,7 +78,12 @@
       "PowerShell(Get-Command *)",
       "PowerShell(npx vitest run src/test/nfse/client.test.ts)",
       "PowerShell(npx vitest run src/test/nfse/)",
-      "Bash(Select-String -Pattern 'FAIL|×|expected' -Context 2,2)"
+      "Bash(Select-String -Pattern 'FAIL|×|expected' -Context 2,2)",
+      "Bash(nslookup ftp.9nineteste.9ninebusinesscontrol.com.br)",
+      "Bash(nslookup 9nineteste.9ninebusinesscontrol.com.br)",
+      "Bash(nc -vz -w 5 ftp.9nineteste.9ninebusinesscontrol.com.br 21)",
+      "Bash(nc -vz -w 5 ftp.9nineteste.9ninebusinesscontrol.com.br 22)",
+      "Bash(powershell *)"
     ]
   }
 }
