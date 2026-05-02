@@ -143,6 +143,44 @@ function criarEnvelopeSOAPGinfes(soapAction: string, cabecalhoXml: string, dados
 </soap:Envelope>`;
 }
 
+function criarEnvelopeSOAPGinfesSemArg0(soapAction: string, dadosXml: string, ambiente?: string): string {
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${namespace}">
+      <arg1 xmlns="">${dadosXml}</arg1>
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function criarEnvelopeSOAPGinfesArg0Vazio(soapAction: string, dadosXml: string, ambiente?: string): string {
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${namespace}">
+      <arg0 xmlns=""></cabecalho></arg0>
+      <arg1 xmlns="">${dadosXml}</arg1>
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
+function criarEnvelopeSOAPGinfesCabecalhoDentro(soapAction: string, cabecalhoXml: string, dadosXml: string, ambiente?: string): string {
+  const namespace = ambiente === "producao" ? "http://producao.ginfes.com.br" : "http://www.ginfes.com.br/";
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <soap:Body>
+    <${soapAction} xmlns="${namespace}">
+      <arg0 xmlns=""></cabecalho></arg0>
+      <arg1 xmlns="">${cabecalhoXml}${dadosXml}</arg1>
+    </${soapAction}>
+  </soap:Body>
+</soap:Envelope>`;
+}
+
 function getAmbiente(): "homologacao" | "producao" {
   return (Deno.env.get("NFSE_AMBIENTE") || "homologacao") as "homologacao" | "producao";
 }
@@ -407,34 +445,45 @@ serve(async (req) => {
     const operacoes = [operacao, "ConsultarNfsePorRps", "ConsultarNfseRps", "ConsultarNfsePorRpsV3"];
     const uniqueOps = [...new Set(operacoes)];
 
+    // Formatos de envelope para testar
+    const formatos = [
+      { nome: "padrao", fn: (op: string) => criarEnvelopeSOAPGinfes(op, cabecalho, dados, ambiente) },
+      { nome: "sem_arg0", fn: (op: string) => criarEnvelopeSOAPGinfesSemArg0(op, dados, ambiente) },
+      { nome: "arg0_vazio", fn: (op: string) => criarEnvelopeSOAPGinfesArg0Vazio(op, dados, ambiente) },
+      { nome: "cabecalho_dentro_arg1", fn: (op: string) => criarEnvelopeSOAPGinfesCabecalhoDentro(op, cabecalho, dados, ambiente) },
+    ];
+
     for (const op of uniqueOps) {
-      const envelope = criarEnvelopeSOAPGinfes(op, cabecalho, dados, ambiente);
-      console.log(`[consultar-nfse] Tentando operacao: ${op}`);
-      console.log(`[consultar-nfse] Envelope:\n${envelope}`);
+      for (const formato of formatos) {
+        const envelope = formato.fn(op);
+        console.log(`[consultar-nfse] Tentando operacao: ${op} | formato: ${formato.nome}`);
+        console.log(`[consultar-nfse] Envelope:\n${envelope}`);
 
-      try {
-        const soapResponse = await retry(() => enviarRequisicaoSOAP(envelope, op, certDigital || undefined));
-        console.log(`[consultar-nfse] Resposta (${op}):\n${soapResponse.substring(0, 2000)}`);
+        try {
+          const soapResponse = await retry(() => enviarRequisicaoSOAP(envelope, op, certDigital || undefined));
+          console.log(`[consultar-nfse] Resposta (${op}/${formato.nome}):\n${soapResponse.substring(0, 2000)}`);
 
-        tentativas.push({ operacao: op, envelope: envelope.substring(0, 500), response: soapResponse.substring(0, 500) });
+          tentativas.push({ operacao: op, formato: formato.nome, envelope: envelope.substring(0, 500), response: soapResponse.substring(0, 500) });
 
-        const parsed = parsearRespostaConsulta(soapResponse);
-        if (parsed.sucesso) {
-          resultado = { ...parsed, xmlEnvio: dados, xmlBruto: soapResponse.substring(0, 8000), operacaoUsada: op };
-          break;
+          const parsed = parsearRespostaConsulta(soapResponse);
+          if (parsed.sucesso) {
+            resultado = { ...parsed, xmlEnvio: dados, xmlBruto: soapResponse.substring(0, 8000), operacaoUsada: op, formatoUsado: formato.nome };
+            break;
+          }
+
+          // Se nao for erro de operacao nao encontrada, usar esse resultado
+          const isOpError = soapResponse.includes("Endpoint does not contain operation") ||
+            soapResponse.includes("Cannot find child element");
+          if (!isOpError) {
+            resultado = { ...parsed, xmlEnvio: dados, xmlBruto: soapResponse.substring(0, 8000), operacaoUsada: op, formatoUsado: formato.nome };
+            break;
+          }
+        } catch (err: any) {
+          console.error(`[consultar-nfse] Erro operacao ${op} formato ${formato.nome}:`, err.message);
+          tentativas.push({ operacao: op, formato: formato.nome, erro: err.message });
         }
-
-        // Se nao for erro de operacao nao encontrada, usar esse resultado
-        const isOpError = soapResponse.includes("Endpoint does not contain operation") ||
-          soapResponse.includes("Cannot find child element");
-        if (!isOpError) {
-          resultado = { ...parsed, xmlEnvio: dados, xmlBruto: soapResponse.substring(0, 8000), operacaoUsada: op };
-          break;
-        }
-      } catch (err: any) {
-        console.error(`[consultar-nfse] Erro operacao ${op}:`, err.message);
-        tentativas.push({ operacao: op, erro: err.message });
       }
+      if (resultado) break;
     }
 
     if (!resultado) {
