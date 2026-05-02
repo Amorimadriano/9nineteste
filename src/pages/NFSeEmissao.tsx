@@ -726,7 +726,7 @@ export default function NFSeEmissao() {
           <p className="text-muted-foreground">Emita notas fiscais de serviço eletrônica</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate("/nfse/historico")}>
+          <Button variant="outline" onClick={() => navigate("/nfse-historico")}>
             <History className="mr-2 h-4 w-4" />
             Histórico
           </Button>
