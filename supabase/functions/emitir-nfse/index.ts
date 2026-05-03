@@ -718,6 +718,7 @@ function getNfeioHeaders(apiKey: string): Record<string, string> {
 async function emitirViaNfeio(dados: any, nota: any): Promise<any> {
   const apiKey = Deno.env.get("NFEIO_API_KEY") || "";
   const companyId = Deno.env.get("NFEIO_COMPANY_ID") || "";
+  console.log("[emitir-nfse] NFE.io config:", { apiKeyPresente: !!apiKey, apiKeyPrimeiros8: apiKey.slice(0, 8), companyId });
   if (!apiKey) throw new Error("NFEIO_API_KEY nao configurada");
   if (!companyId) throw new Error("NFEIO_COMPANY_ID nao configurada");
 
@@ -759,18 +760,28 @@ async function emitirViaNfeio(dados: any, nota: any): Promise<any> {
   };
 
   const url = `${NFEIO_BASE_URL}/companies/${companyId}/serviceinvoices`;
+  console.log("[emitir-nfse] Chamando NFE.io:", url);
+  console.log("[emitir-nfse] Payload NFE.io:", JSON.stringify(payload, null, 2));
   const res = await fetch(url, {
     method: "POST",
     headers: getNfeioHeaders(apiKey),
     body: JSON.stringify(payload),
   });
 
+  const responseText = await res.text();
+  console.log("[emitir-nfse] NFE.io status:", res.status, "resposta:", responseText.substring(0, 500));
+
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ code: "ERR_HTTP", message: `HTTP ${res.status}` }));
+    let err;
+    try {
+      err = JSON.parse(responseText);
+    } catch {
+      err = { code: "ERR_HTTP", message: `HTTP ${res.status}: ${responseText.substring(0, 200)}` };
+    }
     throw new Error(`NFE.io erro [${err.code}]: ${err.message}`);
   }
 
-  const data = await res.json();
+  const data = JSON.parse(responseText);
 
   return {
     sucesso: data.status === "Issued" || data.status === "Processing" || data.status === "Scheduled",
