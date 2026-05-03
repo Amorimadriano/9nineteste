@@ -92,7 +92,8 @@
       "WebFetch(domain:www.nuvemfiscal.com.br)",
       "WebFetch(domain:dev.nuvemfiscal.com.br)",
       "WebFetch(domain:9nineteste.9ninebusinesscontrol.com.br)",
-      "Bash(gh run *)"
+      "Bash(gh run *)",
+      "Bash(python3 -c ' *)"
     ]
   }
 }
