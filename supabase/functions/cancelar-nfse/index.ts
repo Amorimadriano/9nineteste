@@ -524,8 +524,10 @@ serve(async (req) => {
 
     if (ambiente === "homologacao") {
       resultado = cancelarHomologacao(nota, certificado, motivoCancelamento);
+    } else if (nota.nfeio_id) {
+      resultado = await cancelarViaNfeio(nota.nfeio_id);
     } else {
-      resultado = await cancelarProducao(nota, certDigital, motivoCancelamento);
+      throw new Error("Nota sem nfeio_id: nao e possivel cancelar via NFE.io. Notas emitidas no sistema antigo precisam ser canceladas manualmente.");
     }
 
     // Se falhou, enriquece com análise de IA via orquestrador
@@ -590,33 +592,64 @@ serve(async (req) => {
   }
 });
 
+async function cancelarViaNfeio(nfseId: string): Promise<any> {
+  const apiKey = Deno.env.get("NFEIO_API_KEY") || "";
+  const companyId = Deno.env.get("NFEIO_COMPANY_ID") || "";
+  if (!apiKey || !companyId) throw new Error("NFE.io nao configurado");
+
+  const url = `https://api.nfe.io/v2/companies/${companyId}/serviceinvoices/${nfseId}`;
+  const res = await fetch(url, {
+    method: "DELETE",
+    headers: {
+      "Authorization": apiKey,
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ code: "ERR_HTTP", message: `HTTP ${res.status}` }));
+    throw new Error(`NFE.io cancelar erro [${err.code}]: ${err.message}`);
+  }
+
+  const data = await res.json();
+
+  return {
+    sucesso: data.status === "Cancelled" || data.status === "CancelRequested",
+    xmlEnvio: JSON.stringify({ action: "cancelar", nfeioId: nfseId }),
+    xmlRetorno: JSON.stringify(data),
+    mensagens: [{
+      codigo: "0000",
+      mensagem: `Cancelamento processado via NFE.io. Status: ${data.status}`,
+      tipo: "Sucesso",
+    }],
+    nfeioId: data.id,
+    nfeioStatus: data.status,
+  };
+}
+
 function cancelarHomologacao(nota: any, certificado: any, motivoCancelamento: string) {
-  console.log("Ambiente de homologação - retornando cancelamento simulado (Paulistana)");
-  const xmlEnvio = construirXmlCancelamentoPaulistana(
-    nota.numero_nota || nota.numero_rps || "",
-    nota.codigo_verificacao || "",
-    certificado.inscricao_municipal || "",
-    motivoCancelamento
-  );
+  console.log("Ambiente de homologação - retornando cancelamento simulado (NFE.io)");
   return {
     sucesso: true,
-    xmlEnvio,
+    xmlEnvio: "<cancelamento>simulado</cancelamento>",
     xmlRetorno: "<Cancelamento>true</Cancelamento>",
     mensagens: [{
       codigo: "E001",
-      mensagem: "Cancelamento processado com sucesso - ambiente de homologação (Paulistana)",
+      mensagem: "Cancelamento processado com sucesso - ambiente de homologação (NFE.io)",
       tipo: "Sucesso",
     }],
   };
 }
 
 async function cancelarProducao(nota: any, certDigital: CertificadoDigital, motivoCancelamento: string) {
+  // Legado: mantido para referencia, mas nao e mais usado no fluxo principal
   const numeroNfse = nota.numero_nota || nota.numero_rps || "";
   const codigoVerificacao = nota.codigo_verificacao || "";
   const inscricaoMunicipal = certDigital.inscricaoMunicipal || "";
 
   if (!numeroNfse || !codigoVerificacao) {
-    throw new Error("Nota fiscal não possui número da NFSe ou código de verificação necessários para cancelamento na API Paulistana.");
+    throw new Error("Nota fiscal nao possui numero da NFSe ou codigo de verificacao.");
   }
 
   const xmlCancelamento = construirXmlCancelamentoPaulistana(numeroNfse, codigoVerificacao, inscricaoMunicipal, motivoCancelamento);
@@ -627,14 +660,12 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
   const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, signedXml);
   const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
 
-  console.log("=== NFS-e Cancelamento Produção (Paulistana) ===");
-  console.log("NFS-e:", numeroNfse, "Inscricao:", inscricaoMunicipal);
+  console.log("=== NFS-e Cancelamento Producao (Paulistana - legado) ===");
 
   const soapResponse = await enviarRequisicaoSOAP(soapEnvelope, soapAction, {
     certPem: certDigital.certPem,
     keyPem: certDigital.keyPem,
   });
-  console.log("Resposta Paulistana Cancelamento:", soapResponse.substring(0, 500));
   const resultado = parsearRespostaCancelamento(soapResponse);
   return { ...resultado, xmlEnvio: signedXml };
 }

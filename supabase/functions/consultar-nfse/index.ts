@@ -275,6 +275,92 @@ function assinarXmlSHA1(xml: string, certificado: CertificadoDigital, idReferenc
 // --- Envio SOAP ---
 
 const PAULISTANA_URL = "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx";
+const NFEIO_BASE_URL = "https://api.nfe.io/v2";
+
+function getNfeioHeaders(apiKey: string): Record<string, string> {
+  return {
+    "Authorization": apiKey,
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+  };
+}
+
+async function consultarViaNfeio(nfseId: string): Promise<any> {
+  const apiKey = Deno.env.get("NFEIO_API_KEY") || "";
+  const companyId = Deno.env.get("NFEIO_COMPANY_ID") || "";
+  if (!apiKey || !companyId) throw new Error("NFE.io nao configurado");
+
+  const url = `${NFEIO_BASE_URL}/companies/${companyId}/serviceinvoices/${nfseId}`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: getNfeioHeaders(apiKey),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ code: "ERR_HTTP", message: `HTTP ${res.status}` }));
+    throw new Error(`NFE.io consultar erro [${err.code}]: ${err.message}`);
+  }
+
+  const data = await res.json();
+
+  return {
+    sucesso: true,
+    numeroNfse: data.number,
+    numeroRps: data.rpsNumber ? String(data.rpsNumber) : undefined,
+    serieRps: data.rpsSerialNumber,
+    codigoVerificacao: data.verificationCode,
+    dataEmissao: data.issuanceDate,
+    status: data.status === "Issued" ? "autorizada" : data.status === "Cancelled" ? "cancelada" : data.status?.toLowerCase(),
+    valorServicos: String(data.servicesAmount),
+    valorDeducoes: String(data.deductionsAmount || 0),
+    valorIss: String(data.issTaxAmount || 0),
+    aliquotaIss: String(data.issRate || 0),
+    issRetido: false,
+    tomador: data.borrower ? {
+      razaoSocial: data.borrower.name,
+      cnpjCpf: data.borrower.federalTaxNumber,
+    } : undefined,
+    linkPdf: data.pdfUrl,
+    linkXml: data.xmlUrl,
+    nfeioId: data.id,
+    nfeioStatus: data.status,
+    xmlRetorno: JSON.stringify(data),
+    mensagens: [{ codigo: "0000", mensagem: "Consulta realizada via NFE.io", tipo: "Sucesso" }],
+  };
+}
+
+async function consultarViaNfeioPorNumero(numeroNFe?: string, numeroRps?: string): Promise<any> {
+  const apiKey = Deno.env.get("NFEIO_API_KEY") || "";
+  const companyId = Deno.env.get("NFEIO_COMPANY_ID") || "";
+  if (!apiKey || !companyId) throw new Error("NFE.io nao configurado");
+
+  const url = `${NFEIO_BASE_URL}/companies/${companyId}/serviceinvoices?pageSize=50`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: getNfeioHeaders(apiKey),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ code: "ERR_HTTP", message: `HTTP ${res.status}` }));
+    throw new Error(`NFE.io listar erro [${err.code}]: ${err.message}`);
+  }
+
+  const data = await res.json();
+  const items = data.items || [];
+
+  const encontrado = items.find((item: any) =>
+    item.number === numeroNFe || item.rpsNumber === numeroRps || item.rpsNumber === parseInt(numeroRps || "")
+  );
+
+  if (!encontrado) {
+    return {
+      sucesso: false,
+      mensagens: [{ codigo: "NOT_FOUND", mensagem: `Nota nao encontrada na NFE.io (numeroNFe=${numeroNFe}, numeroRps=${numeroRps})`, tipo: "Erro" }],
+    };
+  }
+
+  return consultarViaNfeio(encontrado.id);
+}
 
 async function enviarRequisicaoSOAP(
   soapEnvelope: string,
@@ -539,129 +625,18 @@ serve(async (req: Request) => {
         dataEmissao: new Date().toISOString(),
         status: "autorizada",
         valorServicos: "0",
-        mensagens: [{ codigo: "H001", mensagem: "Homologacao mock - API Paulistana", tipo: "Sucesso" }],
+        mensagens: [{ codigo: "H001", mensagem: "Homologacao mock - NFE.io", tipo: "Sucesso" }],
       }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Validar dados obrigatorios
-    const numeroConsulta = numeroNFe || numeroRps || body.numero || body.numeroNfse || "";
-    const camposFaltantes = [];
-    if (!cnpj) camposFaltantes.push("CNPJ do prestador");
-    if (!im) camposFaltantes.push("Inscricao Municipal do prestador");
-    if (!numeroConsulta) camposFaltantes.push("Numero da NFSe ou RPS");
-
-    if (camposFaltantes.length > 0) {
-      console.log("[consultar-nfse] Dados faltantes:", camposFaltantes, "| notaId:", notaId, "| cnpj:", cnpj, "| im:", im, "| numero:", numeroConsulta);
-      throw new Error(`Dados obrigatorios faltantes: ${camposFaltantes.join(", ")}. Verifique se a nota foi emitida corretamente.`);
-    }
-
-    if (!certDigital && ambiente === "producao") {
-      throw new Error("Certificado digital obrigatorio em producao");
-    }
-
-    // Montar XML de consulta
-    let xmlDados = "";
-    if (operacao === "ConsultaNFe") {
-      xmlDados = xmlPedidoConsultaNFe(cnpj, numeroConsulta, im);
-    } else if (operacao === "ConsultaNFePeriodo") {
-      xmlDados = xmlPedidoConsultaNFePeriodo(cnpj, im, body.dataInicio, body.dataFim, body.cnpjTomador, body.cpfTomador);
+    let resultado;
+    if (notaId && nota?.nfeio_id) {
+      // Consultar via NFE.io
+      resultado = await consultarViaNfeio(nota.nfeio_id);
     } else {
-      throw new Error("Operacao nao suportada: " + operacao);
-    }
-
-    // Assinar XML (SHA-1)
-    let xmlAssinado = xmlDados;
-    if (certDigital && ambiente === "producao") {
-      xmlAssinado = assinarXmlSHA1(xmlDados, certDigital, "Lote1");
-      console.log("[consultar-nfse] XML assinado (primeiros 1000 chars):", xmlAssinado.substring(0, 1000));
-    }
-
-    // Construir envelope SOAP 1.1 Paulistana
-    const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, xmlAssinado);
-    const soapAction = "http://www.prefeitura.sp.gov.br/nfe/" + operacao;
-
-    console.log(`[consultar-nfse] Operacao: ${operacao} | Ambiente: ${ambiente} | Provider: paulistana`);
-    console.log("[consultar-nfse] Envelope SOAP (primeiros 500 chars):", soapEnvelope.substring(0, 500));
-
-    // Enviar requisicao
-    let soapResponse: string;
-    try {
-      soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, certDigital || undefined));
-    } catch (err: any) {
-      console.error("[consultar-nfse] Erro ao enviar SOAP:", err.message);
-
-      let analiseIA = null;
-      try {
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            taskType: "code",
-            messages: [
-              { role: "system", content: "Voce e um especialista em integracao SOAP API Paulistana (Prefeitura de SP). Analise o erro e sugira: 1) Causa provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
-              { role: "user", content: `Erro: ${err.message}\n\nOperacao: ${operacao}\nAmbiente: ${ambiente}\nURL: ${PAULISTANA_URL}` },
-            ],
-            temperature: 0.1,
-          }),
-        });
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const content = aiData.choices?.[0]?.message?.content || "";
-          try {
-            analiseIA = JSON.parse(content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
-          } catch { /* ignora */ }
-        }
-      } catch { /* ignora */ }
-
-      return new Response(JSON.stringify({
-        sucesso: false,
-        mensagens: [{ codigo: "SOAP_ERROR", mensagem: err.message, tipo: "Erro" }],
-        analiseIA,
-        xmlEnvio: xmlDados,
-        xmlBruto: soapEnvelope.substring(0, 3000),
-      }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    console.log("[consultar-nfse] Resposta (primeiros 500 chars):", soapResponse.substring(0, 500));
-
-    const resultado = parsearRespostaConsultaPaulistana(soapResponse);
-    const resultadoFinal = {
-      ...resultado,
-      xmlEnvio: xmlDados,
-      xmlBruto: soapResponse.substring(0, 8000),
-      operacaoUsada: operacao,
-      formatoUsado: "SOAP11_PAULISTANA",
-      provider: "paulistana",
-    };
-
-    if (!resultado.sucesso) {
-      try {
-        const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${Deno.env.get("LOVABLE_API_KEY") || ""}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            taskType: "code",
-            messages: [
-              { role: "system", content: "Voce e um especialista em parsing XML API Paulistana (Prefeitura de SP). Analise a resposta e sugira: 1) Erro provavel, 2) Acao corretiva. Retorne APENAS JSON { erroProvavel: string, acaoSugerida: string }." },
-              { role: "user", content: `Resposta:\n${soapResponse.substring(0, 3000)}` },
-            ],
-            temperature: 0.1,
-          }),
-        });
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          const content = aiData.choices?.[0]?.message?.content || "";
-          try {
-            (resultadoFinal as any).analiseIA = JSON.parse(content.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim());
-          } catch { /* ignora */ }
-        }
-      } catch { /* ignora */ }
+      // Fallback: consulta por numeroNFe/numeroRps sem nfeio_id
+      // Tenta consultar via NFE.io listando e filtrando
+      resultado = await consultarViaNfeioPorNumero(numeroNFe, numeroRps);
     }
 
     // Atualizar banco se veio de notaId
@@ -671,8 +646,17 @@ serve(async (req: Request) => {
       if (resultado.codigoVerificacao) updateData.codigo_verificacao = resultado.codigoVerificacao;
       if (resultado.dataEmissao) updateData.data_autorizacao = resultado.dataEmissao;
       if (resultado.status) updateData.status = resultado.status === "substituida" ? "cancelada" : resultado.status;
+      if (resultado.linkPdf) updateData.link_pdf = resultado.linkPdf;
+      if (resultado.linkXml) updateData.link_xml = resultado.linkXml;
+      if (resultado.nfeioId) updateData.nfeio_id = resultado.nfeioId;
+      if (resultado.nfeioStatus) updateData.nfeio_status = resultado.nfeioStatus;
       await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
     }
+
+    const resultadoFinal = {
+      ...resultado,
+      provider: "nfeio",
+    };
 
     return new Response(JSON.stringify(resultadoFinal), { status: resultado.sucesso ? 200 : 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 

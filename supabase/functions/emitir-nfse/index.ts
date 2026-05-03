@@ -662,36 +662,12 @@ serve(async (req) => {
         linkNfse: `https://nfe.prefeitura.sp.gov.br/${dadosNota.identificacaoRps.numero}`,
         xmlEnvio: "<homologacao>simulado</homologacao>",
         xmlRetorno: "<Compl>true</Compl>",
-        mensagens: [{ codigo: "AA001", mensagem: "RPS processado - ambiente de homologacao (Paulistana)", tipo: "Sucesso" }],
+        mensagens: [{ codigo: "AA001", mensagem: "RPS processado - ambiente de homologacao (NFE.io)", tipo: "Sucesso" }],
       };
     } else {
-      console.log("[emitir-nfse] Dados nota:", JSON.stringify({
-        numeroRps: dadosNota.identificacaoRps.numero,
-        codigoServico: dadosNota.servico.itemListaServico,
-        codigoServicoMapeado: maparCodigoServicoSP(dadosNota.servico.itemListaServico),
-        valorServicos: dadosNota.servico.valores.valorServicos,
-        cidadeTomador: dadosNota.tomador.endereco?.cidade,
-        cidadeTomadorIBGE: cidadeParaIBGE(dadosNota.tomador.endereco?.cidade),
-      }));
-      const { xml: xmlRps, rpsId } = construirXmlRpsPaulistana(dadosNota, certDigital);
-      console.log(`[emitir-nfse] RPS ${rpsId} construido`);
-
-      const { xml: xmlLote, loteId } = construirXmlLotePaulistana(dadosNota, xmlRps);
-      console.log(`[emitir-nfse] Lote ${loteId} construido`);
-      console.log("[emitir-nfse] XML Lote (sem assinar):");
-      console.log(xmlLote);
-
-      // Assina o lote com XML-DSig SHA-1
-      const signedLote = assinarXmlSHA1(xmlLote, certDigital, loteId);
-      console.log("[emitir-nfse] Lote assinado com XML-DSig SHA-1");
-
-      const operacao = "EnvioLoteRPS";
-      const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, signedLote);
-      const soapAction = `http://www.prefeitura.sp.gov.br/nfe/${operacao}`;
-
-      console.log(`[emitir-nfse] Enviando para ${PAULISTANA_URL} action=${soapAction}`);
-      const soapResponse = await retry(() => enviarRequisicaoSOAP(soapEnvelope, soapAction, { certPem: certDigital.certPem, keyPem: certDigital.keyPem }));
-      resultado = { ...parsearRespostaEmissaoPaulistana(soapResponse), xmlEnvio: signedLote };
+      console.log("[emitir-nfse] Emitindo via NFE.io...");
+      resultado = await emitirViaNfeio(dadosNota, nota);
+      console.log("[emitir-nfse] Resposta NFE.io:", JSON.stringify(resultado));
     }
 
     const updateData: any = {
@@ -702,10 +678,14 @@ serve(async (req) => {
       protocolo: resultado.protocolo || null,
       codigo_verificacao: resultado.codigoVerificacao || null,
       link_nfse: (resultado as any).linkNfse || null,
+      link_pdf: (resultado as any).linkPdf || null,
+      link_xml: (resultado as any).linkXml || null,
       data_autorizacao: resultado.sucesso ? new Date().toISOString() : null,
       mensagem_erro: resultado.sucesso ? null : resultado.mensagens?.map((m: any) => m.mensagem).join("; "),
       cnpj_prestador: certDigital.cnpj || nota.cnpj_prestador || "",
       inscricao_municipal: certDigital.inscricaoMunicipal || nota.inscricao_municipal || "",
+      nfeio_id: (resultado as any).nfeioId || null,
+      nfeio_status: (resultado as any).nfeioStatus || null,
     };
     await supabase.from("notas_fiscais_servico").update(updateData).eq("id", notaId).eq("user_id", user.id);
 
@@ -722,6 +702,95 @@ serve(async (req) => {
     return new Response(JSON.stringify({ sucesso: false, mensagens: [{ codigo: "ERROR", mensagem: (err as Error).message, tipo: "Erro" }] }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
+
+// --- NFE.io Integration ---
+
+const NFEIO_BASE_URL = "https://api.nfe.io/v2";
+
+function getNfeioHeaders(apiKey: string): Record<string, string> {
+  return {
+    "Authorization": apiKey,
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+  };
+}
+
+async function emitirViaNfeio(dados: any, nota: any): Promise<any> {
+  const apiKey = Deno.env.get("NFEIO_API_KEY") || "";
+  const companyId = Deno.env.get("NFEIO_COMPANY_ID") || "";
+  if (!apiKey) throw new Error("NFEIO_API_KEY nao configurada");
+  if (!companyId) throw new Error("NFEIO_COMPANY_ID nao configurada");
+
+  const valorServicos = parseFloat(dados.servico.valores.valorServicos) || 0;
+  const valorDeducoes = parseFloat(dados.servico.valores.valorDeducoes) || 0;
+  const codigoServico = maparCodigoServicoSP(dados.servico.itemListaServico || dados.servico.codigo || "");
+
+  const payload = {
+    cityServiceCode: codigoServico,
+    description: dados.servico.descricao || dados.servico.discriminacao || "Servico prestado",
+    servicesAmount: valorServicos,
+    deductionsAmount: valorDeducoes,
+    issRate: parseFloat(dados.servico.aliquotaIss) || 0.05,
+    rpsSerialNumber: dados.identificacaoRps.serie || "1",
+    rpsNumber: parseInt(dados.identificacaoRps.numero),
+    externalId: nota.id,
+    borrower: {
+      federalTaxNumber: (dados.tomador.cnpjCpf || "").replace(/\D/g, ""),
+      name: dados.tomador.razaoSocial || "Tomador",
+      email: dados.tomador.email || undefined,
+      address: dados.tomador.endereco?.logradouro ? {
+        street: dados.tomador.endereco.logradouro,
+        number: dados.tomador.endereco.numero || "S/N",
+        district: dados.tomador.endereco.bairro || "",
+        city: {
+          code: cidadeParaIBGE(dados.tomador.endereco.cidade || ""),
+          name: dados.tomador.endereco.cidade || "SAO PAULO",
+        },
+        state: dados.tomador.endereco.uf || "SP",
+        postalCode: (dados.tomador.endereco.cep || "").replace(/\D/g, ""),
+        country: "BRA",
+      } : undefined,
+    },
+    taxAmountPis: parseFloat(dados.servico.valores.valorPis) || undefined,
+    taxAmountCofins: parseFloat(dados.servico.valores.valorCofins) || undefined,
+    taxAmountInss: parseFloat(dados.servico.valores.valorInss) || undefined,
+    taxAmountIr: parseFloat(dados.servico.valores.valorIr) || undefined,
+    taxAmountCsll: parseFloat(dados.servico.valores.valorCsll) || undefined,
+  };
+
+  const url = `${NFEIO_BASE_URL}/companies/${companyId}/serviceinvoices`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: getNfeioHeaders(apiKey),
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ code: "ERR_HTTP", message: `HTTP ${res.status}` }));
+    throw new Error(`NFE.io erro [${err.code}]: ${err.message}`);
+  }
+
+  const data = await res.json();
+
+  return {
+    sucesso: data.status === "Issued" || data.status === "Processing" || data.status === "Scheduled",
+    numeroNfse: data.number,
+    numeroLote: data.rpsNumber ? String(data.rpsNumber) : undefined,
+    protocolo: data.id,
+    codigoVerificacao: data.verificationCode,
+    linkNfse: data.pdfUrl || data.xmlUrl,
+    linkPdf: data.pdfUrl,
+    linkXml: data.xmlUrl,
+    xmlEnvio: JSON.stringify(payload),
+    xmlRetorno: JSON.stringify(data),
+    mensagens: data.status === "Issued"
+      ? [{ codigo: "0000", mensagem: "Nota emitida com sucesso via NFE.io", tipo: "Sucesso" }]
+      : [{ codigo: "INFO", mensagem: `Status NFE.io: ${data.status}`, tipo: "Sucesso" }],
+    nfeioId: data.id,
+    nfeioStatus: data.status,
+    nfeioData: data,
+  };
+}
 
 // Mapeamento de cidade → codigo IBGE (7 digitos) para Prefeitura SP
 const MAPA_IBGE: Record<string, string> = {
@@ -750,22 +819,21 @@ function cidadeParaIBGE(cidade: string): string {
 }
 
 function gerarNumeroRps(): string {
-  // Gera numero de ate 8 digitos (ultimos 8 do timestamp)
   return Date.now().toString().slice(-8);
 }
 
 // Mapeamento: Lista de Servicos LC 116/2003 → Codigo Prefeitura SP
 const MAPA_CODIGO_SERVICO_SP: Record<string, string> = {
-  "1.01": "7617",   // Analise e desenvolvimento de sistemas
-  "1.02": "7617",   // Programacao
-  "1.03": "7617",   // Processamento de dados
-  "1.04": "7617",   // Elaboracao de programas
-  "1.05": "7617",   // Licenciamento de programas
-  "1.06": "7617",   // Assessoria em informatica
-  "1.07": "7617",   // Suporte tecnico em informatica
-  "1.08": "7617",   // Planejamento de paginas internet
-  "1.09": "7617",   // Hospedagem na internet
-  "17.01": "6912",  // Publicidade e propaganda
+  "1.01": "7617",
+  "1.02": "7617",
+  "1.03": "7617",
+  "1.04": "7617",
+  "1.05": "7617",
+  "1.06": "7617",
+  "1.07": "7617",
+  "1.08": "7617",
+  "1.09": "7617",
+  "17.01": "6912",
   "17.02": "6912",
   "17.03": "6912",
   "17.04": "6912",
@@ -775,7 +843,7 @@ const MAPA_CODIGO_SERVICO_SP: Record<string, string> = {
   "17.08": "6912",
   "17.09": "6912",
   "17.10": "6912",
-  "25.01": "2501",  // Consultoria empresarial
+  "25.01": "2501",
   "25.02": "2501",
   "25.03": "2501",
   "25.04": "2501",
