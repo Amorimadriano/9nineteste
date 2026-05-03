@@ -597,7 +597,7 @@ async function cancelarViaNfeio(nfseId: string): Promise<any> {
   const companyId = Deno.env.get("NFEIO_COMPANY_ID") || "";
   if (!apiKey || !companyId) throw new Error("NFE.io nao configurado");
 
-  const url = `https://api.nfe.io/v2/companies/${companyId}/serviceinvoices/${nfseId}`;
+  const url = `https://api.nfe.io/v1/companies/${companyId}/serviceinvoices/${nfseId}`;
   const res = await fetch(url, {
     method: "DELETE",
     headers: {

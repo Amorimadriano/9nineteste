@@ -705,7 +705,7 @@ serve(async (req) => {
 
 // --- NFE.io Integration ---
 
-const NFEIO_BASE_URL = "https://api.nfe.io/v2";
+const NFEIO_BASE_URL = "https://api.nfe.io/v1";
 
 function getNfeioHeaders(apiKey: string): Record<string, string> {
   return {

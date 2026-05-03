@@ -1,6 +1,6 @@
 import { NfeioServiceInvoiceRequest, NfeioServiceInvoiceResponse, NfeioApiError } from "./types";
 
-const BASE_URL = "https://api.nfe.io/v2";
+const BASE_URL = "https://api.nfe.io/v1";
 
 function getHeaders(apiKey: string): Record<string, string> {
   return {

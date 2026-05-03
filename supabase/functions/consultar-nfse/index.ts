@@ -275,7 +275,7 @@ function assinarXmlSHA1(xml: string, certificado: CertificadoDigital, idReferenc
 // --- Envio SOAP ---
 
 const PAULISTANA_URL = "https://nfe.prefeitura.sp.gov.br/ws/lotenfe.asmx";
-const NFEIO_BASE_URL = "https://api.nfe.io/v2";
+const NFEIO_BASE_URL = "https://api.nfe.io/v1";
 
 function getNfeioHeaders(apiKey: string): Record<string, string> {
   return {
