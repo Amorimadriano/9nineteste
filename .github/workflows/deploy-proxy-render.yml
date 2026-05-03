@@ -17,8 +17,8 @@ jobs:
 
       - name: Deploy to Render
         env:
-          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
-          RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
+          RENDER_API_KEY: nfse-proxy-9xK2mP7q
+          RENDER_SERVICE_ID: srv-d7nupjapmmbs73cq86c0
         run: |
           if [ -z "$RENDER_API_KEY" ] || [ -z "$RENDER_SERVICE_ID" ]; then
             echo "⚠️  RENDER_API_KEY ou RENDER_SERVICE_ID não configurados"
