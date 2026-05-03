@@ -22,7 +22,7 @@ jobs:
 
       - name: Deploy Edge Functions
         env:
-          SUPABASE_ACCESS_TOKEN: sb_publishable_dSvNshTQiRJYBq3kMb2MQg_K2rvrpoG
+          SUPABASE_ACCESS_TOKEN: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRvbXJsb3BzbXhndnpncXNmaXpoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ4NTcwNzQsImV4cCI6MjA5MDQzMzA3NH0.l2r0zBo8p4Y2xkXSQYO5exQCvqtq0yYF4-J6sLz7RhQ
         run: |
           supabase link --project-ref rjcruiwlurqdwooarrpa
           supabase functions deploy --use-api
