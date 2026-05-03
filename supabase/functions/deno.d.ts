@@ -23,7 +23,4 @@ declare module "https://esm.sh/@supabase/supabase-js@2" {
   export { default } from "@supabase/supabase-js";
 }
 
-declare module "https://esm.sh/node-forge@1.3.1" {
-  const forge: any;
-  export default forge;
-}
+// node-forge via esm.sh e coberto pelo catch-all "https://*" acima
