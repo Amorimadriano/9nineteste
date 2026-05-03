@@ -93,7 +93,14 @@
       "WebFetch(domain:dev.nuvemfiscal.com.br)",
       "WebFetch(domain:9nineteste.9ninebusinesscontrol.com.br)",
       "Bash(gh run *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "WebFetch(domain:notadomilhao.sf.prefeitura.sp.gov.br)",
+      "WebFetch(domain:www.fazenda.sp.gov.br)",
+      "WebFetch(domain:coleta.prefeitura.sp.gov.br)",
+      "Bash(where supabase *)",
+      "Bash(Get-Command supabase *)",
+      "Bash(yarn global *)",
+      "Bash(bun list *)"
     ]
   }
 }
