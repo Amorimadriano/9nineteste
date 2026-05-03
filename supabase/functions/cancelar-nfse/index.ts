@@ -201,9 +201,9 @@ function construirXmlCancelamentoPaulistana(
 }
 
 /**
- * Signs XML using XMLDSig SHA-256. Throws error on failure instead of returning unsigned XML.
+ * Signs XML using XMLDSig SHA-1. Throws error on failure instead of returning unsigned XML.
  */
-function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
+function assinarXmlSHA1(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) {
     throw new Error("node-forge não está disponível para assinatura XML. Cancelamento em produção requer assinatura digital.");
@@ -216,21 +216,21 @@ function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idRefere
       throw new Error(`Elemento com Id="${idReferencia}" não encontrado no XML para assinatura`);
     }
     const canonReferenced = canonicalizeXml(referencedXml);
-    const digest = forge.md.sha256.create();
+    const digest = forge.md.sha1.create();
     digest.update(canonReferenced, "utf8");
     const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
+    const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
     const canonSignedInfo = canonicalizeXml(signedInfoXml);
-    const signatureMd = forge.md.sha256.create();
+    const signatureMd = forge.md.sha1.create();
     signatureMd.update(canonSignedInfo, "utf8");
     const signatureBytes = privateKey.sign(signatureMd);
     const signatureBase64 = forge.util.encode64(signatureBytes);
     const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
     const certBase64 = forge.util.encode64(certDer);
 
-    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+    const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
     const elementName = getElementName(xml, idReferencia);
     const closingTag = `</${elementName}>`;
@@ -250,11 +250,12 @@ function criarEnvelopeSOAP11Paulistana(operacao: string, xmlAssinado: string): s
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
   <soapenv:Header/>
   <soapenv:Body>
-    <${operacao} xmlns="http://www.prefeitura.sp.gov.br/nfe">
+    <${operacao}Request xmlns="http://www.prefeitura.sp.gov.br/nfe">
+      <VersaoSchema>1</VersaoSchema>
       <MensagemXML><![CDATA[
 ${xmlAssinado}
       ]]></MensagemXML>
-    </${operacao}>
+    </${operacao}Request>
   </soapenv:Body>
 </soapenv:Envelope>`;
 }
@@ -620,7 +621,7 @@ async function cancelarProducao(nota: any, certDigital: CertificadoDigital, moti
 
   const xmlCancelamento = construirXmlCancelamentoPaulistana(numeroNfse, codigoVerificacao, inscricaoMunicipal, motivoCancelamento);
   const pedidoId = `CANC${numeroNfse}`;
-  const signedXml = assinarXmlSHA256(xmlCancelamento, certDigital, pedidoId);
+  const signedXml = assinarXmlSHA1(xmlCancelamento, certDigital, pedidoId);
 
   const operacao = "CancelamentoNFe";
   const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, signedXml);

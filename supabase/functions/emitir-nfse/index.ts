@@ -163,8 +163,8 @@ function gerarAssinaturaRpsPaulistana(
 function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital): { xml: string; rpsId: string } {
   const rpsId = `rps${dados.identificacaoRps.numero}`;
   const dataEmissao = formatarDataNfse(dados.dataEmissao);
-  const serieRps = dados.identificacaoRps.serie || "1";
-  const numeroRps = dados.identificacaoRps.numero;
+  const serieRps = (dados.identificacaoRps.serie || "1").padStart(5, "0");
+  const numeroRps = String(dados.identificacaoRps.numero).padStart(12, "0");
   const inscricaoPrestador = (certificado.inscricaoMunicipal || dados.emitente.inscricaoMunicipal || "").replace(/\D/g, "").padStart(8, "0");
   const tributacaoRps = dados.tributacaoRps || "T"; // T=TRIBUTADA_MUNICIPIO
   const statusRps = "N"; // N=NORMAL
@@ -198,7 +198,7 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
       <SerieRPS>${serieRps}</SerieRPS>
       <NumeroRPS>${numeroRps}</NumeroRPS>
     </ChaveRPS>
-    <TipoRPS>RPS</TipoRPS>
+    <TipoRPS>RPS-M</TipoRPS>
     <DataEmissao>${dataEmissao}</DataEmissao>
     <StatusRPS>${statusRps}</StatusRPS>
     <TributacaoRPS>${tributacaoRps}</TributacaoRPS>
@@ -229,13 +229,14 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
   if (dados.tomador.endereco?.logradouro) {
     xml += `
     <EnderecoTomador>
+      <TipoLogradouro>${escapeXml(dados.tomador.endereco.tipoLogradouro || "Rua")}</TipoLogradouro>
       <Logradouro>${escapeXml(dados.tomador.endereco.logradouro)}</Logradouro>
       <NumeroEndereco>${escapeXml(dados.tomador.endereco.numero || "S/N")}</NumeroEndereco>
       ${dados.tomador.endereco.complemento ? `<ComplementoEndereco>${escapeXml(dados.tomador.endereco.complemento)}</ComplementoEndereco>` : ""}
       <Bairro>${escapeXml(dados.tomador.endereco.bairro || "")}</Bairro>
       <Cidade>${cidadeParaIBGE(dados.tomador.endereco.cidade || "")}</Cidade>
       <UF>${dados.tomador.endereco.uf || "SP"}</UF>
-      <CEP>${(dados.tomador.endereco.cep || "").replace(/\D/g, "")}</CEP>
+      <CEP>${(dados.tomador.endereco.cep || "").replace(/\D/g, "").padStart(8, "0")}</CEP>
     </EnderecoTomador>`;
   }
 
@@ -252,7 +253,7 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
 }
 
 function construirXmlLotePaulistana(dados: any, xmlRps: string): { xml: string; loteId: string } {
-  const numeroLote = Date.now().toString();
+  const numeroLote = Date.now().toString().slice(-8);
   const loteId = `LOTE${numeroLote}`;
   const dataInicio = formatarDataNfse(dados.dataEmissao);
   const valorServicos = (parseFloat(dados.servico.valores.valorServicos) || 0).toFixed(2);
@@ -260,19 +261,25 @@ function construirXmlLotePaulistana(dados: any, xmlRps: string): { xml: string; 
 
   const cnpjRemetente = (dados.emitente.cnpj || "").replace(/\D/g, "").padStart(14, "0");
 
-  const xml = `<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="${loteId}">
-  <Cabecalho Versao="1">
+  const xml = `<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe">
+  <Cabecalho>
+    <Versao>1</Versao>
     <CPFCNPJRemetente>
       <CNPJ>${cnpjRemetente}</CNPJ>
     </CPFCNPJRemetente>
-    <transacao>true</transacao>
-    <dtInicio>${dataInicio}</dtInicio>
-    <dtFim>${dataInicio}</dtFim>
-    <QtdRPS>1</QtdRPS>
+  </Cabecalho>
+  <Lote Id="${loteId}">
+    <NumeroLote>${numeroLote}</NumeroLote>
+    <CPFCNPJRemetente>
+      <CNPJ>${cnpjRemetente}</CNPJ>
+    </CPFCNPJRemetente>
+    <QuantidadeRPS>1</QuantidadeRPS>
     <ValorTotalServicos>${valorServicos}</ValorTotalServicos>
     <ValorTotalDeducoes>${valorDeducoes}</ValorTotalDeducoes>
-  </Cabecalho>
-  ${xmlRps}
+    <ListaRPS>
+      ${xmlRps}
+    </ListaRPS>
+  </Lote>
 </PedidoEnvioLoteRPS>`;
 
   return { xml, loteId };
@@ -331,7 +338,7 @@ function getElementName(xml: string, id: string): string {
   return match ? match[1] : "PedidoEnvioLoteRPS";
 }
 
-function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
+function assinarXmlSHA1(xml: string, certificado: CertificadoDigital, idReferencia: string): string {
   const forge = (globalThis as any).forge;
   if (!forge) throw new Error("node-forge nao disponivel");
   const privateKey = forge.pki.privateKeyFromPem(certificado.keyPem);
@@ -339,21 +346,21 @@ function assinarXmlSHA256(xml: string, certificado: CertificadoDigital, idRefere
   const referencedXml = extractElementById(xml, idReferencia);
   if (!referencedXml) throw new Error(`Elemento Id="${idReferencia}" nao encontrado`);
   const canonReferenced = canonicalizeXml(referencedXml);
-  const digest = forge.md.sha256.create();
+  const digest = forge.md.sha1.create();
   digest.update(canonReferenced, "utf8");
   const digestBase64 = forge.util.encode64(digest.digest().bytes());
 
-  const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
+  const signedInfoXml = `<SignedInfo xmlns="http://www.w3.org/2000/09/xmldsig#"><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo>`;
 
   const canonSignedInfo = canonicalizeXml(signedInfoXml);
-  const signatureMd = forge.md.sha256.create();
+  const signatureMd = forge.md.sha1.create();
   signatureMd.update(canonSignedInfo, "utf8");
   const signatureBytes = privateKey.sign(signatureMd);
   const signatureBase64 = forge.util.encode64(signatureBytes);
   const certDer = forge.asn1.toDer(forge.pki.certificateToAsn1(certificate)).getBytes();
   const certBase64 = forge.util.encode64(certDer);
 
-  const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha256"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
+  const signatureBlock = `<Signature xmlns="http://www.w3.org/2000/09/xmldsig#"><SignedInfo><CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"></CanonicalizationMethod><SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"></SignatureMethod><Reference URI="#${idReferencia}"><Transforms><Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"></Transform></Transforms><DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"></DigestMethod><DigestValue>${digestBase64}</DigestValue></Reference></SignedInfo><SignatureValue>${signatureBase64}</SignatureValue><KeyInfo><X509Data><X509Certificate>${certBase64}</X509Certificate></X509Data></KeyInfo></Signature>`;
 
   const elementName = getElementName(xml, idReferencia);
   const closingTag = `</${elementName}>`;
@@ -369,11 +376,12 @@ function criarEnvelopeSOAP11Paulistana(operacao: string, xmlAssinado: string): s
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/">
   <soapenv:Header/>
   <soapenv:Body>
-    <${operacao} xmlns="http://www.prefeitura.sp.gov.br/nfe">
+    <${operacao}Request xmlns="http://www.prefeitura.sp.gov.br/nfe">
+      <VersaoSchema>1</VersaoSchema>
       <MensagemXML><![CDATA[
 ${xmlAssinado}
       ]]></MensagemXML>
-    </${operacao}>
+    </${operacao}Request>
   </soapenv:Body>
 </soapenv:Envelope>`;
 }
@@ -673,9 +681,9 @@ serve(async (req) => {
       console.log("[emitir-nfse] XML Lote (sem assinar):");
       console.log(xmlLote);
 
-      // Assina o lote com XML-DSig SHA-256
-      const signedLote = assinarXmlSHA256(xmlLote, certDigital, loteId);
-      console.log("[emitir-nfse] Lote assinado com XML-DSig SHA-256");
+      // Assina o lote com XML-DSig SHA-1
+      const signedLote = assinarXmlSHA1(xmlLote, certDigital, loteId);
+      console.log("[emitir-nfse] Lote assinado com XML-DSig SHA-1");
 
       const operacao = "EnvioLoteRPS";
       const soapEnvelope = criarEnvelopeSOAP11Paulistana(operacao, signedLote);
