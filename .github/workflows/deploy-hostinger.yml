@@ -54,7 +54,7 @@ jobs:
           security: loose
           timeout: 300000
           local-dir: ./dist/
-          server-dir: /public_html
+          server-dir: /home/u358595036/domains/9nineteste.9ninebusinesscontrol.com.br/public_html/
           dangerous-clean-slate: true
           state-name: .ftp-deploy-sync-state-new
           exclude: |
