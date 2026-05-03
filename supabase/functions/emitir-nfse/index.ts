@@ -165,13 +165,13 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
   const dataEmissao = formatarDataNfse(dados.dataEmissao);
   const serieRps = dados.identificacaoRps.serie || "1";
   const numeroRps = dados.identificacaoRps.numero;
-  const inscricaoPrestador = certificado.inscricaoMunicipal || dados.emitente.inscricaoMunicipal || "00000000";
+  const inscricaoPrestador = (certificado.inscricaoMunicipal || dados.emitente.inscricaoMunicipal || "").replace(/\D/g, "").padStart(8, "0");
   const tributacaoRps = dados.tributacaoRps || "T"; // T=TRIBUTADA_MUNICIPIO
   const statusRps = "N"; // N=NORMAL
   const issRetido = !!dados.servico.issRetido;
   const valorServicos = parseFloat(dados.servico.valores.valorServicos) || 0;
   const valorDeducoes = parseFloat(dados.servico.valores.valorDeducoes) || 0;
-  const codigoServico = dados.servico.itemListaServico || dados.servico.codigo || "";
+  const codigoServico = (dados.servico.itemListaServico || dados.servico.codigo || "").replace(/\D/g, "").padStart(5, "0");
 
   const tomadorCnpjCpf = (dados.tomador.cnpjCpf || "").replace(/\D/g, "");
   const indicadorCpfCnpj = dados.tomador.tipoDocumento === "CPF" ? "1" : tomadorCnpjCpf ? "2" : "3";
@@ -214,9 +214,10 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
     <ISSRetido>${issRetido ? "true" : "false"}</ISSRetido>`;
 
   if (dados.tomador.cnpjCpf) {
+    const cnpjCpfLimpo = dados.tomador.cnpjCpf.replace(/\D/g, "");
     xml += `
     <CPFCNPJTomador>
-      <${dados.tomador.tipoDocumento === "CPF" ? "CPF" : "CNPJ"}>${dados.tomador.cnpjCpf}</${dados.tomador.tipoDocumento === "CPF" ? "CPF" : "CNPJ"}>
+      <${dados.tomador.tipoDocumento === "CPF" ? "CPF" : "CNPJ"}>${cnpjCpfLimpo}</${dados.tomador.tipoDocumento === "CPF" ? "CPF" : "CNPJ"}>
     </CPFCNPJTomador>`;
   }
 
@@ -257,10 +258,12 @@ function construirXmlLotePaulistana(dados: any, xmlRps: string): { xml: string; 
   const valorServicos = (parseFloat(dados.servico.valores.valorServicos) || 0).toFixed(2);
   const valorDeducoes = (parseFloat(dados.servico.valores.valorDeducoes) || 0).toFixed(2);
 
+  const cnpjRemetente = (dados.emitente.cnpj || "").replace(/\D/g, "").padStart(14, "0");
+
   const xml = `<PedidoEnvioLoteRPS xmlns="http://www.prefeitura.sp.gov.br/nfe" Id="${loteId}">
   <Cabecalho Versao="1">
     <CPFCNPJRemetente>
-      <CNPJ>${dados.emitente.cnpj}</CNPJ>
+      <CNPJ>${cnpjRemetente}</CNPJ>
     </CPFCNPJRemetente>
     <transacao>true</transacao>
     <dtInicio>${dataInicio}</dtInicio>
@@ -561,6 +564,8 @@ serve(async (req) => {
     certDigital.cnpj = certificado.cnpj || certDigital.cnpj || "";
     if (!certDigital.cnpj) throw new Error("CNPJ nao encontrado no certificado");
 
+    console.log("[emitir-nfse] Certificado CNPJ:", certDigital.cnpj, "IM bruta:", certDigital.inscricaoMunicipal);
+
     await supabase.from("notas_fiscais_servico").update({ status: "enviando" }).eq("id", notaId).eq("user_id", user.id);
     const { data: nota, error: notaError } = await supabase.from("notas_fiscais_servico").select("*").eq("id", notaId).eq("user_id", user.id).single();
     if (notaError || !nota) throw new Error("Nota nao encontrada");
@@ -657,6 +662,8 @@ serve(async (req) => {
 
       const { xml: xmlLote, loteId } = construirXmlLotePaulistana(dadosNota, xmlRps);
       console.log(`[emitir-nfse] Lote ${loteId} construido`);
+      console.log("[emitir-nfse] XML Lote (sem assinar):");
+      console.log(xmlLote);
 
       // Assina o lote com XML-DSig SHA-256
       const signedLote = assinarXmlSHA256(xmlLote, certDigital, loteId);
