@@ -100,7 +100,9 @@
       "Bash(where supabase *)",
       "Bash(Get-Command supabase *)",
       "Bash(yarn global *)",
-      "Bash(bun list *)"
+      "Bash(bun list *)",
+      "Bash(git revert *)",
+      "Bash(git checkout *)"
     ]
   }
 }
