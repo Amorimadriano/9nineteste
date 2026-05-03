@@ -43,14 +43,14 @@ jobs:
           curl -v --connect-timeout 10 ftp://${{ secrets.HOSTINGER_FTP_SERVER }}:21/ 2>&1 | head -20 || true
         shell: bash
 
-      - name: Deploy to Hostinger via FTP
+      - name: Deploy to Hostinger via SFTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.HOSTINGER_FTP_SERVER }}
           username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
           password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
+          protocol: sftp
+          port: 22
           security: loose
           timeout: 300000
           local-dir: ./dist/
