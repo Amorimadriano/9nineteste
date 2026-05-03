@@ -171,7 +171,7 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
   const issRetido = !!dados.servico.issRetido;
   const valorServicos = parseFloat(dados.servico.valores.valorServicos) || 0;
   const valorDeducoes = parseFloat(dados.servico.valores.valorDeducoes) || 0;
-  const codigoServico = (dados.servico.itemListaServico || dados.servico.codigo || "").replace(/\D/g, "").padStart(5, "0");
+  const codigoServico = maparCodigoServicoSP(dados.servico.itemListaServico || dados.servico.codigo || "");
 
   const tomadorCnpjCpf = (dados.tomador.cnpjCpf || "").replace(/\D/g, "");
   const indicadorCpfCnpj = dados.tomador.tipoDocumento === "CPF" ? "1" : tomadorCnpjCpf ? "2" : "3";
@@ -233,7 +233,7 @@ function construirXmlRpsPaulistana(dados: any, certificado: CertificadoDigital):
       <NumeroEndereco>${escapeXml(dados.tomador.endereco.numero || "S/N")}</NumeroEndereco>
       ${dados.tomador.endereco.complemento ? `<ComplementoEndereco>${escapeXml(dados.tomador.endereco.complemento)}</ComplementoEndereco>` : ""}
       <Bairro>${escapeXml(dados.tomador.endereco.bairro || "")}</Bairro>
-      <Cidade>${escapeXml(dados.tomador.endereco.cidade || "")}</Cidade>
+      <Cidade>${cidadeParaIBGE(dados.tomador.endereco.cidade || "")}</Cidade>
       <UF>${dados.tomador.endereco.uf || "SP"}</UF>
       <CEP>${(dados.tomador.endereco.cep || "").replace(/\D/g, "")}</CEP>
     </EnderecoTomador>`;
@@ -657,6 +657,14 @@ serve(async (req) => {
         mensagens: [{ codigo: "AA001", mensagem: "RPS processado - ambiente de homologacao (Paulistana)", tipo: "Sucesso" }],
       };
     } else {
+      console.log("[emitir-nfse] Dados nota:", JSON.stringify({
+        numeroRps: dadosNota.identificacaoRps.numero,
+        codigoServico: dadosNota.servico.itemListaServico,
+        codigoServicoMapeado: maparCodigoServicoSP(dadosNota.servico.itemListaServico),
+        valorServicos: dadosNota.servico.valores.valorServicos,
+        cidadeTomador: dadosNota.tomador.endereco?.cidade,
+        cidadeTomadorIBGE: cidadeParaIBGE(dadosNota.tomador.endereco?.cidade),
+      }));
       const { xml: xmlRps, rpsId } = construirXmlRpsPaulistana(dadosNota, certDigital);
       console.log(`[emitir-nfse] RPS ${rpsId} construido`);
 
@@ -707,8 +715,64 @@ serve(async (req) => {
   }
 });
 
+// Mapeamento de cidade → codigo IBGE (7 digitos) para Prefeitura SP
+const MAPA_IBGE: Record<string, string> = {
+  "SAO PAULO": "3550308",
+  "SÃO PAULO": "3550308",
+  "sao paulo": "3550308",
+  "são paulo": "3550308",
+  "RIO DE JANEIRO": "3304557",
+  "BELO HORIZONTE": "3106200",
+  "CURITIBA": "4106902",
+  "PORTO ALEGRE": "4314902",
+  "SALVADOR": "2927408",
+  "BRASILIA": "5300108",
+  "BRASÍLIA": "5300108",
+  "CAMPINAS": "3509502",
+  "GUARULHOS": "3518800",
+  "OSASCO": "3534401",
+  "BARUERI": "3505708",
+  "SANTO ANDRE": "3547809",
+  "SÃO BERNARDO DO CAMPO": "3548708",
+  "SAO BERNARDO DO CAMPO": "3548708",
+};
+
+function cidadeParaIBGE(cidade: string): string {
+  return MAPA_IBGE[cidade?.toUpperCase()] || MAPA_IBGE[cidade] || "3550308";
+}
+
 function gerarNumeroRps(): string {
-  const timestamp = Date.now().toString().slice(-8);
-  const random = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
-  return `${timestamp}${random}`;
+  // Gera numero de ate 8 digitos (ultimos 8 do timestamp)
+  return Date.now().toString().slice(-8);
+}
+
+// Mapeamento: Lista de Servicos LC 116/2003 → Codigo Prefeitura SP
+const MAPA_CODIGO_SERVICO_SP: Record<string, string> = {
+  "1.01": "7617",   // Analise e desenvolvimento de sistemas
+  "1.02": "7617",   // Programacao
+  "1.03": "7617",   // Processamento de dados
+  "1.04": "7617",   // Elaboracao de programas
+  "1.05": "7617",   // Licenciamento de programas
+  "1.06": "7617",   // Assessoria em informatica
+  "1.07": "7617",   // Suporte tecnico em informatica
+  "1.08": "7617",   // Planejamento de paginas internet
+  "1.09": "7617",   // Hospedagem na internet
+  "17.01": "6912",  // Publicidade e propaganda
+  "17.02": "6912",
+  "17.03": "6912",
+  "17.04": "6912",
+  "17.05": "6912",
+  "17.06": "6912",
+  "17.07": "6912",
+  "17.08": "6912",
+  "17.09": "6912",
+  "17.10": "6912",
+  "25.01": "2501",  // Consultoria empresarial
+  "25.02": "2501",
+  "25.03": "2501",
+  "25.04": "2501",
+};
+
+function maparCodigoServicoSP(codigoLC116: string): string {
+  return MAPA_CODIGO_SERVICO_SP[codigoLC116] || codigoLC116.replace(/\D/g, "").padStart(4, "0");
 }
