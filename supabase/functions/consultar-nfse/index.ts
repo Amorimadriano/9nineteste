@@ -466,7 +466,7 @@ async function retry<T>(fn: () => Promise<T>, options = { tentativas: 3, delay: 
 }
 
 // --- Handler ---
-serve(async (req) => {
+serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders });
 
