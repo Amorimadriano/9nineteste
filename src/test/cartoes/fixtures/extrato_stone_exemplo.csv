@@ -1,0 +1,9 @@
+Data/Hora,Tipo,Modalidade,Bandeira,Últimos 4 dígitos,Valor Bruto,Taxa,Valor Líquido,Parcela,Total Parcelas,NSU,Autorização,Status
+17/04/2026 10:30:15,Crédito,À vista,Visa,1234,"150,00","1,99%","147,02",1,1,ST001,AUTH001,Recebido
+17/04/2026 14:22:45,Crédito,Parcelado,Mastercard,5678,"320,50","1,99%","314,12",1,3,ST002,AUTH002,Recebido
+17/04/2026 14:22:45,Crédito,Parcelado,Mastercard,5678,"320,50","1,99%","314,12",2,3,ST002,AUTH002,Agendado
+17/04/2026 14:22:45,Crédito,Parcelado,Mastercard,5678,"320,50","1,99%","314,12",3,3,ST002,AUTH002,Agendado
+17/04/2026 16:45:30,Débito,À vista,Elo,9012,"89,90","2,29%","87,85",1,1,ST003,AUTH003,Recebido
+16/04/2026 09:15:00,Crédito,Parcelado,Visa,3456,"1.250,00","1,99%","1.225,13",1,6,ST004,AUTH004,Recebido
+16/04/2026 11:30:20,Débito,À vista,Mastercard,7890,"45,00","1,99%","44,11",1,1,ST005,AUTH005,Recebido
+18/04/2026 10:30:15,Estorno,À vista,Visa,1234,"-150,00","1,99%","-147,02",1,1,ST001,AUTH001,Estornado
