@@ -5,7 +5,7 @@ create table if not exists public.budget_planning_lines (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   empresa_id uuid null, -- FK para empresas se existir
-  plano_conta_id uuid not null references public.plano_contas(id) on delete cascade,
+  plano_conta_id uuid not null, -- FK adicionada posteriormente em 20260522100000_add_budget_planning_fk.sql
   fiscal_year integer not null,
   values jsonb not null default '{}',
   created_at timestamptz default now(),

@@ -89,6 +89,7 @@ CREATE INDEX IF NOT EXISTS idx_mapeamento_plano ON public.mapeamento_contabil(pl
 -- RLS (idempotente)
 ALTER TABLE public.mapeamento_contabil ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users manage own mapeamento_contabil" ON public.mapeamento_contabil;
 CREATE POLICY "Users manage own mapeamento_contabil"
 ON public.mapeamento_contabil
 FOR ALL

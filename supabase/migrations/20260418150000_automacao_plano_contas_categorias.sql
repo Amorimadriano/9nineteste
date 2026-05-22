@@ -7,7 +7,7 @@
 -- ============================================
 CREATE OR REPLACE FUNCTION public.criar_conta_plano_automatico(
     p_user_id UUID,
-    p_empresa_id UUID DEFAULT NULL,
+    p_empresa_id UUID,
     p_nome_categoria TEXT,
     p_tipo TEXT
 ) RETURNS UUID AS $$

@@ -10,6 +10,7 @@ CREATE OR REPLACE FUNCTION public.criar_plano_contas_padrao(
 ) RETURNS INTEGER AS $$
 DECLARE
     v_count INTEGER := 0;
+    v_rows INTEGER;
 BEGIN
     -- ATIVO (1)
     INSERT INTO public.plano_contas (user_id, empresa_id, codigo_conta, codigo_pai, nivel, tipo_conta, natureza, descricao, permite_lancamento) VALUES
@@ -25,7 +26,8 @@ BEGIN
     (p_user_id, p_empresa_id, '1.2', '1', 2, 'sintetica', 'ativa', 'Ativo Não Circulante', false),
     (p_user_id, p_empresa_id, '1.2.04', '1.2', 3, 'sintetica', 'ativa', 'Imobilizado', false),
     (p_user_id, p_empresa_id, '1.2.04.0001', '1.2.04', 4, 'analitica', 'ativa', 'Móveis e Utensílios', true);
-    GET DIAGNOSTICS v_count = ROW_COUNT;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_count := v_count + v_rows;
 
     -- PASSIVO (2)
     INSERT INTO public.plano_contas (user_id, empresa_id, codigo_conta, codigo_pai, nivel, tipo_conta, natureza, descricao, permite_lancamento) VALUES
@@ -38,7 +40,8 @@ BEGIN
     (p_user_id, p_empresa_id, '2.1.03.0002', '2.1.03', 4, 'analitica', 'passiva', 'ISS a Recolher', true),
     (p_user_id, p_empresa_id, '2.1.04', '2.1', 3, 'sintetica', 'passiva', 'Obrigações Trabalhistas', false),
     (p_user_id, p_empresa_id, '2.1.04.0001', '2.1.04', 4, 'analitica', 'passiva', 'Salários a Pagar', true);
-    GET DIAGNOSTICS v_count = v_count + ROW_COUNT;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_count := v_count + v_rows;
 
     -- RECEITAS (3)
     INSERT INTO public.plano_contas (user_id, empresa_id, codigo_conta, codigo_pai, nivel, tipo_conta, natureza, descricao, permite_lancamento) VALUES
@@ -49,7 +52,8 @@ BEGIN
     (p_user_id, p_empresa_id, '3.1.02', '3.1', 3, 'sintetica', 'receita', 'Serviços', false),
     (p_user_id, p_empresa_id, '3.1.02.0001', '3.1.02', 4, 'analitica', 'receita', 'Serviços Prestados', true),
     (p_user_id, p_empresa_id, '3.1.02.0002', '3.1.02', 4, 'analitica', 'receita', 'Consultoria', true);
-    GET DIAGNOSTICS v_count = v_count + ROW_COUNT;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_count := v_count + v_rows;
 
     -- DESPESAS (4)
     INSERT INTO public.plano_contas (user_id, empresa_id, codigo_conta, codigo_pai, nivel, tipo_conta, natureza, descricao, permite_lancamento) VALUES
@@ -62,7 +66,8 @@ BEGIN
     (p_user_id, p_empresa_id, '4.1.02.0001', '4.1.02', 4, 'analitica', 'despesa', 'Aluguel', true),
     (p_user_id, p_empresa_id, '4.1.02.0002', '4.1.02', 4, 'analitica', 'despesa', 'Energia', true),
     (p_user_id, p_empresa_id, '4.1.02.0003', '4.1.02', 4, 'analitica', 'despesa', 'Telefone', true);
-    GET DIAGNOSTICS v_count = v_count + ROW_COUNT;
+    GET DIAGNOSTICS v_rows = ROW_COUNT;
+    v_count := v_count + v_rows;
 
     RETURN v_count;
 END;

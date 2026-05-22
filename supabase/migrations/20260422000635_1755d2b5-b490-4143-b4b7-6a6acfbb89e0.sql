@@ -4,6 +4,9 @@ ALTER TABLE public.categorias
 ADD COLUMN IF NOT EXISTS plano_conta_id uuid REFERENCES public.plano_contas(id) ON DELETE SET NULL;
 
 -- 2. Criar função de sincronização categorias <-> plano de contas
+-- Remover função existente para permitir mudança de tipo de retorno
+DROP FUNCTION IF EXISTS public.sincronizar_categorias_plano_contas(uuid, uuid);
+
 CREATE OR REPLACE FUNCTION public.sincronizar_categorias_plano_contas(p_user_id uuid, p_empresa_id uuid DEFAULT NULL)
 RETURNS SETOF jsonb
 LANGUAGE plpgsql

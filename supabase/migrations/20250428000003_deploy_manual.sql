@@ -1,5 +1,6 @@
 -- MIGRATION MANUAL: Aplicação direta das alterações de 28/04/2026
 -- Aplicar no Supabase SQL Editor (New Query)
+-- Migration segura: verifica existência de tabelas antes de alterar
 
 -- ============================================
 -- 1. BUDGET PLANNING LINES
@@ -9,7 +10,7 @@ create table if not exists public.budget_planning_lines (
   id uuid default gen_random_uuid() primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   empresa_id uuid null,
-  plano_conta_id uuid not null references public.plano_contas(id) on delete cascade,
+  plano_conta_id uuid not null, -- FK adicionada posteriormente em 20260522100000_add_budget_planning_fk.sql
   fiscal_year integer not null,
   values jsonb not null default '{}',
   created_at timestamptz default now(),
@@ -51,27 +52,35 @@ create trigger trg_budget_lines_updated_at
   execute function public.handle_updated_at();
 
 -- ============================================
--- 2. CONCILIAÇÃO BANCÁRIA V2
+-- 2. CONCILIAÇÃO BANCÁRIA V2 (segura: verifica existência da tabela)
 -- ============================================
 
-alter table public.extrato_bancario
-add column if not exists status_conciliacao text default 'pendente'
-check (status_conciliacao in ('pendente', 'aguardando_extrato', 'em_conciliacao', 'conciliado', 'divergente'));
+do $$
+begin
+  if exists (
+    select 1 from information_schema.tables
+    where table_schema = 'public' and table_name = 'extrato_bancario'
+  ) then
+    alter table public.extrato_bancario
+    add column if not exists status_conciliacao text default 'pendente'
+    check (status_conciliacao in ('pendente', 'aguardando_extrato', 'em_conciliacao', 'conciliado', 'divergente'));
 
-create index if not exists idx_extrato_status_conciliacao
-on public.extrato_bancario(status_conciliacao);
+    create index if not exists idx_extrato_status_conciliacao
+    on public.extrato_bancario(status_conciliacao);
 
-create index if not exists idx_extrato_matching
-on public.extrato_bancario(tipo, valor, data_transacao, conciliado, origem);
+    create index if not exists idx_extrato_matching
+    on public.extrato_bancario(tipo, valor, data_transacao, conciliado, origem);
 
-comment on column public.extrato_bancario.status_conciliacao is
-  'pendente = importado do OFX; aguardando_extrato = espelho de conta a pagar/receber; em_conciliacao = em processo de match; conciliado = confirmado; divergente = sem correspondente';
+    comment on column public.extrato_bancario.status_conciliacao is
+      'pendente = importado do OFX; aguardando_extrato = espelho de conta a pagar/receber; em_conciliacao = em processo de match; conciliado = confirmado; divergente = sem correspondente';
 
--- Atualiza registros existentes
-update public.extrato_bancario
-set status_conciliacao = 'aguardando_extrato'
-where origem = 'sistema' and conciliado = false;
+    -- Atualiza registros existentes
+    update public.extrato_bancario
+    set status_conciliacao = 'aguardando_extrato'
+    where origem = 'sistema' and conciliado = false;
 
-update public.extrato_bancario
-set status_conciliacao = 'conciliado'
-where conciliado = true;
+    update public.extrato_bancario
+    set status_conciliacao = 'conciliado'
+    where conciliado = true;
+  end if;
+end $$;

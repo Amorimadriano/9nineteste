@@ -29,7 +29,7 @@ ALTER TABLE public.certificados_nfse ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.certificados_nfse FORCE ROW LEVEL SECURITY;
 
 -- 4. Remover TODAS as políticas existentes
-DO \$\$
+DO $$
 DECLARE
     pol RECORD;
 BEGIN
@@ -40,7 +40,7 @@ BEGIN
     LOOP
         EXECUTE format('DROP POLICY IF EXISTS %I ON certificados_nfse', pol.policyname);
     END LOOP;
-END \$\$;
+END $$;
 
 -- 5. Criar políticas RLS individuais
 
@@ -79,12 +79,12 @@ GRANT ALL ON public.certificados_nfse TO service_role;
 
 -- 7. Trigger para updated_at
 CREATE OR REPLACE FUNCTION update_certificado_updated_at()
-RETURNS TRIGGER AS \$\$
+RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-\$\$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql;
 
 DROP TRIGGER IF EXISTS trigger_update_certificado_updated_at ON public.certificados_nfse;
 CREATE TRIGGER trigger_update_certificado_updated_at

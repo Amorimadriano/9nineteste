@@ -416,6 +416,7 @@ ALTER TABLE configuracoes_cartao ENABLE ROW LEVEL SECURITY;
 ALTER TABLE auditoria_transacoes_cartao ENABLE ROW LEVEL SECURITY;
 
 -- Políticas para transacoes_cartao
+DROP POLICY IF EXISTS select_transacoes_cartao ON transacoes_cartao;
 CREATE POLICY select_transacoes_cartao ON transacoes_cartao
     FOR SELECT USING (
         empresa_id IN (
@@ -424,6 +425,7 @@ CREATE POLICY select_transacoes_cartao ON transacoes_cartao
         )
     );
 
+DROP POLICY IF EXISTS insert_transacoes_cartao ON transacoes_cartao;
 CREATE POLICY insert_transacoes_cartao ON transacoes_cartao
     FOR INSERT WITH CHECK (
         user_id = auth.uid() AND
@@ -433,6 +435,7 @@ CREATE POLICY insert_transacoes_cartao ON transacoes_cartao
         )
     );
 
+DROP POLICY IF EXISTS update_transacoes_cartao ON transacoes_cartao;
 CREATE POLICY update_transacoes_cartao ON transacoes_cartao
     FOR UPDATE USING (
         empresa_id IN (
@@ -441,6 +444,7 @@ CREATE POLICY update_transacoes_cartao ON transacoes_cartao
         )
     );
 
+DROP POLICY IF EXISTS delete_transacoes_cartao ON transacoes_cartao;
 CREATE POLICY delete_transacoes_cartao ON transacoes_cartao
     FOR DELETE USING (
         empresa_id IN (
@@ -450,6 +454,7 @@ CREATE POLICY delete_transacoes_cartao ON transacoes_cartao
     );
 
 -- Políticas para configuracoes_cartao
+DROP POLICY IF EXISTS select_configuracoes_cartao ON configuracoes_cartao;
 CREATE POLICY select_configuracoes_cartao ON configuracoes_cartao
     FOR SELECT USING (
         empresa_id IN (
@@ -458,6 +463,7 @@ CREATE POLICY select_configuracoes_cartao ON configuracoes_cartao
         )
     );
 
+DROP POLICY IF EXISTS insert_configuracoes_cartao ON configuracoes_cartao;
 CREATE POLICY insert_configuracoes_cartao ON configuracoes_cartao
     FOR INSERT WITH CHECK (
         user_id = auth.uid() AND
@@ -467,6 +473,7 @@ CREATE POLICY insert_configuracoes_cartao ON configuracoes_cartao
         )
     );
 
+DROP POLICY IF EXISTS update_configuracoes_cartao ON configuracoes_cartao;
 CREATE POLICY update_configuracoes_cartao ON configuracoes_cartao
     FOR UPDATE USING (
         empresa_id IN (
@@ -476,6 +483,7 @@ CREATE POLICY update_configuracoes_cartao ON configuracoes_cartao
     );
 
 -- Políticas para auditoria (apenas visualização)
+DROP POLICY IF EXISTS select_auditoria_cartao ON auditoria_transacoes_cartao;
 CREATE POLICY select_auditoria_cartao ON auditoria_transacoes_cartao
     FOR SELECT USING (
         empresa_id IN (
