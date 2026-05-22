@@ -53,6 +53,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 
+const ADMIN_EMAILS = ["9ninebpo9@gmail.com", "adriano.amorim83@gmail.com", "amorim.adriano83@gmail.com", "marketing@9ninebusinesscontrol.com.br"];
+
 const menuItems = [
   { title: "Empresa", url: "/empresa", icon: Briefcase },
   { title: "Licenças de Software", url: "/licencas-software", icon: KeyRound, adminOnly: true },

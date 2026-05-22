@@ -105,7 +105,16 @@
       "Bash(git checkout *)",
       "WebFetch(domain:nfe.io)",
       "Bash(npm --version)",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "PowerShell(supabase *)",
+      "PowerShell(npm install *)",
+      "PowerShell(npm root *)",
+      "PowerShell(node \"$env:APPDATA\\\\npm\\\\node_modules\\\\supabase\\\\dist\\\\supabase.js\" --version)",
+      "Bash(tar -xzf /tmp/supabase.tar.gz -C /tmp/)",
+      "Bash(/tmp/supabase.exe --version)",
+      "Bash(/tmp/supabase.exe functions *)",
+      "Bash(env)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3da35662185347437695b1753693135fd5c3b124\" /tmp/supabase.exe functions deploy manage-users)"
     ]
   }
 }
