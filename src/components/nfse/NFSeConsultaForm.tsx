@@ -123,7 +123,7 @@ export function NFSeConsultaForm({ certificado }: NFSeConsultaFormProps) {
 
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://gcmxhuadibdrumvqdrkc.supabase.co";
           const response = await fetch(`${supabaseUrl}/functions/v1/consultar-nfse`, {
             method: "POST",
             headers: {

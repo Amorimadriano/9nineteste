@@ -502,7 +502,7 @@ export default function NFSeEmissao() {
       }
 
       // Chama Edge Function via fetch para poder ler o corpo do erro 500
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://gcmxhuadibdrumvqdrkc.supabase.co";
       const maxRetries = 2;
       let emitData: any = null;
       let lastError: string | null = null;

@@ -206,7 +206,7 @@ export default function NFSeHistorico() {
     if (!token) throw new Error("Sessão não encontrada");
 
     const res = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/download-nfse`,
+      `${import.meta.env.VITE_SUPABASE_URL || "https://gcmxhuadibdrumvqdrkc.supabase.co"}/functions/v1/download-nfse`,
       {
         method: "POST",
         headers: {
