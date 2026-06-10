@@ -1,0 +1,1049 @@
+              table_name               |            column_name             |        data_type         | character_maximum_length | numeric_precision | numeric_scale | is_nullable 
+---------------------------------------+------------------------------------+--------------------------+--------------------------+-------------------+---------------+-------------
+ anexos                                | id                                 | uuid                     |                          |                   |               | NO
+ anexos                                | user_id                            | uuid                     |                          |                   |               | NO
+ anexos                                | conta_pagar_id                     | uuid                     |                          |                   |               | YES
+ anexos                                | conta_receber_id                   | uuid                     |                          |                   |               | YES
+ anexos                                | nome_arquivo                       | text                     |                          |                   |               | NO
+ anexos                                | storage_path                       | text                     |                          |                   |               | NO
+ anexos                                | tipo_arquivo                       | text                     |                          |                   |               | YES
+ anexos                                | tamanho                            | bigint                   |                          |                64 |             0 | YES
+ anexos                                | created_at                         | timestamp with time zone |                          |                   |               | NO
+ assinaturas                           | id                                 | uuid                     |                          |                   |               | NO
+ assinaturas                           | user_id                            | uuid                     |                          |                   |               | NO
+ assinaturas                           | status                             | text                     |                          |                   |               | NO
+ assinaturas                           | plano                              | text                     |                          |                   |               | NO
+ assinaturas                           | valor                              | numeric                  |                          |                   |               | NO
+ assinaturas                           | data_inicio                        | timestamp with time zone |                          |                   |               | YES
+ assinaturas                           | data_fim                           | timestamp with time zone |                          |                   |               | YES
+ assinaturas                           | metodo_pagamento                   | text                     |                          |                   |               | YES
+ assinaturas                           | pagarme_order_id                   | text                     |                          |                   |               | YES
+ assinaturas                           | pagarme_charge_id                  | text                     |                          |                   |               | YES
+ assinaturas                           | pagarme_customer_id                | text                     |                          |                   |               | YES
+ assinaturas                           | pix_qr_code                        | text                     |                          |                   |               | YES
+ assinaturas                           | pix_qr_code_url                    | text                     |                          |                   |               | YES
+ assinaturas                           | boleto_url                         | text                     |                          |                   |               | YES
+ assinaturas                           | boleto_barcode                     | text                     |                          |                   |               | YES
+ assinaturas                           | created_at                         | timestamp with time zone |                          |                   |               | NO
+ assinaturas                           | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ audit_logs                            | id                                 | uuid                     |                          |                   |               | NO
+ audit_logs                            | user_id                            | uuid                     |                          |                   |               | NO
+ audit_logs                            | action                             | text                     |                          |                   |               | NO
+ audit_logs                            | table_name                         | text                     |                          |                   |               | NO
+ audit_logs                            | record_id                          | text                     |                          |                   |               | YES
+ audit_logs                            | old_data                           | jsonb                    |                          |                   |               | YES
+ audit_logs                            | new_data                           | jsonb                    |                          |                   |               | YES
+ audit_logs                            | ip_address                         | text                     |                          |                   |               | YES
+ audit_logs                            | created_at                         | timestamp with time zone |                          |                   |               | NO
+ auditoria_transacoes_cartao           | id                                 | uuid                     |                          |                   |               | NO
+ auditoria_transacoes_cartao           | user_id                            | uuid                     |                          |                   |               | YES
+ auditoria_transacoes_cartao           | empresa_id                         | uuid                     |                          |                   |               | YES
+ auditoria_transacoes_cartao           | tabela                             | text                     |                          |                   |               | NO
+ auditoria_transacoes_cartao           | operacao                           | text                     |                          |                   |               | NO
+ auditoria_transacoes_cartao           | registro_id                        | uuid                     |                          |                   |               | YES
+ auditoria_transacoes_cartao           | dados_antigos                      | jsonb                    |                          |                   |               | YES
+ auditoria_transacoes_cartao           | dados_novos                        | jsonb                    |                          |                   |               | YES
+ auditoria_transacoes_cartao           | ip_address                         | inet                     |                          |                   |               | YES
+ auditoria_transacoes_cartao           | user_agent                         | text                     |                          |                   |               | YES
+ auditoria_transacoes_cartao           | created_at                         | timestamp with time zone |                          |                   |               | YES
+ bancos_cartoes                        | id                                 | uuid                     |                          |                   |               | NO
+ bancos_cartoes                        | user_id                            | uuid                     |                          |                   |               | NO
+ bancos_cartoes                        | tipo                               | text                     |                          |                   |               | NO
+ bancos_cartoes                        | nome                               | text                     |                          |                   |               | NO
+ bancos_cartoes                        | banco                              | text                     |                          |                   |               | YES
+ bancos_cartoes                        | agencia                            | text                     |                          |                   |               | YES
+ bancos_cartoes                        | conta                              | text                     |                          |                   |               | YES
+ bancos_cartoes                        | bandeira                           | text                     |                          |                   |               | YES
+ bancos_cartoes                        | limite                             | numeric                  |                          |                   |               | YES
+ bancos_cartoes                        | saldo_inicial                      | numeric                  |                          |                   |               | YES
+ bancos_cartoes                        | ativo                              | boolean                  |                          |                   |               | NO
+ bancos_cartoes                        | observacoes                        | text                     |                          |                   |               | YES
+ bancos_cartoes                        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ bancos_cartoes                        | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ budget_planning_lines                 | id                                 | uuid                     |                          |                   |               | NO
+ budget_planning_lines                 | user_id                            | uuid                     |                          |                   |               | NO
+ budget_planning_lines                 | empresa_id                         | uuid                     |                          |                   |               | YES
+ budget_planning_lines                 | plano_conta_id                     | uuid                     |                          |                   |               | NO
+ budget_planning_lines                 | fiscal_year                        | integer                  |                          |                32 |             0 | NO
+ budget_planning_lines                 | values                             | jsonb                    |                          |                   |               | NO
+ budget_planning_lines                 | created_at                         | timestamp with time zone |                          |                   |               | YES
+ budget_planning_lines                 | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ card_aliquotas_reforma                | id                                 | uuid                     |                          |                   |               | NO
+ card_aliquotas_reforma                | ano                                | integer                  |                          |                32 |             0 | NO
+ card_aliquotas_reforma                | aliquota_cbs                       | numeric                  |                          |                 7 |             4 | NO
+ card_aliquotas_reforma                | aliquota_ibs                       | numeric                  |                          |                 7 |             4 | NO
+ card_aliquotas_reforma                | observacao                         | text                     |                          |                   |               | YES
+ card_aliquotas_reforma                | created_at                         | timestamp with time zone |                          |                   |               | NO
+ card_aliquotas_reforma                | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ card_audit_logs                       | id                                 | uuid                     |                          |                   |               | NO
+ card_audit_logs                       | user_id                            | uuid                     |                          |                   |               | NO
+ card_audit_logs                       | acao                               | text                     |                          |                   |               | NO
+ card_audit_logs                       | entidade                           | text                     |                          |                   |               | NO
+ card_audit_logs                       | entidade_id                        | uuid                     |                          |                   |               | YES
+ card_audit_logs                       | detalhes                           | jsonb                    |                          |                   |               | YES
+ card_audit_logs                       | created_at                         | timestamp with time zone |                          |                   |               | NO
+ card_dashboard_cache                  | id                                 | uuid                     |                          |                   |               | NO
+ card_dashboard_cache                  | user_id                            | uuid                     |                          |                   |               | NO
+ card_dashboard_cache                  | empresa_id                         | uuid                     |                          |                   |               | YES
+ card_dashboard_cache                  | total_bruto                        | numeric                  |                          |                15 |             2 | YES
+ card_dashboard_cache                  | total_liquido                      | numeric                  |                          |                15 |             2 | YES
+ card_dashboard_cache                  | total_taxas                        | numeric                  |                          |                15 |             2 | YES
+ card_dashboard_cache                  | total_transacoes                   | integer                  |                          |                32 |             0 | YES
+ card_dashboard_cache                  | pendentes                          | integer                  |                          |                32 |             0 | YES
+ card_dashboard_cache                  | conferidas                         | integer                  |                          |                32 |             0 | YES
+ card_dashboard_cache                  | divergentes                        | integer                  |                          |                32 |             0 | YES
+ card_dashboard_cache                  | chargebacks                        | integer                  |                          |                32 |             0 | YES
+ card_dashboard_cache                  | por_adquirente                     | jsonb                    |                          |                   |               | YES
+ card_dashboard_cache                  | por_bandeira                       | jsonb                    |                          |                   |               | YES
+ card_dashboard_cache                  | split_cbs                          | numeric                  |                          |                15 |             2 | YES
+ card_dashboard_cache                  | split_ibs                          | numeric                  |                          |                15 |             2 | YES
+ card_dashboard_cache                  | split_liquido_projetado            | numeric                  |                          |                15 |             2 | YES
+ card_dashboard_cache                  | cashflow_previsto                  | jsonb                    |                          |                   |               | YES
+ card_dashboard_cache                  | atualizado_em                      | timestamp with time zone |                          |                   |               | YES
+ card_importacoes                      | id                                 | uuid                     |                          |                   |               | NO
+ card_importacoes                      | user_id                            | uuid                     |                          |                   |               | NO
+ card_importacoes                      | empresa_id                         | uuid                     |                          |                   |               | YES
+ card_importacoes                      | adquirente                         | text                     |                          |                   |               | NO
+ card_importacoes                      | tipo_arquivo                       | text                     |                          |                   |               | NO
+ card_importacoes                      | nome_arquivo                       | text                     |                          |                   |               | NO
+ card_importacoes                      | tamanho_arquivo                    | integer                  |                          |                32 |             0 | YES
+ card_importacoes                      | total_linhas                       | integer                  |                          |                32 |             0 | YES
+ card_importacoes                      | total_importadas                   | integer                  |                          |                32 |             0 | YES
+ card_importacoes                      | total_erros                        | integer                  |                          |                32 |             0 | YES
+ card_importacoes                      | erros                              | jsonb                    |                          |                   |               | YES
+ card_importacoes                      | status                             | text                     |                          |                   |               | YES
+ card_importacoes                      | processado_em                      | timestamp with time zone |                          |                   |               | YES
+ card_importacoes                      | criado_em                          | timestamp with time zone |                          |                   |               | YES
+ card_relatorios_gerados               | id                                 | uuid                     |                          |                   |               | NO
+ card_relatorios_gerados               | user_id                            | uuid                     |                          |                   |               | NO
+ card_relatorios_gerados               | empresa_id                         | uuid                     |                          |                   |               | YES
+ card_relatorios_gerados               | tipo_relatorio                     | text                     |                          |                   |               | NO
+ card_relatorios_gerados               | periodo_inicio                     | date                     |                          |                   |               | NO
+ card_relatorios_gerados               | periodo_fim                        | date                     |                          |                   |               | NO
+ card_relatorios_gerados               | filtros                            | jsonb                    |                          |                   |               | YES
+ card_relatorios_gerados               | total_transacoes                   | integer                  |                          |                32 |             0 | YES
+ card_relatorios_gerados               | total_bruto                        | numeric                  |                          |                15 |             2 | YES
+ card_relatorios_gerados               | total_liquido                      | numeric                  |                          |                15 |             2 | YES
+ card_relatorios_gerados               | total_divergencias                 | integer                  |                          |                32 |             0 | YES
+ card_relatorios_gerados               | nome_arquivo                       | text                     |                          |                   |               | YES
+ card_relatorios_gerados               | tamanho_bytes                      | integer                  |                          |                32 |             0 | YES
+ card_relatorios_gerados               | criado_em                          | timestamp with time zone |                          |                   |               | YES
+ card_report_config                    | id                                 | uuid                     |                          |                   |               | NO
+ card_report_config                    | user_id                            | uuid                     |                          |                   |               | NO
+ card_report_config                    | empresa_id                         | uuid                     |                          |                   |               | YES
+ card_report_config                    | nome_relatorio                     | text                     |                          |                   |               | NO
+ card_report_config                    | tipo_relatorio                     | text                     |                          |                   |               | NO
+ card_report_config                    | incluir_graficos                   | boolean                  |                          |                   |               | YES
+ card_report_config                    | incluir_detalhamento_parcelas      | boolean                  |                          |                   |               | YES
+ card_report_config                    | periodo_padrao_dias                | integer                  |                          |                32 |             0 | YES
+ card_report_config                    | logo_empresa                       | boolean                  |                          |                   |               | YES
+ card_report_config                    | criado_em                          | timestamp with time zone |                          |                   |               | YES
+ card_report_config                    | atualizado_em                      | timestamp with time zone |                          |                   |               | YES
+ card_simulacoes_salvas                | id                                 | uuid                     |                          |                   |               | NO
+ card_simulacoes_salvas                | user_id                            | uuid                     |                          |                   |               | NO
+ card_simulacoes_salvas                | empresa_id                         | uuid                     |                          |                   |               | YES
+ card_simulacoes_salvas                | nome                               | text                     |                          |                   |               | NO
+ card_simulacoes_salvas                | valor_bruto                        | numeric                  |                          |                15 |             2 | NO
+ card_simulacoes_salvas                | taxa_mdr                           | numeric                  |                          |                 8 |             6 | NO
+ card_simulacoes_salvas                | aliquota_cbs                       | numeric                  |                          |                 8 |             6 | NO
+ card_simulacoes_salvas                | aliquota_ibs                       | numeric                  |                          |                 8 |             6 | NO
+ card_simulacoes_salvas                | ano_referencia                     | integer                  |                          |                32 |             0 | NO
+ card_simulacoes_salvas                | valor_mdr                          | numeric                  |                          |                15 |             2 | YES
+ card_simulacoes_salvas                | valor_cbs                          | numeric                  |                          |                15 |             2 | YES
+ card_simulacoes_salvas                | valor_ibs                          | numeric                  |                          |                15 |             2 | YES
+ card_simulacoes_salvas                | valor_liquido                      | numeric                  |                          |                15 |             2 | YES
+ card_simulacoes_salvas                | observacoes                        | text                     |                          |                   |               | YES
+ card_simulacoes_salvas                | criado_em                          | timestamp with time zone |                          |                   |               | YES
+ card_split_simulacoes                 | id                                 | uuid                     |                          |                   |               | NO
+ card_split_simulacoes                 | user_id                            | uuid                     |                          |                   |               | NO
+ card_split_simulacoes                 | transacao_id                       | uuid                     |                          |                   |               | YES
+ card_split_simulacoes                 | ano_referencia                     | integer                  |                          |                32 |             0 | NO
+ card_split_simulacoes                 | valor_bruto                        | numeric                  |                          |                14 |             2 | NO
+ card_split_simulacoes                 | aliquota_cbs                       | numeric                  |                          |                 7 |             4 | NO
+ card_split_simulacoes                 | aliquota_ibs                       | numeric                  |                          |                 7 |             4 | NO
+ card_split_simulacoes                 | valor_cbs                          | numeric                  |                          |                14 |             2 | NO
+ card_split_simulacoes                 | valor_ibs                          | numeric                  |                          |                14 |             2 | NO
+ card_split_simulacoes                 | valor_mdr                          | numeric                  |                          |                14 |             2 | NO
+ card_split_simulacoes                 | valor_liquido_empresa              | numeric                  |                          |                14 |             2 | NO
+ card_split_simulacoes                 | observacoes                        | text                     |                          |                   |               | YES
+ card_split_simulacoes                 | created_at                         | timestamp with time zone |                          |                   |               | NO
+ card_split_simulacoes                 | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ card_transacoes_brutas                | id                                 | uuid                     |                          |                   |               | NO
+ card_transacoes_brutas                | user_id                            | uuid                     |                          |                   |               | NO
+ card_transacoes_brutas                | banco_cartao_id                    | uuid                     |                          |                   |               | YES
+ card_transacoes_brutas                | adquirente                         | text                     |                          |                   |               | NO
+ card_transacoes_brutas                | bandeira                           | text                     |                          |                   |               | YES
+ card_transacoes_brutas                | nsu                                | text                     |                          |                   |               | YES
+ card_transacoes_brutas                | autorizacao                        | text                     |                          |                   |               | YES
+ card_transacoes_brutas                | data_venda                         | date                     |                          |                   |               | NO
+ card_transacoes_brutas                | data_prevista_recebimento          | date                     |                          |                   |               | YES
+ card_transacoes_brutas                | data_recebimento                   | date                     |                          |                   |               | YES
+ card_transacoes_brutas                | tipo_transacao                     | text                     |                          |                   |               | NO
+ card_transacoes_brutas                | parcelas                           | integer                  |                          |                32 |             0 | NO
+ card_transacoes_brutas                | parcela_atual                      | integer                  |                          |                32 |             0 | NO
+ card_transacoes_brutas                | valor_bruto                        | numeric                  |                          |                14 |             2 | NO
+ card_transacoes_brutas                | taxa_mdr                           | numeric                  |                          |                 7 |             4 | NO
+ card_transacoes_brutas                | valor_taxa                         | numeric                  |                          |                14 |             2 | NO
+ card_transacoes_brutas                | valor_liquido                      | numeric                  |                          |                14 |             2 | NO
+ card_transacoes_brutas                | status_auditoria                   | text                     |                          |                   |               | NO
+ card_transacoes_brutas                | conciliado                         | boolean                  |                          |                   |               | NO
+ card_transacoes_brutas                | arquivo_origem                     | text                     |                          |                   |               | YES
+ card_transacoes_brutas                | observacoes                        | text                     |                          |                   |               | YES
+ card_transacoes_brutas                | created_at                         | timestamp with time zone |                          |                   |               | NO
+ card_transacoes_brutas                | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ card_transacoes_brutas                | tipo_arquivo                       | text                     |                          |                   |               | YES
+ card_transacoes_brutas                | empresa_id                         | uuid                     |                          |                   |               | YES
+ card_transacoes_brutas                | valor_extrato_bancario             | numeric                  |                          |                15 |             2 | YES
+ card_transacoes_brutas                | data_conciliacao                   | timestamp with time zone |                          |                   |               | YES
+ card_transacoes_brutas                | score_conciliacao                  | numeric                  |                          |                 5 |             2 | YES
+ categorias                            | id                                 | uuid                     |                          |                   |               | NO
+ categorias                            | user_id                            | uuid                     |                          |                   |               | NO
+ categorias                            | nome                               | text                     |                          |                   |               | NO
+ categorias                            | tipo                               | text                     |                          |                   |               | NO
+ categorias                            | descricao                          | text                     |                          |                   |               | YES
+ categorias                            | ativo                              | boolean                  |                          |                   |               | NO
+ categorias                            | created_at                         | timestamp with time zone |                          |                   |               | NO
+ categorias                            | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ categorias                            | plano_conta_id                     | uuid                     |                          |                   |               | YES
+ certificados_nfse                     | id                                 | uuid                     |                          |                   |               | NO
+ certificados_nfse                     | user_id                            | uuid                     |                          |                   |               | NO
+ certificados_nfse                     | nome                               | text                     |                          |                   |               | NO
+ certificados_nfse                     | arquivo_path                       | text                     |                          |                   |               | YES
+ certificados_nfse                     | valido_ate                         | date                     |                          |                   |               | YES
+ certificados_nfse                     | cnpj                               | text                     |                          |                   |               | YES
+ certificados_nfse                     | emissor                            | text                     |                          |                   |               | YES
+ certificados_nfse                     | ativo                              | boolean                  |                          |                   |               | NO
+ certificados_nfse                     | created_at                         | timestamp with time zone |                          |                   |               | NO
+ certificados_nfse                     | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ certificados_nfse                     | arquivo_pfx                        | text                     |                          |                   |               | YES
+ certificados_nfse                     | senha                              | text                     |                          |                   |               | YES
+ certificados_nfse                     | razao_social                       | text                     |                          |                   |               | YES
+ certificados_nfse                     | inscricao_municipal                | text                     |                          |                   |               | YES
+ certificados_nfse                     | endereco                           | jsonb                    |                          |                   |               | YES
+ certificados_nfse                     | codigo_municipio                   | text                     |                          |                   |               | YES
+ certificados_nfse                     | uf                                 | text                     |                          |                   |               | YES
+ certificados_nfse                     | cep                                | text                     |                          |                   |               | YES
+ certificados_nfse                     | numero                             | text                     |                          |                   |               | YES
+ certificados_nfse                     | bairro                             | text                     |                          |                   |               | YES
+ clientes                              | id                                 | uuid                     |                          |                   |               | NO
+ clientes                              | user_id                            | uuid                     |                          |                   |               | NO
+ clientes                              | nome                               | text                     |                          |                   |               | NO
+ clientes                              | documento                          | text                     |                          |                   |               | YES
+ clientes                              | email                              | text                     |                          |                   |               | YES
+ clientes                              | telefone                           | text                     |                          |                   |               | YES
+ clientes                              | endereco                           | text                     |                          |                   |               | YES
+ clientes                              | cidade                             | text                     |                          |                   |               | YES
+ clientes                              | estado                             | text                     |                          |                   |               | YES
+ clientes                              | observacoes                        | text                     |                          |                   |               | YES
+ clientes                              | ativo                              | boolean                  |                          |                   |               | NO
+ clientes                              | created_at                         | timestamp with time zone |                          |                   |               | NO
+ clientes                              | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ clientes                              | bairro                             | text                     |                          |                   |               | YES
+ clientes                              | cep                                | text                     |                          |                   |               | YES
+ clientes                              | numero                             | text                     |                          |                   |               | YES
+ clientes                              | complemento                        | text                     |                          |                   |               | YES
+ clientes                              | cnae                               | text                     |                          |                   |               | YES
+ clientes                              | natureza_juridica                  | text                     |                          |                   |               | YES
+ clientes                              | empresa_id                         | uuid                     |                          |                   |               | YES
+ cobranca_historico                    | id                                 | uuid                     |                          |                   |               | NO
+ cobranca_historico                    | user_id                            | uuid                     |                          |                   |               | NO
+ cobranca_historico                    | conta_receber_id                   | uuid                     |                          |                   |               | YES
+ cobranca_historico                    | cliente_nome                       | text                     |                          |                   |               | YES
+ cobranca_historico                    | cliente_email                      | text                     |                          |                   |               | YES
+ cobranca_historico                    | tipo                               | text                     |                          |                   |               | NO
+ cobranca_historico                    | canal                              | text                     |                          |                   |               | NO
+ cobranca_historico                    | mensagem                           | text                     |                          |                   |               | YES
+ cobranca_historico                    | status                             | text                     |                          |                   |               | NO
+ cobranca_historico                    | valor                              | numeric                  |                          |                   |               | YES
+ cobranca_historico                    | data_vencimento                    | date                     |                          |                   |               | YES
+ cobranca_historico                    | created_at                         | timestamp with time zone |                          |                   |               | NO
+ configuracoes_cartao                  | id                                 | uuid                     |                          |                   |               | NO
+ configuracoes_cartao                  | empresa_id                         | uuid                     |                          |                   |               | NO
+ configuracoes_cartao                  | user_id                            | uuid                     |                          |                   |               | YES
+ configuracoes_cartao                  | taxa_visa                          | numeric                  |                          |                 5 |             4 | YES
+ configuracoes_cartao                  | taxa_mastercard                    | numeric                  |                          |                 5 |             4 | YES
+ configuracoes_cartao                  | taxa_elo                           | numeric                  |                          |                 5 |             4 | YES
+ configuracoes_cartao                  | taxa_amex                          | numeric                  |                          |                 5 |             4 | YES
+ configuracoes_cartao                  | taxa_hipercard                     | numeric                  |                          |                 5 |             4 | YES
+ configuracoes_cartao                  | taxa_outros                        | numeric                  |                          |                 5 |             4 | YES
+ configuracoes_cartao                  | prazo_credito_dias                 | integer                  |                          |                32 |             0 | YES
+ configuracoes_cartao                  | prazo_debito_dias                  | integer                  |                          |                32 |             0 | YES
+ configuracoes_cartao                  | prazo_parcelado_dias               | integer                  |                          |                32 |             0 | YES
+ configuracoes_cartao                  | criterios_conciliacao              | jsonb                    |                          |                   |               | YES
+ configuracoes_cartao                  | created_at                         | timestamp with time zone |                          |                   |               | YES
+ configuracoes_cartao                  | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ contabilidade_erp_config              | id                                 | uuid                     |                          |                   |               | NO
+ contabilidade_erp_config              | user_id                            | uuid                     |                          |                   |               | NO
+ contabilidade_erp_config              | erp_tipo                           | USER-DEFINED             |                          |                   |               | NO
+ contabilidade_erp_config              | nome_configuracao                  | character varying        |                      100 |                   |               | NO
+ contabilidade_erp_config              | ativo                              | boolean                  |                          |                   |               | NO
+ contabilidade_erp_config              | ambiente                           | USER-DEFINED             |                          |                   |               | NO
+ contabilidade_erp_config              | api_url                            | text                     |                          |                   |               | YES
+ contabilidade_erp_config              | api_key                            | bytea                    |                          |                   |               | YES
+ contabilidade_erp_config              | api_secret                         | bytea                    |                          |                   |               | YES
+ contabilidade_erp_config              | usuario                            | character varying        |                      100 |                   |               | YES
+ contabilidade_erp_config              | senha                              | bytea                    |                          |                   |               | YES
+ contabilidade_erp_config              | token_acesso                       | bytea                    |                          |                   |               | YES
+ contabilidade_erp_config              | token_refresh                      | bytea                    |                          |                   |               | YES
+ contabilidade_erp_config              | token_expira_em                    | timestamp with time zone |                          |                   |               | YES
+ contabilidade_erp_config              | codigo_empresa_erp                 | character varying        |                       50 |                   |               | YES
+ contabilidade_erp_config              | codigo_filial                      | character varying        |                       50 |                   |               | YES
+ contabilidade_erp_config              | configuracoes_extras               | jsonb                    |                          |                   |               | YES
+ contabilidade_erp_config              | ultima_sincronizacao               | timestamp with time zone |                          |                   |               | YES
+ contabilidade_erp_config              | status_conexao                     | USER-DEFINED             |                          |                   |               | YES
+ contabilidade_erp_config              | error_log                          | jsonb                    |                          |                   |               | YES
+ contabilidade_erp_config              | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_erp_config              | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | id                                 | uuid                     |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | sincronizacao_id                   | uuid                     |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | config_id                          | uuid                     |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | user_id                            | uuid                     |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | lancamento_erp_id                  | character varying        |                      255 |                   |               | NO
+ contabilidade_lancamentos_importados  | data_lancamento                    | date                     |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | data_competencia                   | date                     |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | tipo                               | USER-DEFINED             |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | conta_contabil                     | character varying        |                       50 |                   |               | NO
+ contabilidade_lancamentos_importados  | historico                          | text                     |                          |                   |               | YES
+ contabilidade_lancamentos_importados  | valor                              | numeric                  |                          |                15 |             2 | NO
+ contabilidade_lancamentos_importados  | centro_custo                       | character varying        |                       50 |                   |               | YES
+ contabilidade_lancamentos_importados  | documento                          | character varying        |                      100 |                   |               | YES
+ contabilidade_lancamentos_importados  | conciliado                         | boolean                  |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | lancamento_financeiro_vinculado_id | uuid                     |                          |                   |               | YES
+ contabilidade_lancamentos_importados  | dados_originais                    | jsonb                    |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_lancamentos_importados  | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | id                                 | uuid                     |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | user_id                            | uuid                     |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | config_id                          | uuid                     |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | tipo_lancamento                    | USER-DEFINED             |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | categoria_id                       | uuid                     |                          |                   |               | YES
+ contabilidade_mapeamento_contas       | conta_contabil_erp                 | character varying        |                       50 |                   |               | NO
+ contabilidade_mapeamento_contas       | historico_padrao                   | text                     |                          |                   |               | YES
+ contabilidade_mapeamento_contas       | centro_custo_erp                   | character varying        |                       50 |                   |               | YES
+ contabilidade_mapeamento_contas       | ativo                              | boolean                  |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_mapeamento_contas       | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_sincronizacao           | id                                 | uuid                     |                          |                   |               | NO
+ contabilidade_sincronizacao           | config_id                          | uuid                     |                          |                   |               | NO
+ contabilidade_sincronizacao           | user_id                            | uuid                     |                          |                   |               | NO
+ contabilidade_sincronizacao           | tipo_operacao                      | USER-DEFINED             |                          |                   |               | NO
+ contabilidade_sincronizacao           | status                             | USER-DEFINED             |                          |                   |               | NO
+ contabilidade_sincronizacao           | periodo_inicio                     | date                     |                          |                   |               | NO
+ contabilidade_sincronizacao           | periodo_fim                        | date                     |                          |                   |               | NO
+ contabilidade_sincronizacao           | total_registros                    | integer                  |                          |                32 |             0 | YES
+ contabilidade_sincronizacao           | registros_sucesso                  | integer                  |                          |                32 |             0 | YES
+ contabilidade_sincronizacao           | registros_erro                     | integer                  |                          |                32 |             0 | YES
+ contabilidade_sincronizacao           | dados_exportados                   | jsonb                    |                          |                   |               | YES
+ contabilidade_sincronizacao           | resposta_erp                       | jsonb                    |                          |                   |               | YES
+ contabilidade_sincronizacao           | erros_detalhados                   | jsonb                    |                          |                   |               | YES
+ contabilidade_sincronizacao           | iniciado_em                        | timestamp with time zone |                          |                   |               | YES
+ contabilidade_sincronizacao           | finalizado_em                      | timestamp with time zone |                          |                   |               | YES
+ contabilidade_sincronizacao           | iniciado_por                       | uuid                     |                          |                   |               | YES
+ contabilidade_sincronizacao           | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contabilidade_sincronizacao           | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contador_config                       | id                                 | uuid                     |                          |                   |               | NO
+ contador_config                       | user_id                            | uuid                     |                          |                   |               | NO
+ contador_config                       | nome_contador                      | text                     |                          |                   |               | YES
+ contador_config                       | email_contador                     | text                     |                          |                   |               | NO
+ contador_config                       | escritorio                         | text                     |                          |                   |               | YES
+ contador_config                       | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contador_config                       | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contador_documentos                   | id                                 | uuid                     |                          |                   |               | NO
+ contador_documentos                   | user_id                            | uuid                     |                          |                   |               | NO
+ contador_documentos                   | nome_arquivo                       | text                     |                          |                   |               | NO
+ contador_documentos                   | storage_path                       | text                     |                          |                   |               | NO
+ contador_documentos                   | tipo_arquivo                       | text                     |                          |                   |               | YES
+ contador_documentos                   | tamanho                            | bigint                   |                          |                64 |             0 | YES
+ contador_documentos                   | mes_referencia                     | integer                  |                          |                32 |             0 | YES
+ contador_documentos                   | ano_referencia                     | integer                  |                          |                32 |             0 | YES
+ contador_documentos                   | enviado                            | boolean                  |                          |                   |               | NO
+ contador_documentos                   | enviado_em                         | timestamp with time zone |                          |                   |               | YES
+ contador_documentos                   | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contador_documentos                   | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contas_pagar                          | id                                 | uuid                     |                          |                   |               | NO
+ contas_pagar                          | user_id                            | uuid                     |                          |                   |               | NO
+ contas_pagar                          | fornecedor_id                      | uuid                     |                          |                   |               | YES
+ contas_pagar                          | categoria_id                       | uuid                     |                          |                   |               | YES
+ contas_pagar                          | descricao                          | text                     |                          |                   |               | NO
+ contas_pagar                          | valor                              | numeric                  |                          |                15 |             2 | NO
+ contas_pagar                          | data_emissao                       | date                     |                          |                   |               | NO
+ contas_pagar                          | data_vencimento                    | date                     |                          |                   |               | NO
+ contas_pagar                          | data_pagamento                     | date                     |                          |                   |               | YES
+ contas_pagar                          | status                             | text                     |                          |                   |               | NO
+ contas_pagar                          | documento                          | text                     |                          |                   |               | YES
+ contas_pagar                          | observacoes                        | text                     |                          |                   |               | YES
+ contas_pagar                          | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contas_pagar                          | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contas_pagar                          | recorrente                         | boolean                  |                          |                   |               | NO
+ contas_pagar                          | frequencia                         | text                     |                          |                   |               | YES
+ contas_pagar                          | data_fim_recorrencia               | date                     |                          |                   |               | YES
+ contas_pagar                          | forma_pagamento                    | text                     |                          |                   |               | YES
+ contas_pagar                          | banco_cartao_id                    | uuid                     |                          |                   |               | YES
+ contas_receber                        | id                                 | uuid                     |                          |                   |               | NO
+ contas_receber                        | user_id                            | uuid                     |                          |                   |               | NO
+ contas_receber                        | cliente_id                         | uuid                     |                          |                   |               | YES
+ contas_receber                        | categoria_id                       | uuid                     |                          |                   |               | YES
+ contas_receber                        | descricao                          | text                     |                          |                   |               | NO
+ contas_receber                        | valor                              | numeric                  |                          |                15 |             2 | NO
+ contas_receber                        | data_emissao                       | date                     |                          |                   |               | NO
+ contas_receber                        | data_vencimento                    | date                     |                          |                   |               | NO
+ contas_receber                        | data_recebimento                   | date                     |                          |                   |               | YES
+ contas_receber                        | status                             | text                     |                          |                   |               | NO
+ contas_receber                        | documento                          | text                     |                          |                   |               | YES
+ contas_receber                        | observacoes                        | text                     |                          |                   |               | YES
+ contas_receber                        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ contas_receber                        | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ contas_receber                        | recorrente                         | boolean                  |                          |                   |               | NO
+ contas_receber                        | frequencia                         | text                     |                          |                   |               | YES
+ contas_receber                        | data_fim_recorrencia               | date                     |                          |                   |               | YES
+ contas_receber                        | forma_pagamento                    | text                     |                          |                   |               | YES
+ contas_receber                        | banco_cartao_id                    | uuid                     |                          |                   |               | YES
+ empresa                               | id                                 | uuid                     |                          |                   |               | NO
+ empresa                               | user_id                            | uuid                     |                          |                   |               | NO
+ empresa                               | razao_social                       | text                     |                          |                   |               | YES
+ empresa                               | nome_fantasia                      | text                     |                          |                   |               | YES
+ empresa                               | cnpj                               | text                     |                          |                   |               | YES
+ empresa                               | inscricao_estadual                 | text                     |                          |                   |               | YES
+ empresa                               | inscricao_municipal                | text                     |                          |                   |               | YES
+ empresa                               | telefone                           | text                     |                          |                   |               | YES
+ empresa                               | email                              | text                     |                          |                   |               | YES
+ empresa                               | website                            | text                     |                          |                   |               | YES
+ empresa                               | cep                                | text                     |                          |                   |               | YES
+ empresa                               | endereco                           | text                     |                          |                   |               | YES
+ empresa                               | numero                             | text                     |                          |                   |               | YES
+ empresa                               | complemento                        | text                     |                          |                   |               | YES
+ empresa                               | bairro                             | text                     |                          |                   |               | YES
+ empresa                               | cidade                             | text                     |                          |                   |               | YES
+ empresa                               | estado                             | text                     |                          |                   |               | YES
+ empresa                               | logo_url                           | text                     |                          |                   |               | YES
+ empresa                               | observacoes                        | text                     |                          |                   |               | YES
+ empresa                               | created_at                         | timestamp with time zone |                          |                   |               | NO
+ empresa                               | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ empresas                              | id                                 | uuid                     |                          |                   |               | NO
+ empresas                              | razao_social                       | text                     |                          |                   |               | NO
+ empresas                              | nome_fantasia                      | text                     |                          |                   |               | YES
+ empresas                              | cnpj                               | text                     |                          |                   |               | NO
+ empresas                              | inscricao_estadual                 | text                     |                          |                   |               | YES
+ empresas                              | inscricao_municipal                | text                     |                          |                   |               | YES
+ empresas                              | segmento                           | text                     |                          |                   |               | YES
+ empresas                              | endereco_cep                       | text                     |                          |                   |               | YES
+ empresas                              | endereco_logradouro                | text                     |                          |                   |               | YES
+ empresas                              | endereco_numero                    | text                     |                          |                   |               | YES
+ empresas                              | endereco_complemento               | text                     |                          |                   |               | YES
+ empresas                              | endereco_bairro                    | text                     |                          |                   |               | YES
+ empresas                              | endereco_cidade                    | text                     |                          |                   |               | YES
+ empresas                              | endereco_uf                        | text                     |                          |                   |               | YES
+ empresas                              | telefone                           | text                     |                          |                   |               | YES
+ empresas                              | email                              | text                     |                          |                   |               | YES
+ empresas                              | logo_url                           | text                     |                          |                   |               | YES
+ empresas                              | certificado_digital_a1_path        | text                     |                          |                   |               | YES
+ empresas                              | certificado_digital_senha          | text                     |                          |                   |               | YES
+ empresas                              | ativo                              | boolean                  |                          |                   |               | YES
+ empresas                              | created_at                         | timestamp with time zone |                          |                   |               | YES
+ empresas                              | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ empresas                              | website                            | text                     |                          |                   |               | YES
+ empresas                              | observacoes                        | text                     |                          |                   |               | YES
+ extrato_bancario                      | id                                 | uuid                     |                          |                   |               | NO
+ extrato_bancario                      | user_id                            | uuid                     |                          |                   |               | NO
+ extrato_bancario                      | banco_cartao_id                    | uuid                     |                          |                   |               | YES
+ extrato_bancario                      | data_transacao                     | date                     |                          |                   |               | NO
+ extrato_bancario                      | descricao                          | text                     |                          |                   |               | NO
+ extrato_bancario                      | valor                              | numeric                  |                          |                   |               | NO
+ extrato_bancario                      | tipo                               | text                     |                          |                   |               | NO
+ extrato_bancario                      | fitid                              | text                     |                          |                   |               | YES
+ extrato_bancario                      | conciliado                         | boolean                  |                          |                   |               | NO
+ extrato_bancario                      | lancamento_id                      | uuid                     |                          |                   |               | YES
+ extrato_bancario                      | conta_receber_id                   | uuid                     |                          |                   |               | YES
+ extrato_bancario                      | conta_pagar_id                     | uuid                     |                          |                   |               | YES
+ extrato_bancario                      | origem                             | text                     |                          |                   |               | NO
+ extrato_bancario                      | created_at                         | timestamp with time zone |                          |                   |               | NO
+ extrato_bancario                      | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ extrato_bancario                      | parcelas                           | integer                  |                          |                32 |             0 | YES
+ extrato_bancario                      | parcela_atual                      | integer                  |                          |                32 |             0 | YES
+ fechamentos_mensais                   | id                                 | uuid                     |                          |                   |               | NO
+ fechamentos_mensais                   | user_id                            | uuid                     |                          |                   |               | NO
+ fechamentos_mensais                   | mes                                | integer                  |                          |                32 |             0 | NO
+ fechamentos_mensais                   | ano                                | integer                  |                          |                32 |             0 | NO
+ fechamentos_mensais                   | receita_total                      | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | despesa_total                      | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | custos_diretos                     | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | despesas_operacionais              | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | lucro_bruto                        | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | lucro_liquido                      | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | saldo_inicial                      | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | saldo_final                        | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | contas_receber_pendentes           | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | contas_pagar_pendentes             | numeric                  |                          |                   |               | NO
+ fechamentos_mensais                   | observacoes                        | text                     |                          |                   |               | YES
+ fechamentos_mensais                   | status                             | text                     |                          |                   |               | NO
+ fechamentos_mensais                   | fechado_em                         | timestamp with time zone |                          |                   |               | YES
+ fechamentos_mensais                   | created_at                         | timestamp with time zone |                          |                   |               | NO
+ fechamentos_mensais                   | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ fornecedores                          | id                                 | uuid                     |                          |                   |               | NO
+ fornecedores                          | user_id                            | uuid                     |                          |                   |               | NO
+ fornecedores                          | nome                               | text                     |                          |                   |               | NO
+ fornecedores                          | documento                          | text                     |                          |                   |               | YES
+ fornecedores                          | email                              | text                     |                          |                   |               | YES
+ fornecedores                          | telefone                           | text                     |                          |                   |               | YES
+ fornecedores                          | endereco                           | text                     |                          |                   |               | YES
+ fornecedores                          | cidade                             | text                     |                          |                   |               | YES
+ fornecedores                          | estado                             | text                     |                          |                   |               | YES
+ fornecedores                          | observacoes                        | text                     |                          |                   |               | YES
+ fornecedores                          | ativo                              | boolean                  |                          |                   |               | NO
+ fornecedores                          | created_at                         | timestamp with time zone |                          |                   |               | NO
+ fornecedores                          | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ fornecedores                          | bairro                             | text                     |                          |                   |               | YES
+ fornecedores                          | cep                                | text                     |                          |                   |               | YES
+ fornecedores                          | numero                             | text                     |                          |                   |               | YES
+ fornecedores                          | complemento                        | text                     |                          |                   |               | YES
+ fornecedores                          | cnae                               | text                     |                          |                   |               | YES
+ fornecedores                          | natureza_juridica                  | text                     |                          |                   |               | YES
+ fornecedores                          | empresa_id                         | uuid                     |                          |                   |               | YES
+ lancamentos_caixa                     | id                                 | uuid                     |                          |                   |               | NO
+ lancamentos_caixa                     | user_id                            | uuid                     |                          |                   |               | NO
+ lancamentos_caixa                     | tipo                               | text                     |                          |                   |               | NO
+ lancamentos_caixa                     | categoria_id                       | uuid                     |                          |                   |               | YES
+ lancamentos_caixa                     | descricao                          | text                     |                          |                   |               | NO
+ lancamentos_caixa                     | valor                              | numeric                  |                          |                15 |             2 | NO
+ lancamentos_caixa                     | data_lancamento                    | date                     |                          |                   |               | NO
+ lancamentos_caixa                     | conta_receber_id                   | uuid                     |                          |                   |               | YES
+ lancamentos_caixa                     | conta_pagar_id                     | uuid                     |                          |                   |               | YES
+ lancamentos_caixa                     | observacoes                        | text                     |                          |                   |               | YES
+ lancamentos_caixa                     | created_at                         | timestamp with time zone |                          |                   |               | NO
+ lancamentos_caixa                     | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ leads_diagnostico                     | id                                 | uuid                     |                          |                   |               | NO
+ leads_diagnostico                     | nome                               | text                     |                          |                   |               | NO
+ leads_diagnostico                     | email                              | text                     |                          |                   |               | NO
+ leads_diagnostico                     | telefone                           | text                     |                          |                   |               | NO
+ leads_diagnostico                     | empresa                            | text                     |                          |                   |               | NO
+ leads_diagnostico                     | cnpj                               | text                     |                          |                   |               | YES
+ leads_diagnostico                     | faturamento_mensal                 | text                     |                          |                   |               | YES
+ leads_diagnostico                     | num_funcionarios                   | text                     |                          |                   |               | YES
+ leads_diagnostico                     | principal_dor                      | text                     |                          |                   |               | YES
+ leads_diagnostico                     | origem                             | text                     |                          |                   |               | NO
+ leads_diagnostico                     | status                             | text                     |                          |                   |               | NO
+ leads_diagnostico                     | observacoes_internas               | text                     |                          |                   |               | YES
+ leads_diagnostico                     | created_at                         | timestamp with time zone |                          |                   |               | NO
+ leads_diagnostico                     | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ licencas_software                     | id                                 | uuid                     |                          |                   |               | NO
+ licencas_software                     | user_id                            | uuid                     |                          |                   |               | NO
+ licencas_software                     | tipo_cliente                       | text                     |                          |                   |               | NO
+ licencas_software                     | razao_social                       | text                     |                          |                   |               | NO
+ licencas_software                     | nome_fantasia                      | text                     |                          |                   |               | YES
+ licencas_software                     | cnpj                               | text                     |                          |                   |               | YES
+ licencas_software                     | email                              | text                     |                          |                   |               | YES
+ licencas_software                     | telefone                           | text                     |                          |                   |               | YES
+ licencas_software                     | contato_nome                       | text                     |                          |                   |               | YES
+ licencas_software                     | plano                              | text                     |                          |                   |               | NO
+ licencas_software                     | valor_mensal                       | numeric                  |                          |                   |               | NO
+ licencas_software                     | desconto_percentual                | numeric                  |                          |                   |               | YES
+ licencas_software                     | data_inicio                        | date                     |                          |                   |               | NO
+ licencas_software                     | data_fim                           | date                     |                          |                   |               | YES
+ licencas_software                     | status                             | text                     |                          |                   |               | NO
+ licencas_software                     | chave_licenca                      | text                     |                          |                   |               | NO
+ licencas_software                     | max_usuarios                       | integer                  |                          |                32 |             0 | NO
+ licencas_software                     | observacoes                        | text                     |                          |                   |               | YES
+ licencas_software                     | created_at                         | timestamp with time zone |                          |                   |               | NO
+ licencas_software                     | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ licencas_software                     | quantidade_licencas                | integer                  |                          |                32 |             0 | NO
+ licencas_software                     | configuracao_extra                 | jsonb                    |                          |                   |               | NO
+ mapeamento_contabil                   | id                                 | uuid                     |                          |                   |               | NO
+ mapeamento_contabil                   | user_id                            | uuid                     |                          |                   |               | NO
+ mapeamento_contabil                   | empresa_id                         | uuid                     |                          |                   |               | YES
+ mapeamento_contabil                   | categoria_id                       | uuid                     |                          |                   |               | YES
+ mapeamento_contabil                   | tipo_lancamento                    | text                     |                          |                   |               | NO
+ mapeamento_contabil                   | plano_conta_id                     | uuid                     |                          |                   |               | NO
+ mapeamento_contabil                   | historico_padrao                   | text                     |                          |                   |               | YES
+ mapeamento_contabil                   | centro_custo                       | text                     |                          |                   |               | YES
+ mapeamento_contabil                   | regra_condicional                  | jsonb                    |                          |                   |               | YES
+ mapeamento_contabil                   | ativo                              | boolean                  |                          |                   |               | NO
+ mapeamento_contabil                   | automatico                         | boolean                  |                          |                   |               | NO
+ mapeamento_contabil                   | created_at                         | timestamp with time zone |                          |                   |               | NO
+ mapeamento_contabil                   | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ metas_orcamentarias                   | id                                 | uuid                     |                          |                   |               | NO
+ metas_orcamentarias                   | user_id                            | uuid                     |                          |                   |               | NO
+ metas_orcamentarias                   | categoria_id                       | uuid                     |                          |                   |               | YES
+ metas_orcamentarias                   | mes                                | integer                  |                          |                32 |             0 | NO
+ metas_orcamentarias                   | ano                                | integer                  |                          |                32 |             0 | NO
+ metas_orcamentarias                   | valor_orcado                       | numeric                  |                          |                   |               | NO
+ metas_orcamentarias                   | observacoes                        | text                     |                          |                   |               | YES
+ metas_orcamentarias                   | created_at                         | timestamp with time zone |                          |                   |               | NO
+ metas_orcamentarias                   | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ nfs_e_emitentes                       | id                                 | uuid                     |                          |                   |               | NO
+ nfs_e_emitentes                       | empresa_id                         | uuid                     |                          |                   |               | NO
+ nfs_e_emitentes                       | cnpj_emitente                      | character varying        |                       14 |                   |               | NO
+ nfs_e_emitentes                       | inscricao_municipal                | character varying        |                       20 |                   |               | YES
+ nfs_e_emitentes                       | razao_social                       | character varying        |                      150 |                   |               | NO
+ nfs_e_emitentes                       | nome_fantasia                      | character varying        |                       60 |                   |               | YES
+ nfs_e_emitentes                       | endereco                           | jsonb                    |                          |                   |               | NO
+ nfs_e_emitentes                       | certificado_digital                | text                     |                          |                   |               | YES
+ nfs_e_emitentes                       | senha_certificado                  | text                     |                          |                   |               | YES
+ nfs_e_emitentes                       | ambiente                           | USER-DEFINED             |                          |                   |               | NO
+ nfs_e_emitentes                       | proximo_numero_nota                | integer                  |                          |                32 |             0 | NO
+ nfs_e_emitentes                       | serie_nota                         | character varying        |                        3 |                   |               | NO
+ nfs_e_emitentes                       | regime_tributario                  | USER-DEFINED             |                          |                   |               | NO
+ nfs_e_emitentes                       | aliquota_iss                       | numeric                  |                          |                 5 |             2 | NO
+ nfs_e_emitentes                       | item_lista_servicos                | character varying        |                        5 |                   |               | YES
+ nfs_e_emitentes                       | cnae                               | character varying        |                        7 |                   |               | YES
+ nfs_e_emitentes                       | codigo_tributacao_municipio        | character varying        |                       20 |                   |               | YES
+ nfs_e_emitentes                       | ativo                              | boolean                  |                          |                   |               | NO
+ nfs_e_emitentes                       | created_at                         | timestamp with time zone |                          |                   |               | NO
+ nfs_e_emitentes                       | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ nfs_e_notas                           | id                                 | uuid                     |                          |                   |               | NO
+ nfs_e_notas                           | emitente_id                        | uuid                     |                          |                   |               | NO
+ nfs_e_notas                           | empresa_id                         | uuid                     |                          |                   |               | NO
+ nfs_e_notas                           | numero_nota                        | integer                  |                          |                32 |             0 | NO
+ nfs_e_notas                           | serie                              | character varying        |                        3 |                   |               | NO
+ nfs_e_notas                           | data_emissao                       | timestamp with time zone |                          |                   |               | NO
+ nfs_e_notas                           | competencia                        | date                     |                          |                   |               | NO
+ nfs_e_notas                           | status                             | USER-DEFINED             |                          |                   |               | NO
+ nfs_e_notas                           | protocolo_autorizacao              | character varying        |                       50 |                   |               | YES
+ nfs_e_notas                           | codigo_verificacao                 | character varying        |                       50 |                   |               | YES
+ nfs_e_notas                           | link_pdf                           | text                     |                          |                   |               | YES
+ nfs_e_notas                           | link_xml                           | text                     |                          |                   |               | YES
+ nfs_e_notas                           | tomador_tipo                       | USER-DEFINED             |                          |                   |               | NO
+ nfs_e_notas                           | tomador_documento                  | character varying        |                       14 |                   |               | NO
+ nfs_e_notas                           | tomador_razao_social               | character varying        |                      150 |                   |               | YES
+ nfs_e_notas                           | tomador_endereco                   | jsonb                    |                          |                   |               | YES
+ nfs_e_notas                           | tomador_email                      | character varying        |                      100 |                   |               | YES
+ nfs_e_notas                           | servico_descricao                  | text                     |                          |                   |               | NO
+ nfs_e_notas                           | servico_valor                      | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | servico_deducoes                   | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | servico_base_calculo               | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | servico_aliquota                   | numeric                  |                          |                 5 |             2 | NO
+ nfs_e_notas                           | servico_iss_retido                 | boolean                  |                          |                   |               | NO
+ nfs_e_notas                           | servico_valor_iss                  | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | servico_valor_liquido              | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | retencoes_pis                      | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | retencoes_cofins                   | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | retencoes_inss                     | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | retencoes_ir                       | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | retencoes_csll                     | numeric                  |                          |                15 |             2 | NO
+ nfs_e_notas                           | mensagem_fiscal                    | text                     |                          |                   |               | YES
+ nfs_e_notas                           | rascunho                           | boolean                  |                          |                   |               | NO
+ nfs_e_notas                           | enviada_prefeitura_em              | timestamp with time zone |                          |                   |               | YES
+ nfs_e_notas                           | cancelada_em                       | timestamp with time zone |                          |                   |               | YES
+ nfs_e_notas                           | motivo_cancelamento                | text                     |                          |                   |               | YES
+ nfs_e_notas                           | error_log                          | jsonb                    |                          |                   |               | YES
+ nfs_e_notas                           | created_at                         | timestamp with time zone |                          |                   |               | NO
+ nfs_e_notas                           | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ nfs_e_rascunhos                       | id                                 | uuid                     |                          |                   |               | NO
+ nfs_e_rascunhos                       | empresa_id                         | uuid                     |                          |                   |               | NO
+ nfs_e_rascunhos                       | user_id                            | uuid                     |                          |                   |               | NO
+ nfs_e_rascunhos                       | dados                              | jsonb                    |                          |                   |               | NO
+ nfs_e_rascunhos                       | ultimo_autosave                    | timestamp with time zone |                          |                   |               | NO
+ nfs_e_rascunhos                       | created_at                         | timestamp with time zone |                          |                   |               | NO
+ nfs_e_rascunhos                       | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ nfse_cron_logs                        | id                                 | uuid                     |                          |                   |               | NO
+ nfse_cron_logs                        | user_id                            | uuid                     |                          |                   |               | NO
+ nfse_cron_logs                        | tipo                               | text                     |                          |                   |               | NO
+ nfse_cron_logs                        | notas_processadas                  | integer                  |                          |                32 |             0 | YES
+ nfse_cron_logs                        | notas_autorizadas                  | integer                  |                          |                32 |             0 | YES
+ nfse_cron_logs                        | notas_rejeitadas                   | integer                  |                          |                32 |             0 | YES
+ nfse_cron_logs                        | erros                              | integer                  |                          |                32 |             0 | YES
+ nfse_cron_logs                        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ nfse_rascunhos                        | id                                 | uuid                     |                          |                   |               | NO
+ nfse_rascunhos                        | user_id                            | uuid                     |                          |                   |               | NO
+ nfse_rascunhos                        | dados                              | jsonb                    |                          |                   |               | NO
+ nfse_rascunhos                        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ nfse_rascunhos                        | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ nfse_sync_logs                        | id                                 | uuid                     |                          |                   |               | NO
+ nfse_sync_logs                        | nota_id                            | uuid                     |                          |                   |               | YES
+ nfse_sync_logs                        | user_id                            | uuid                     |                          |                   |               | NO
+ nfse_sync_logs                        | status                             | text                     |                          |                   |               | NO
+ nfse_sync_logs                        | mensagem                           | text                     |                          |                   |               | YES
+ nfse_sync_logs                        | detalhes                           | jsonb                    |                          |                   |               | YES
+ nfse_sync_logs                        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ notas_fiscais_servico                 | id                                 | uuid                     |                          |                   |               | NO
+ notas_fiscais_servico                 | user_id                            | uuid                     |                          |                   |               | NO
+ notas_fiscais_servico                 | status                             | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | numero_nota                        | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | serie                              | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | tipo_rps                           | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_tipo_documento             | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_cnpj_cpf                   | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_razao_social               | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_nome_fantasia              | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_email                      | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_telefone                   | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_endereco                   | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_numero                     | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_complemento                | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_bairro                     | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_cidade                     | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_estado                     | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_cep                        | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_ibge                       | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | servico_descricao                  | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | servico_codigo                     | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | servico_cnae                       | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | servico_codigo_tributacao          | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | servico_discriminacao              | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | servico_item_lista_servico         | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | valor_servico                      | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | valor_deducoes                     | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | valor_iss                          | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | valor_liquido                      | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | base_calculo                       | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | aliquota_iss                       | numeric                  |                          |                 6 |             4 | YES
+ notas_fiscais_servico                 | iss_retido                         | boolean                  |                          |                   |               | YES
+ notas_fiscais_servico                 | retencao_pis                       | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | retencao_cofins                    | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | retencao_inss                      | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | retencao_ir                        | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | retencao_csll                      | numeric                  |                          |                15 |             2 | YES
+ notas_fiscais_servico                 | aliquota_pis                       | numeric                  |                          |                 6 |             4 | YES
+ notas_fiscais_servico                 | aliquota_cofins                    | numeric                  |                          |                 6 |             4 | YES
+ notas_fiscais_servico                 | aliquota_inss                      | numeric                  |                          |                 6 |             4 | YES
+ notas_fiscais_servico                 | aliquota_ir                        | numeric                  |                          |                 6 |             4 | YES
+ notas_fiscais_servico                 | aliquota_csll                      | numeric                  |                          |                 6 |             4 | YES
+ notas_fiscais_servico                 | data_competencia                   | date                     |                          |                   |               | YES
+ notas_fiscais_servico                 | data_emissao                       | timestamp with time zone |                          |                   |               | YES
+ notas_fiscais_servico                 | natureza_operacao                  | integer                  |                          |                32 |             0 | YES
+ notas_fiscais_servico                 | regime_tributario                  | integer                  |                          |                32 |             0 | YES
+ notas_fiscais_servico                 | municipio_prestacao                | integer                  |                          |                32 |             0 | YES
+ notas_fiscais_servico                 | certificado_id                     | uuid                     |                          |                   |               | YES
+ notas_fiscais_servico                 | xml_envio                          | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | xml_retorno                        | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | numero_rps                         | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | link_pdf                           | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | link_xml                           | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | protocolo                          | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | codigo_verificacao                 | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | link_nfse                          | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | created_at                         | timestamp with time zone |                          |                   |               | YES
+ notas_fiscais_servico                 | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ notas_fiscais_servico                 | cliente_nome                       | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cnae                               | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | codigo_tributacao                  | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | data_autorizacao                   | timestamp with time zone |                          |                   |               | YES
+ notas_fiscais_servico                 | motivo_cancelamento                | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | mensagem_erro                      | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | cnpj_prestador                     | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | inscricao_municipal                | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | nfeio_id                           | text                     |                          |                   |               | YES
+ notas_fiscais_servico                 | nfeio_status                       | text                     |                          |                   |               | YES
+ notificacoes_admin                    | id                                 | uuid                     |                          |                   |               | NO
+ notificacoes_admin                    | titulo                             | text                     |                          |                   |               | NO
+ notificacoes_admin                    | mensagem                           | text                     |                          |                   |               | YES
+ notificacoes_admin                    | tipo                               | text                     |                          |                   |               | NO
+ notificacoes_admin                    | lida                               | boolean                  |                          |                   |               | NO
+ notificacoes_admin                    | created_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_bancos_suportados        | id                                 | uuid                     |                          |                   |               | NO
+ open_banking_bancos_suportados        | codigo                             | character varying        |                       10 |                   |               | NO
+ open_banking_bancos_suportados        | nome                               | character varying        |                      100 |                   |               | NO
+ open_banking_bancos_suportados        | nome_completo                      | character varying        |                      255 |                   |               | YES
+ open_banking_bancos_suportados        | cnpj                               | character varying        |                       18 |                   |               | YES
+ open_banking_bancos_suportados        | api_base_url                       | text                     |                          |                   |               | NO
+ open_banking_bancos_suportados        | api_version                        | character varying        |                       20 |                   |               | YES
+ open_banking_bancos_suportados        | auth_url                           | text                     |                          |                   |               | NO
+ open_banking_bancos_suportados        | token_url                          | text                     |                          |                   |               | NO
+ open_banking_bancos_suportados        | client_id_required                 | boolean                  |                          |                   |               | YES
+ open_banking_bancos_suportados        | client_secret_required             | boolean                  |                          |                   |               | YES
+ open_banking_bancos_suportados        | pkce_required                      | boolean                  |                          |                   |               | YES
+ open_banking_bancos_suportados        | scopes_padrao                      | ARRAY                    |                          |                   |               | YES
+ open_banking_bancos_suportados        | ativo                              | boolean                  |                          |                   |               | NO
+ open_banking_bancos_suportados        | participante_open_banking          | boolean                  |                          |                   |               | NO
+ open_banking_bancos_suportados        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_bancos_suportados        | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_extratos                 | id                                 | uuid                     |                          |                   |               | NO
+ open_banking_extratos                 | integracao_id                      | uuid                     |                          |                   |               | NO
+ open_banking_extratos                 | transacao_id                       | character varying        |                      255 |                   |               | NO
+ open_banking_extratos                 | transacao_id_externo               | character varying        |                      255 |                   |               | YES
+ open_banking_extratos                 | data_transacao                     | date                     |                          |                   |               | NO
+ open_banking_extratos                 | data_lancamento                    | timestamp with time zone |                          |                   |               | NO
+ open_banking_extratos                 | hora_transacao                     | time without time zone   |                          |                   |               | YES
+ open_banking_extratos                 | descricao                          | text                     |                          |                   |               | NO
+ open_banking_extratos                 | descricao_original                 | text                     |                          |                   |               | YES
+ open_banking_extratos                 | valor                              | numeric                  |                          |                15 |             2 | NO
+ open_banking_extratos                 | tipo                               | USER-DEFINED             |                          |                   |               | NO
+ open_banking_extratos                 | categoria_banco                    | character varying        |                      100 |                   |               | YES
+ open_banking_extratos                 | subcategoria_banco                 | character varying        |                      100 |                   |               | YES
+ open_banking_extratos                 | codigo_mcc                         | character varying        |                        4 |                   |               | YES
+ open_banking_extratos                 | nome_estabelecimento               | character varying        |                      255 |                   |               | YES
+ open_banking_extratos                 | cidade_transacao                   | character varying        |                      100 |                   |               | YES
+ open_banking_extratos                 | conta_numero_snapshot              | character varying        |                       20 |                   |               | YES
+ open_banking_extratos                 | agencia_snapshot                   | character varying        |                       20 |                   |               | YES
+ open_banking_extratos                 | saldo_apos_transacao               | numeric                  |                          |                15 |             2 | YES
+ open_banking_extratos                 | comprovante_url                    | text                     |                          |                   |               | YES
+ open_banking_extratos                 | comprovante_storage_path           | text                     |                          |                   |               | YES
+ open_banking_extratos                 | conciliado                         | boolean                  |                          |                   |               | NO
+ open_banking_extratos                 | conciliado_at                      | timestamp with time zone |                          |                   |               | YES
+ open_banking_extratos                 | conciliado_por                     | uuid                     |                          |                   |               | YES
+ open_banking_extratos                 | lancamento_vinculado_id            | uuid                     |                          |                   |               | YES
+ open_banking_extratos                 | conta_receber_vinculada_id         | uuid                     |                          |                   |               | YES
+ open_banking_extratos                 | conta_pagar_vinculada_id           | uuid                     |                          |                   |               | YES
+ open_banking_extratos                 | importado_por                      | uuid                     |                          |                   |               | YES
+ open_banking_extratos                 | importado_via                      | character varying        |                       50 |                   |               | YES
+ open_banking_extratos                 | ignorado                           | boolean                  |                          |                   |               | NO
+ open_banking_extratos                 | ignorado_por                       | uuid                     |                          |                   |               | YES
+ open_banking_extratos                 | ignorado_at                        | timestamp with time zone |                          |                   |               | YES
+ open_banking_extratos                 | ignorado_motivo                    | text                     |                          |                   |               | YES
+ open_banking_extratos                 | created_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_extratos                 | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_integracoes              | id                                 | uuid                     |                          |                   |               | NO
+ open_banking_integracoes              | user_id                            | uuid                     |                          |                   |               | NO
+ open_banking_integracoes              | banco_codigo                       | character varying        |                       10 |                   |               | NO
+ open_banking_integracoes              | banco_nome                         | character varying        |                      100 |                   |               | NO
+ open_banking_integracoes              | banco_logo_url                     | text                     |                          |                   |               | YES
+ open_banking_integracoes              | access_token_encrypted             | bytea                    |                          |                   |               | YES
+ open_banking_integracoes              | refresh_token_encrypted            | bytea                    |                          |                   |               | YES
+ open_banking_integracoes              | token_expires_at                   | timestamp with time zone |                          |                   |               | YES
+ open_banking_integracoes              | consent_id                         | character varying        |                      255 |                   |               | YES
+ open_banking_integracoes              | consent_expires_at                 | timestamp with time zone |                          |                   |               | YES
+ open_banking_integracoes              | status                             | USER-DEFINED             |                          |                   |               | NO
+ open_banking_integracoes              | ultimo_erro                        | text                     |                          |                   |               | YES
+ open_banking_integracoes              | ultimo_erro_at                     | timestamp with time zone |                          |                   |               | YES
+ open_banking_integracoes              | conta_numero                       | character varying        |                       20 |                   |               | YES
+ open_banking_integracoes              | conta_tipo                         | character varying        |                       50 |                   |               | YES
+ open_banking_integracoes              | agencia                            | character varying        |                       20 |                   |               | YES
+ open_banking_integracoes              | ultima_sincronizacao               | timestamp with time zone |                          |                   |               | YES
+ open_banking_integracoes              | proxima_sincronizacao              | timestamp with time zone |                          |                   |               | YES
+ open_banking_integracoes              | auto_sync                          | boolean                  |                          |                   |               | NO
+ open_banking_integracoes              | sync_interval_minutes              | integer                  |                          |                32 |             0 | NO
+ open_banking_integracoes              | created_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_integracoes              | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ open_banking_integracoes              | revoked_at                         | timestamp with time zone |                          |                   |               | YES
+ open_banking_integracoes              | revoked_by                         | uuid                     |                          |                   |               | YES
+ open_banking_logs                     | id                                 | uuid                     |                          |                   |               | NO
+ open_banking_logs                     | integracao_id                      | uuid                     |                          |                   |               | YES
+ open_banking_logs                     | user_id                            | uuid                     |                          |                   |               | YES
+ open_banking_logs                     | operacao                           | character varying        |                      100 |                   |               | NO
+ open_banking_logs                     | status                             | character varying        |                       50 |                   |               | NO
+ open_banking_logs                     | mensagem                           | text                     |                          |                   |               | YES
+ open_banking_logs                     | detalhes                           | jsonb                    |                          |                   |               | YES
+ open_banking_logs                     | request_path                       | character varying        |                      255 |                   |               | YES
+ open_banking_logs                     | http_status                        | integer                  |                          |                32 |             0 | YES
+ open_banking_logs                     | created_at                         | timestamp with time zone |                          |                   |               | NO
+ plano_contas                          | id                                 | uuid                     |                          |                   |               | NO
+ plano_contas                          | user_id                            | uuid                     |                          |                   |               | NO
+ plano_contas                          | empresa_id                         | uuid                     |                          |                   |               | YES
+ plano_contas                          | codigo_conta                       | text                     |                          |                   |               | NO
+ plano_contas                          | codigo_pai                         | text                     |                          |                   |               | YES
+ plano_contas                          | nivel                              | integer                  |                          |                32 |             0 | NO
+ plano_contas                          | tipo_conta                         | text                     |                          |                   |               | NO
+ plano_contas                          | natureza                           | text                     |                          |                   |               | NO
+ plano_contas                          | descricao                          | text                     |                          |                   |               | NO
+ plano_contas                          | descricao_reduzida                 | text                     |                          |                   |               | YES
+ plano_contas                          | ativo                              | boolean                  |                          |                   |               | NO
+ plano_contas                          | permite_lancamento                 | boolean                  |                          |                   |               | NO
+ plano_contas                          | categoria_financeira_id            | uuid                     |                          |                   |               | YES
+ plano_contas                          | created_at                         | timestamp with time zone |                          |                   |               | NO
+ plano_contas                          | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ rate_limit_uploads                    | user_id                            | uuid                     |                          |                   |               | NO
+ rate_limit_uploads                    | count                              | integer                  |                          |                32 |             0 | YES
+ rate_limit_uploads                    | reset_at                           | timestamp with time zone |                          |                   |               | YES
+ regua_cobranca                        | id                                 | uuid                     |                          |                   |               | NO
+ regua_cobranca                        | user_id                            | uuid                     |                          |                   |               | NO
+ regua_cobranca                        | nome                               | text                     |                          |                   |               | NO
+ regua_cobranca                        | dias_antes_1                       | integer                  |                          |                32 |             0 | YES
+ regua_cobranca                        | dias_antes_2                       | integer                  |                          |                32 |             0 | YES
+ regua_cobranca                        | dias_no_vencimento                 | boolean                  |                          |                   |               | YES
+ regua_cobranca                        | dias_apos_1                        | integer                  |                          |                32 |             0 | YES
+ regua_cobranca                        | dias_apos_2                        | integer                  |                          |                32 |             0 | YES
+ regua_cobranca                        | dias_apos_3                        | integer                  |                          |                32 |             0 | YES
+ regua_cobranca                        | canal                              | text                     |                          |                   |               | NO
+ regua_cobranca                        | mensagem_antes                     | text                     |                          |                   |               | YES
+ regua_cobranca                        | mensagem_vencimento                | text                     |                          |                   |               | YES
+ regua_cobranca                        | mensagem_apos                      | text                     |                          |                   |               | YES
+ regua_cobranca                        | ativo                              | boolean                  |                          |                   |               | NO
+ regua_cobranca                        | created_at                         | timestamp with time zone |                          |                   |               | NO
+ regua_cobranca                        | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ regua_cobranca_automacao              | id                                 | uuid                     |                          |                   |               | NO
+ regua_cobranca_automacao              | user_id                            | uuid                     |                          |                   |               | NO
+ regua_cobranca_automacao              | empresa_id                         | uuid                     |                          |                   |               | YES
+ regua_cobranca_automacao              | enviar_lembretes                   | boolean                  |                          |                   |               | YES
+ regua_cobranca_automacao              | dias_antes_lembrete_1              | integer                  |                          |                32 |             0 | YES
+ regua_cobranca_automacao              | dias_antes_lembrete_2              | integer                  |                          |                32 |             0 | YES
+ regua_cobranca_automacao              | enviar_dia_vencimento              | boolean                  |                          |                   |               | YES
+ regua_cobranca_automacao              | dias_apos_cobranca_1               | integer                  |                          |                32 |             0 | YES
+ regua_cobranca_automacao              | dias_apos_cobranca_2               | integer                  |                          |                32 |             0 | YES
+ regua_cobranca_automacao              | dias_apos_cobranca_3               | integer                  |                          |                32 |             0 | YES
+ regua_cobranca_automacao              | dias_bloqueio                      | integer                  |                          |                32 |             0 | YES
+ regua_cobranca_automacao              | canal_padrao                       | text                     |                          |                   |               | YES
+ regua_cobranca_automacao              | usar_whatsapp                      | boolean                  |                          |                   |               | YES
+ regua_cobranca_automacao              | usar_sms                           | boolean                  |                          |                   |               | YES
+ regua_cobranca_automacao              | horario_envio_inicio               | time without time zone   |                          |                   |               | YES
+ regua_cobranca_automacao              | horario_envio_fim                  | time without time zone   |                          |                   |               | YES
+ regua_cobranca_automacao              | dias_semana_envio                  | ARRAY                    |                          |                   |               | YES
+ regua_cobranca_automacao              | mensagem_lembrete                  | text                     |                          |                   |               | YES
+ regua_cobranca_automacao              | mensagem_vencimento                | text                     |                          |                   |               | YES
+ regua_cobranca_automacao              | mensagem_cobranca                  | text                     |                          |                   |               | YES
+ regua_cobranca_automacao              | mensagem_urgente                   | text                     |                          |                   |               | YES
+ regua_cobranca_automacao              | ativo                              | boolean                  |                          |                   |               | YES
+ regua_cobranca_automacao              | created_at                         | timestamp with time zone |                          |                   |               | YES
+ regua_cobranca_automacao              | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ settings                              | id                                 | uuid                     |                          |                   |               | NO
+ settings                              | user_id                            | uuid                     |                          |                   |               | NO
+ settings                              | key                                | character varying        |                      255 |                   |               | NO
+ settings                              | value                              | text                     |                          |                   |               | YES
+ settings                              | created_at                         | timestamp with time zone |                          |                   |               | YES
+ settings                              | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ transacoes_cartao                     | id                                 | uuid                     |                          |                   |               | NO
+ transacoes_cartao                     | empresa_id                         | uuid                     |                          |                   |               | NO
+ transacoes_cartao                     | user_id                            | uuid                     |                          |                   |               | YES
+ transacoes_cartao                     | data_transacao                     | date                     |                          |                   |               | NO
+ transacoes_cartao                     | data_pagamento                     | date                     |                          |                   |               | YES
+ transacoes_cartao                     | bandeira                           | character varying        |                       20 |                   |               | NO
+ transacoes_cartao                     | valor_bruto                        | numeric                  |                          |                15 |             2 | NO
+ transacoes_cartao                     | taxa_percentual                    | numeric                  |                          |                 5 |             4 | YES
+ transacoes_cartao                     | valor_taxa                         | numeric                  |                          |                15 |             2 | YES
+ transacoes_cartao                     | valor_liquido                      | numeric                  |                          |                15 |             2 | NO
+ transacoes_cartao                     | numero_cartao_mascara              | character varying        |                        4 |                   |               | YES
+ transacoes_cartao                     | nsu                                | character varying        |                       50 |                   |               | YES
+ transacoes_cartao                     | codigo_autorizacao                 | character varying        |                       20 |                   |               | YES
+ transacoes_cartao                     | tipo_transacao                     | character varying        |                       20 |                   |               | YES
+ transacoes_cartao                     | numero_parcelas                    | integer                  |                          |                32 |             0 | YES
+ transacoes_cartao                     | parcela_atual                      | integer                  |                          |                32 |             0 | YES
+ transacoes_cartao                     | status                             | character varying        |                       20 |                   |               | YES
+ transacoes_cartao                     | conciliado_com                     | uuid                     |                          |                   |               | YES
+ transacoes_cartao                     | conciliado_tipo                    | character varying        |                       20 |                   |               | YES
+ transacoes_cartao                     | conciliado_em                      | timestamp with time zone |                          |                   |               | YES
+ transacoes_cartao                     | score_conciliacao                  | numeric                  |                          |                 5 |             2 | YES
+ transacoes_cartao                     | linha_extrato                      | text                     |                          |                   |               | YES
+ transacoes_cartao                     | arquivo_origem                     | character varying        |                      255 |                   |               | YES
+ transacoes_cartao                     | created_at                         | timestamp with time zone |                          |                   |               | YES
+ transacoes_cartao                     | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ transferencias_contas                 | id                                 | uuid                     |                          |                   |               | NO
+ transferencias_contas                 | user_id                            | uuid                     |                          |                   |               | NO
+ transferencias_contas                 | conta_origem_id                    | uuid                     |                          |                   |               | YES
+ transferencias_contas                 | conta_destino_id                   | uuid                     |                          |                   |               | YES
+ transferencias_contas                 | valor                              | numeric                  |                          |                   |               | NO
+ transferencias_contas                 | data_transferencia                 | date                     |                          |                   |               | NO
+ transferencias_contas                 | descricao                          | text                     |                          |                   |               | YES
+ transferencias_contas                 | observacoes                        | text                     |                          |                   |               | YES
+ transferencias_contas                 | created_at                         | timestamp with time zone |                          |                   |               | NO
+ transferencias_contas                 | updated_at                         | timestamp with time zone |                          |                   |               | NO
+ user_roles                            | id                                 | uuid                     |                          |                   |               | NO
+ user_roles                            | user_id                            | uuid                     |                          |                   |               | NO
+ user_roles                            | role                               | USER-DEFINED             |                          |                   |               | NO
+ user_roles                            | created_at                         | timestamp with time zone |                          |                   |               | NO
+ user_trials                           | id                                 | uuid                     |                          |                   |               | NO
+ user_trials                           | user_id                            | uuid                     |                          |                   |               | NO
+ user_trials                           | trial_start                        | timestamp with time zone |                          |                   |               | NO
+ user_trials                           | trial_end                          | timestamp with time zone |                          |                   |               | NO
+ user_trials                           | active                             | boolean                  |                          |                   |               | NO
+ user_trials                           | created_at                         | timestamp with time zone |                          |                   |               | NO
+ usuario_empresas                      | id                                 | uuid                     |                          |                   |               | NO
+ usuario_empresas                      | user_id                            | uuid                     |                          |                   |               | NO
+ usuario_empresas                      | empresa_id                         | uuid                     |                          |                   |               | NO
+ usuario_empresas                      | role                               | text                     |                          |                   |               | YES
+ usuario_empresas                      | created_at                         | timestamp with time zone |                          |                   |               | YES
+ v_automacao_categorias_plano          | user_id                            | uuid                     |                          |                   |               | YES
+ v_automacao_categorias_plano          | total_categorias                   | bigint                   |                          |                64 |             0 | YES
+ v_automacao_categorias_plano          | categorias_vinculadas              | bigint                   |                          |                64 |             0 | YES
+ v_automacao_categorias_plano          | categorias_sem_vinculo             | bigint                   |                          |                64 |             0 | YES
+ v_automacao_categorias_plano          | percentual_vinculado               | numeric                  |                          |                   |               | YES
+ v_categorias_com_plano                | id                                 | uuid                     |                          |                   |               | YES
+ v_categorias_com_plano                | user_id                            | uuid                     |                          |                   |               | YES
+ v_categorias_com_plano                | nome                               | text                     |                          |                   |               | YES
+ v_categorias_com_plano                | tipo                               | text                     |                          |                   |               | YES
+ v_categorias_com_plano                | descricao                          | text                     |                          |                   |               | YES
+ v_categorias_com_plano                | ativo                              | boolean                  |                          |                   |               | YES
+ v_categorias_com_plano                | created_at                         | timestamp with time zone |                          |                   |               | YES
+ v_categorias_com_plano                | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ v_categorias_com_plano                | plano_conta_id                     | uuid                     |                          |                   |               | YES
+ v_categorias_com_plano                | plano_codigo                       | text                     |                          |                   |               | YES
+ v_categorias_com_plano                | plano_descricao                    | text                     |                          |                   |               | YES
+ v_categorias_com_plano                | plano_natureza                     | text                     |                          |                   |               | YES
+ v_categorias_com_plano                | vinculado                          | boolean                  |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | id                                 | uuid                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | sincronizacao_id                   | uuid                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | config_id                          | uuid                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | user_id                            | uuid                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | lancamento_erp_id                  | character varying        |                      255 |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | data_lancamento                    | date                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | data_competencia                   | date                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | tipo                               | USER-DEFINED             |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | conta_contabil                     | character varying        |                       50 |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | historico                          | text                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | valor                              | numeric                  |                          |                15 |             2 | YES
+ v_contabilidade_lancamentos_pendentes | centro_custo                       | character varying        |                       50 |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | documento                          | character varying        |                      100 |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | conciliado                         | boolean                  |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | lancamento_financeiro_vinculado_id | uuid                     |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | dados_originais                    | jsonb                    |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | created_at                         | timestamp with time zone |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | nome_configuracao                  | character varying        |                      100 |                   |               | YES
+ v_contabilidade_lancamentos_pendentes | erp_tipo                           | USER-DEFINED             |                          |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | config_id                          | uuid                     |                          |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | nome_configuracao                  | character varying        |                      100 |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | erp_tipo                           | USER-DEFINED             |                          |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | status_conexao                     | USER-DEFINED             |                          |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | ultima_sincronizacao               | timestamp with time zone |                          |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | total_sincronizacoes               | bigint                   |                          |                64 |             0 | YES
+ v_contabilidade_sincronizacao_resumo  | sincronizacoes_sucesso             | bigint                   |                          |                64 |             0 | YES
+ v_contabilidade_sincronizacao_resumo  | sincronizacoes_erro                | bigint                   |                          |                64 |             0 | YES
+ v_contabilidade_sincronizacao_resumo  | ultima_tentativa                   | timestamp with time zone |                          |                   |               | YES
+ v_contabilidade_sincronizacao_resumo  | total_registros_processados        | bigint                   |                          |                64 |             0 | YES
+ v_open_banking_conciliacao_resumo     | integracao_id                      | uuid                     |                          |                   |               | YES
+ v_open_banking_conciliacao_resumo     | total_transacoes                   | bigint                   |                          |                64 |             0 | YES
+ v_open_banking_conciliacao_resumo     | conciliadas                        | bigint                   |                          |                64 |             0 | YES
+ v_open_banking_conciliacao_resumo     | pendentes                          | bigint                   |                          |                64 |             0 | YES
+ v_open_banking_conciliacao_resumo     | ignoradas                          | bigint                   |                          |                64 |             0 | YES
+ v_open_banking_conciliacao_resumo     | total_entradas                     | numeric                  |                          |                   |               | YES
+ v_open_banking_conciliacao_resumo     | total_saidas                       | numeric                  |                          |                   |               | YES
+ v_open_banking_extratos_completo      | id                                 | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | integracao_id                      | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | transacao_id                       | character varying        |                      255 |                   |               | YES
+ v_open_banking_extratos_completo      | transacao_id_externo               | character varying        |                      255 |                   |               | YES
+ v_open_banking_extratos_completo      | data_transacao                     | date                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | data_lancamento                    | timestamp with time zone |                          |                   |               | YES
+ v_open_banking_extratos_completo      | hora_transacao                     | time without time zone   |                          |                   |               | YES
+ v_open_banking_extratos_completo      | descricao                          | text                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | descricao_original                 | text                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | valor                              | numeric                  |                          |                15 |             2 | YES
+ v_open_banking_extratos_completo      | tipo                               | USER-DEFINED             |                          |                   |               | YES
+ v_open_banking_extratos_completo      | categoria_banco                    | character varying        |                      100 |                   |               | YES
+ v_open_banking_extratos_completo      | subcategoria_banco                 | character varying        |                      100 |                   |               | YES
+ v_open_banking_extratos_completo      | codigo_mcc                         | character varying        |                        4 |                   |               | YES
+ v_open_banking_extratos_completo      | nome_estabelecimento               | character varying        |                      255 |                   |               | YES
+ v_open_banking_extratos_completo      | cidade_transacao                   | character varying        |                      100 |                   |               | YES
+ v_open_banking_extratos_completo      | conta_numero_snapshot              | character varying        |                       20 |                   |               | YES
+ v_open_banking_extratos_completo      | agencia_snapshot                   | character varying        |                       20 |                   |               | YES
+ v_open_banking_extratos_completo      | saldo_apos_transacao               | numeric                  |                          |                15 |             2 | YES
+ v_open_banking_extratos_completo      | comprovante_url                    | text                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | comprovante_storage_path           | text                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | conciliado                         | boolean                  |                          |                   |               | YES
+ v_open_banking_extratos_completo      | conciliado_at                      | timestamp with time zone |                          |                   |               | YES
+ v_open_banking_extratos_completo      | conciliado_por                     | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | lancamento_vinculado_id            | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | conta_receber_vinculada_id         | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | conta_pagar_vinculada_id           | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | importado_por                      | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | importado_via                      | character varying        |                       50 |                   |               | YES
+ v_open_banking_extratos_completo      | ignorado                           | boolean                  |                          |                   |               | YES
+ v_open_banking_extratos_completo      | ignorado_por                       | uuid                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | ignorado_at                        | timestamp with time zone |                          |                   |               | YES
+ v_open_banking_extratos_completo      | ignorado_motivo                    | text                     |                          |                   |               | YES
+ v_open_banking_extratos_completo      | created_at                         | timestamp with time zone |                          |                   |               | YES
+ v_open_banking_extratos_completo      | updated_at                         | timestamp with time zone |                          |                   |               | YES
+ v_open_banking_extratos_completo      | banco_codigo                       | character varying        |                       10 |                   |               | YES
+ v_open_banking_extratos_completo      | banco_nome                         | character varying        |                      100 |                   |               | YES
+ v_open_banking_extratos_completo      | integracao_agencia                 | character varying        |                       20 |                   |               | YES
+ v_open_banking_extratos_completo      | integracao_conta                   | character varying        |                       20 |                   |               | YES
+ view_transacoes_cartao_segura         | id                                 | uuid                     |                          |                   |               | YES
+ view_transacoes_cartao_segura         | empresa_id                         | uuid                     |                          |                   |               | YES
+ view_transacoes_cartao_segura         | data_transacao                     | date                     |                          |                   |               | YES
+ view_transacoes_cartao_segura         | data_pagamento                     | date                     |                          |                   |               | YES
+ view_transacoes_cartao_segura         | bandeira                           | character varying        |                       20 |                   |               | YES
+ view_transacoes_cartao_segura         | valor_bruto                        | numeric                  |                          |                15 |             2 | YES
+ view_transacoes_cartao_segura         | taxa_percentual                    | numeric                  |                          |                 5 |             4 | YES
+ view_transacoes_cartao_segura         | valor_taxa                         | numeric                  |                          |                15 |             2 | YES
+ view_transacoes_cartao_segura         | valor_liquido                      | numeric                  |                          |                15 |             2 | YES
+ view_transacoes_cartao_segura         | numero_cartao_mascara              | character varying        |                        4 |                   |               | YES
+ view_transacoes_cartao_segura         | nsu                                | character varying        |                       50 |                   |               | YES
+ view_transacoes_cartao_segura         | codigo_autorizacao                 | character varying        |                       20 |                   |               | YES
+ view_transacoes_cartao_segura         | tipo_transacao                     | character varying        |                       20 |                   |               | YES
+ view_transacoes_cartao_segura         | numero_parcelas                    | integer                  |                          |                32 |             0 | YES
+ view_transacoes_cartao_segura         | parcela_atual                      | integer                  |                          |                32 |             0 | YES
+ view_transacoes_cartao_segura         | status                             | character varying        |                       20 |                   |               | YES
+ view_transacoes_cartao_segura         | conciliado_com                     | uuid                     |                          |                   |               | YES
+ view_transacoes_cartao_segura         | conciliado_tipo                    | character varying        |                       20 |                   |               | YES
+ view_transacoes_cartao_segura         | conciliado_em                      | timestamp with time zone |                          |                   |               | YES
+ view_transacoes_cartao_segura         | score_conciliacao                  | numeric                  |                          |                 5 |             2 | YES
+ view_transacoes_cartao_segura         | created_at                         | timestamp with time zone |                          |                   |               | YES
+ view_transacoes_cartao_segura         | updated_at                         | timestamp with time zone |                          |                   |               | YES
+(1045 rows)
+
