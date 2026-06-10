@@ -380,7 +380,7 @@ export default function PlanoContas() {
               </div>
             </div>
 
-            <Badge variant="outline" className={`text-xs ${node.tipo_conta === "analitica" ? "bg-blue-50" : "bg-gray-50"}`}>
+            <Badge variant="outline" className="text-xs">
               {node.tipo_conta === "sintetica" ? "Sintética" : "Analítica"}
             </Badge>
 
@@ -780,7 +780,7 @@ export default function PlanoContas() {
                   </Button>
                 </div>
 
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="border border-blue-200 rounded-lg p-4">
                   <p className="font-medium text-blue-900 mb-2 text-sm">Estrutura esperada do Excel:</p>
                   <ul className="list-disc list-inside space-y-1 text-xs text-blue-800">
                     <li><strong>Codigo:</strong> Código da conta (ex: 1.1.01.0001)</li>

@@ -106,6 +106,7 @@
       "WebFetch(domain:nfe.io)",
       "Bash(npm --version)",
       "Bash(git reset *)",
+<<<<<<< HEAD
       "PowerShell(try { $r = Invoke-WebRequest -Uri \"https://mcp.supabase.com/mcp\" -Method HEAD -TimeoutSec 10 -UseBasicParsing; Write-Output \\(\"HTTP \" + $r.StatusCode\\) } catch { Write-Output \\(\"HTTP \" + $_.Exception.Response.StatusCode.value__\\) })",
       "PowerShell(supabase db *)",
       "Bash(/c/Users/adriano.santos/AppData/Local/npm-cache/_npx/aa8e5c70f9d8d161/node_modules/supabase/bin/supabase.exe db *)",
@@ -234,6 +235,17 @@
       "Bash(git remote *)",
       "Bash(git fetch *)",
       "Bash(git merge *)"
+=======
+      "PowerShell(supabase *)",
+      "PowerShell(npm install *)",
+      "PowerShell(npm root *)",
+      "PowerShell(node \"$env:APPDATA\\\\npm\\\\node_modules\\\\supabase\\\\dist\\\\supabase.js\" --version)",
+      "Bash(tar -xzf /tmp/supabase.tar.gz -C /tmp/)",
+      "Bash(/tmp/supabase.exe --version)",
+      "Bash(/tmp/supabase.exe functions *)",
+      "Bash(env)",
+      "Bash(SUPABASE_ACCESS_TOKEN=\"sbp_3da35662185347437695b1753693135fd5c3b124\" /tmp/supabase.exe functions deploy manage-users)"
+>>>>>>> 3c8ecce30385f5fbfeba93bb0c913b274c375033
     ]
   }
 }

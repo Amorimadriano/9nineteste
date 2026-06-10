@@ -102,8 +102,8 @@ export default function ContasReceber() {
     const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || "https://gcmxhuadibdrumvqdrkc.supabase.co";
+      const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || "sb_publishable_rEvIcwt1iF932n9otioBNg_dgPt7zRm";
 
       let res: Response;
       if (mode === "barcode") {

@@ -46,12 +46,12 @@ export async function callManageUsers<T>(payload: ManageUsersPayload): Promise<T
     throw new Error("Sua sessão expirou. Faça login novamente.");
   }
 
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-users`, {
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://gcmxhuadibdrumvqdrkc.supabase.co"}/functions/v1/manage-users`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_rEvIcwt1iF932n9otioBNg_dgPt7zRm",
     },
     body: JSON.stringify(payload),
   });

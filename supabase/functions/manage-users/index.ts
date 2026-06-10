@@ -1,6 +1,7 @@
 const ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:3000",
+  "http://localhost:8080",
   "https://9ninebusinesscontrol.com.br",
   "https://www.9ninebusinesscontrol.com.br",
   "https://9nineteste.9ninebusinesscontrol.com.br",
@@ -45,15 +46,15 @@ Deno.serve(async (req) => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await anonClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      console.error("Auth failed:", claimsError?.message);
+    const { data: userData, error: userError } = await anonClient.auth.getUser(token);
+    if (userError || !userData?.user) {
+      console.error("Auth failed:", userError?.message);
       return new Response(JSON.stringify({ error: "Não autorizado" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    const caller = { id: claimsData.claims.sub as string, email: claimsData.claims.email as string };
+    const caller = { id: userData.user.id, email: userData.user.email || "" };
     const callerIsSystemAdmin = SYSTEM_ADMIN_EMAILS.includes((caller.email || "").toLowerCase());
 
     const { action, email, password, userId, banned } = await req.json();

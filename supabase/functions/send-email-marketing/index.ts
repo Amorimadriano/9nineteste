@@ -1,6 +1,7 @@
 const ALLOWED_ORIGINS = [
   "http://localhost:5173",
   "http://localhost:3000",
+  "http://localhost:8080",
   "https://9ninebusinesscontrol.com.br",
   "https://www.9ninebusinesscontrol.com.br",
   "https://9nineteste.9ninebusinesscontrol.com.br",

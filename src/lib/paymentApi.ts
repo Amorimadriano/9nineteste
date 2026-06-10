@@ -34,12 +34,12 @@ export async function callPaymentFunction<T = Record<string, unknown>>(
     throw new Error("Sua sessão expirou. Faça login novamente para continuar.");
   }
 
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${functionName}`, {
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || "https://gcmxhuadibdrumvqdrkc.supabase.co"}/functions/v1/${functionName}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "sb_publishable_rEvIcwt1iF932n9otioBNg_dgPt7zRm",
     },
     body: JSON.stringify(body),
   });
