@@ -55,6 +55,29 @@ jobs:
           SUPABASE_URL="${INPUT_SUPABASE_URL:-$DEFAULT_SUPABASE_URL}"
           SUPABASE_PUBLISHABLE_KEY="${INPUT_SUPABASE_PUBLISHABLE_KEY:-$DEFAULT_SUPABASE_PUBLISHABLE_KEY}"
 
+          SUPABASE_URL="$(printf '%s' "$SUPABASE_URL" | tr -d '\r\n')"
+          SUPABASE_PUBLISHABLE_KEY="$(printf '%s' "$SUPABASE_PUBLISHABLE_KEY" | tr -d '\r\n')"
+
+          case "$SUPABASE_URL" in
+            \"*\") SUPABASE_URL="${SUPABASE_URL#\"}"; SUPABASE_URL="${SUPABASE_URL%\"}" ;;
+          esac
+
+          case "$SUPABASE_PUBLISHABLE_KEY" in
+            \"*\") SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY#\"}"; SUPABASE_PUBLISHABLE_KEY="${SUPABASE_PUBLISHABLE_KEY%\"}" ;;
+          esac
+
+          SUPABASE_URL="$(printf '%s' "$SUPABASE_URL" | xargs)"
+          SUPABASE_PUBLISHABLE_KEY="$(printf '%s' "$SUPABASE_PUBLISHABLE_KEY" | xargs)"
+
+          case "$SUPABASE_URL" in
+            http://*|https://*) ;;
+            *)
+              echo "VITE_SUPABASE_URL invalida apos sanitizacao: '$SUPABASE_URL'"
+              echo "No GitHub Secret, use apenas a URL sem aspas."
+              exit 1
+              ;;
+          esac
+
           SUPABASE_HOST="${SUPABASE_URL#https://}"
           SUPABASE_HOST="${SUPABASE_HOST#http://}"
           SUPABASE_HOST="${SUPABASE_HOST%%/*}"

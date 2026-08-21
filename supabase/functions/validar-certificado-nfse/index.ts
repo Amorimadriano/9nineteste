@@ -6,6 +6,7 @@ const ALLOWED_ORIGINS = [
   "https://9nineteste.9ninebusinesscontrol.com.br",
   "https://ninebpofinanceiro.lovable.app",
   "https://ninebpofinanceiro.vercel.app",
+  "https://9businesscontrol.pages.dev",
 ];
 
 function getCorsHeaders(req: Request) {

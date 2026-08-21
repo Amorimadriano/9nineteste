@@ -21,6 +21,7 @@ function getCorsHeaders(req: Request) {
     "https://9nineteste.9ninebusinesscontrol.com.br",
     "https://ninebpofinanceiro.lovable.app",
     "https://ninebpofinanceiro.vercel.app",
+    "https://9businesscontrol.pages.dev",
   ];
   const corsOrigin = allowed.includes(origin) ? origin : allowed[0];
   return {
