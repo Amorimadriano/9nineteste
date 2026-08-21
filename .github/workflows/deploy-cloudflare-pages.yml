@@ -41,10 +41,39 @@ jobs:
       - name: Install Rollup native binary for Linux runner
         run: npm install --no-save @rollup/rollup-linux-x64-gnu
 
-      - name: Build production
+      - name: Resolve and validate Supabase environment
+        shell: bash
         env:
-          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
-          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          INPUT_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          INPUT_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -e
+
+          DEFAULT_SUPABASE_URL="https://gcmxhuadibdrumvqdrkc.supabase.co"
+          DEFAULT_SUPABASE_PUBLISHABLE_KEY="sb_publishable_rEvIcwt1iF932n9otioBNg_dgPt7zRm"
+
+          SUPABASE_URL="${INPUT_SUPABASE_URL:-$DEFAULT_SUPABASE_URL}"
+          SUPABASE_PUBLISHABLE_KEY="${INPUT_SUPABASE_PUBLISHABLE_KEY:-$DEFAULT_SUPABASE_PUBLISHABLE_KEY}"
+
+          SUPABASE_HOST="${SUPABASE_URL#https://}"
+          SUPABASE_HOST="${SUPABASE_HOST#http://}"
+          SUPABASE_HOST="${SUPABASE_HOST%%/*}"
+
+          if [ -z "$SUPABASE_HOST" ]; then
+            echo "VITE_SUPABASE_URL invalida: '$SUPABASE_URL'"
+            exit 1
+          fi
+
+          if ! getent hosts "$SUPABASE_HOST" >/dev/null 2>&1; then
+            echo "Host do Supabase nao resolve DNS: $SUPABASE_HOST"
+            echo "Corrija o secret VITE_SUPABASE_URL no GitHub Actions antes de publicar."
+            exit 1
+          fi
+
+          echo "VITE_SUPABASE_URL=$SUPABASE_URL" >> "$GITHUB_ENV"
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=$SUPABASE_PUBLISHABLE_KEY" >> "$GITHUB_ENV"
+
+      - name: Build production
         run: npm run build
 
       - name: Install Wrangler CLI
