@@ -64,8 +64,12 @@ jobs:
             exit 1
           fi
 
-          if ! getent hosts "$SUPABASE_HOST" >/dev/null 2>&1; then
-            echo "Host do Supabase nao resolve DNS: $SUPABASE_HOST"
+          if ! nslookup "$SUPABASE_HOST" >/dev/null 2>&1; then
+            echo "Aviso: nslookup falhou para $SUPABASE_HOST. Tentando validacao por HTTPS..."
+          fi
+
+          if ! curl -sSIL --retry 3 --retry-all-errors --connect-timeout 10 "$SUPABASE_URL" >/dev/null; then
+            echo "Nao foi possivel conectar ao Supabase em $SUPABASE_URL"
             echo "Corrija o secret VITE_SUPABASE_URL no GitHub Actions antes de publicar."
             exit 1
           fi
