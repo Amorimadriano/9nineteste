@@ -187,7 +187,7 @@ function buildSimpleHtml(nome: string, mensagemExtra: string): string {
 </td></tr>
 <tr><td style="background:#f8fafc;padding:24px 32px;text-align:center;border-top:1px solid #e2e8f0">
   <p style="color:#64748b;font-size:12px;margin:0">9Nine Business Control — Gestão Financeira Inteligente</p>
-  <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">contato@9ninebusinesscontrol.com.br | WhatsApp (11) 96001-2210</p>
+  <p style="color:#94a3b8;font-size:11px;margin:8px 0 0">9businesscontrol@gmail.com | WhatsApp (11) 99489-8306</p>
 </td></tr>
 </table>
 </td></tr>

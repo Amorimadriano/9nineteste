@@ -94,7 +94,7 @@ const FLUXO_CONVERSA = {
     campo: "empresa",
   },
   finalizacao: {
-    mensagem: "🎉 **Obrigado pelas informações!**\n\nNossa equipe comercial entrará em contato em **até 2 horas úteis** para apresentar uma proposta personalizada.\n\nVocê também pode:\n\n📱 Falar direto pelo WhatsApp\n📧 Enviar e-mail para contato@9ninebusinesscontrol.com.br\n📅 Agendar sua demonstração agora",
+    mensagem: "🎉 **Obrigado pelas informações!**\n\nNossa equipe comercial entrará em contato em **até 2 horas úteis** para apresentar uma proposta personalizada.\n\nVocê também pode:\n\n📱 Falar direto pelo WhatsApp\n📧 Enviar e-mail para 9businesscontrol@gmail.com\n📅 Agendar sua demonstração agora",
     opcoes: [
       { label: "📱 Chamar no WhatsApp", valor: "whatsapp", icone: <Phone className="h-4 w-4" /> },
       { label: "📅 Agendar Demonstração", valor: "agendar", icone: <Calendar className="h-4 w-4" /> },
@@ -265,7 +265,7 @@ export function AgenteVendas() {
     if (valor === "email") {
       const subject = "Interesse no 9Nine Business Control";
       const body = `Olá,\n\nMeu nome é ${leadData.nome} da empresa ${leadData.empresa}.\nGostaria de receber mais informações sobre o sistema.\n\nTelefone: ${leadData.telefone}\nE-mail: ${leadData.email}`;
-      window.open(`mailto:contato@9ninebusinesscontrol.com.br?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
+      window.open(`mailto:9businesscontrol@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`);
       return;
     }
 

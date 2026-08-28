@@ -523,13 +523,13 @@ export default function Site() {
               <div className="flex items-center gap-3 mt-4">
                 <Phone size={18} className="text-green-500" />
                 <a href="https://wa.me/5511960012210" target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-blue-600 transition-colors">
-                  (11) 96001-2210
+                  (11) 99489-8306
                 </a>
               </div>
               <div className="flex items-center gap-3">
                 <Mail size={18} className="text-blue-500" />
-                <a href="mailto:contato@9ninebusinesscontrol.com.br" className="text-gray-700 hover:text-blue-600 transition-colors">
-                  contato@9ninebusinesscontrol.com.br
+                <a href="mailto:9businesscontrol@gmail.com" className="text-gray-700 hover:text-blue-600 transition-colors">
+                  9businesscontrol@gmail.com
                 </a>
               </div>
             </div>
@@ -581,14 +581,14 @@ export default function Site() {
                 className="flex items-center gap-3 text-blue-200/70 hover:text-white transition-colors text-sm"
               >
                 <Phone size={16} className="text-green-400" />
-                (11) 96001-2210
+                (11) 99489-8306
               </a>
               <a
-                href="mailto:contato@9ninebusinesscontrol.com.br"
+                href="mailto:9businesscontrol@gmail.com"
                 className="flex items-center gap-3 text-blue-200/70 hover:text-white transition-colors text-sm"
               >
                 <Mail size={16} className="text-blue-400" />
-                contato@9ninebusinesscontrol.com.br
+                9businesscontrol@gmail.com
               </a>
               <button
                 onClick={() => window.open("https://www.instagram.com/9ninebusinesscontrol/", "_blank", "noopener,noreferrer")}
